@@ -1,0 +1,214 @@
+%%
+Screen
+        Name = "arsmt150a" ;
+        Type = "Detail" ;
+        Padcharacter=Space;
+        Highlite = Underscore;
+        Screensize="dynamic";
+        Windowtitle = "%s      %a D/B NSF checks clearing the bank - Version 7.20    %m";
+        iconline = 0;
+        Domain = "arschksu" ;
+
+        Global String G_COMPANY_ID[10];
+
+        Global unsigned ascii number g_check_reference[7];
+
+        String l_check_no[20]="",
+               l_company_id[10]="DELOS",
+               l_continue_1[100]="",
+               l_enter[1];
+
+        unsigned ascii number l_chk_ref[7];
+
+        wdate l_statement_date,
+              l_cleared_date ;
+
+        Access arschksu, Set arschksu:company_id = G_company_id,
+                             arschksu:check_reference = g_check_reference, Approximate
+
+        Include "STDKEYS7.INC"
+
+style definition
+    include "styles.inc"
+
+Functions
+
+--        Include "STDFUNC7.INC"
+Add                                     Tagged Add_fn;
+Change/auto                                  Tagged Change_fn;
+Delete                                  Tagged Delete_fn;
+Search                                  Tagged Search_fn;
+Find                                    Tagged Find_fn;
+Next                                    Tagged Next_fn;
+Previous                                Tagged Previous_fn;
+Page/noreturn                           Tagged Page_fn;
+"BACK"  Sequence "EXIT"         Tagged Back_fn;
+"EXIT"  return                  Tagged Exit_fn;
+Return                                  Tagged Return_fn;
+Print                                   Tagged Print_fn;
+"Check"   Sequence "FIND"     Tagged Check_fn;
+
+
+
+Menu Definition
+    include "stdmenu7.inc"
+}
+
+Toolbar Definition
+    include "stdtoolbar7.inc"
+}
+
+screen entry
+
+
+disable (add_fn)
+--disable (change_fn)
+disable (delete_fn)
+
+Access Validation
+--skip if (arschksu:nsf_check_cleared <> 0)
+--skip if arschksu:trans_date < 01.01.2011
+--skip if arschksu:disposition <> "NSF"
+
+screen
+properties
+    {
+   Layouttype = column
+    }
+{
+
+Panel Tagged header_pl
+properties
+    {
+    borderstyle = raised
+    scrollbarpolicy = asneeded
+    }
+{
+%%
+                                                         ____________
+*---------------------------------------------------------------------*
+| Company Id: __________  ________________________________________    |
+|                                                                     |
+| Check Reference: _______                                            |
+*---------------------------------------------------------------------*
+| Clear  Policy     Check Ref            Stmt Date        Amount      |
+*---------------------------------------------------------------------*
+|   _  _________ ____________________    __________     _____________ |
+|                                                                     |
+*---------------------------------------------------------------------*
+%%
+
+components
+
+Fields
+0101     FUNCTION/noecho/showasguidetext ;
+0301     arschksu:COMPANY_ID/displayonly       Mandatory
+         Error 1223 If SFSCOMPANY:NAME[1] = ""
+         Activehelp If SFSCOMPANY:USE <> "1" Then NULL Else SFSCOMPANY:COMPANY_ID/width=12,
+                    If SFSCOMPANY:USE <> "1" Then NULL Else SFSCOMPANY:NAME[1]/width=45;
+
+0302     SFSCOMPANY:NAME[1]
+         properties {
+                    ForeGroundcolor = "Black"
+                    BackGroundcolor = "White"
+                    };
+0501     arschksu:check_reference/displayonly
+         properties {
+                    ForeGroundcolor = "Red"
+                    BackGroundcolor = "White"
+                    };
+0901     arschksu:nsf_check_cleared
+         properties {
+                    ForeGroundcolor = "Red"
+                    BackGroundcolor = "White"
+                    };
+0902     arschksu:policy_no/displayonly
+         properties {
+                    ForeGroundcolor = "Black"
+                    BackGroundcolor = "White"
+                    };
+0903     arschksu:check_reference/displayonly
+         properties {
+                    ForeGroundcolor = "Black"
+                    BackGroundcolor = "White"
+                    };
+0904     {
+         if function = "SEARCH" then
+             l_cleared_date = arsnsfcleared:cleared_date
+         }
+         l_cleared_date
+         properties {
+                    ForeGroundcolor = "Red"
+                    BackGroundcolor = "White"
+                    }
+         if arschksu:nsf_check_cleared = 1 then
+          {
+           do add_arsnsfcleared
+          }
+         if function = "CHANGE" and
+            arschksu:nsf_check_cleared = 0 then
+            {
+             do delete_arsnsfcleared
+             } ;
+0905     arschksu:CHECK_AMOUNT/displayonly
+         properties {
+                    ForeGroundcolor = "Black"
+                    BackGroundcolor = "White"
+                    };
+
+
+}
+}
+
+screen exit
+
+procedure definition
+
+procedure add_arsnsfcleared
+begin
+
+access arsnsfcleared, set arsnsfcleared:company_id      = arschksu:company_id,
+                          arsnsfcleared:check_reference = arschksu:check_reference,
+                          arsnsfcleared:policy_no       = arschksu:policy_no, exact
+
+
+   if  arsnsfcleared:company_id <> arschksu:company_id and
+       arsnsfcleared:check_reference <> arschksu:check_reference and
+       arsnsfcleared:policy_no <> arschksu:policy_no then
+       {
+       add arsnsfcleared
+        {
+          arsnsfcleared:company_id      = arschksu:company_id
+          arsnsfcleared:check_reference = arschksu:check_reference
+          arsnsfcleared:policy_no       = arschksu:policy_no
+          arsnsfcleared:disposition      = arschksu:disposition
+          arsnsfcleared:trans_date      = todaysdate
+          arsnsfcleared:cleared_date    = l_cleared_date
+          arsnsfcleared:return_date     = arschksu:return_date
+          arsnsfcleared:return_reason   = "NSF"
+          arsnsfcleared:check_amount    = arschksu:check_amount
+          arsnsfcleared:check_cleared   = 1
+          arsnsfcleared:clearing_username = username
+        }
+       }
+
+end
+
+procedure delete_arsnsfcleared
+begin
+
+access arsnsfcleared, set arsnsfcleared:company_id      = arschksu:company_id,
+                          arsnsfcleared:check_reference = arschksu:check_reference,
+                          arsnsfcleared:policy_no       = arschksu:policy_no, exact
+
+
+   if  arsnsfcleared:company_id = arschksu:company_id and
+       arsnsfcleared:check_reference = arschksu:check_reference and
+       arsnsfcleared:policy_no = arschksu:policy_no then
+       {
+       delete arsnsfcleared
+       }
+
+end
+
+}

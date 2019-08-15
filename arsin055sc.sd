@@ -1,0 +1,111 @@
+%%
+Screen
+        Name = "arsin055sc" ;
+        Type = "Detail" ;
+        Padcharacter = Space;
+        Highlite = Underscore ;
+        Screensize = "dynamic";
+        domain = "arschksu" ;
+        resizeable = yes ;
+        iconline = 0 ;
+
+        Global String G_COMPANY_ID[10];
+
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+
+        Local Signed Ascii Number L_TOTAL_CHECKS[9]=0/DECIMALS=2;
+
+        Local String l_enter[1];
+
+        access arschksu, set arschksu:policy_no    =  g_policy_no, generic
+
+Style Definition
+
+--        Include "styles.inc"
+
+Functions
+     include "stdfunc7.inc"
+     reaccess ;
+
+Event Definition
+    Default eventhandler {
+        "reload" { Function = "reaccess" abort () }
+                         }
+
+Menu Definition
+
+Toolbar Definition
+
+screen entry
+
+do get_totals
+
+Access Validation
+
+if arschksu:policy_no <> g_policy_no then
+{
+    abort ()
+}
+
+screen  at 1,1 to 40,81
+
+Properties
+        {
+           LayoutType = Column
+        }
+{
+Panel
+Properties
+        {
+--        BorderStyle     = Raised
+        ScrollBarPolicy = asNeeded
+        }
+{
+%%
+                       Total Checks               ______________
+%%
+
+Components
+
+Fields
+
+--{
+--    do get_totals
+
+--    write ("%c%s%n",02001,"total  = ",l_total_checks)
+--}
+L_TOTAL_CHECKS/mask="ZZZ,ZZZ.ZZ-"/displayonly
+Properties {
+              BackgroundColor = "white"
+              ForegroundColor = "black"
+           }
+;
+
+}
+
+}
+
+Screen Exit
+If ARSCHKSU:COMPANY_ID <> "" Then G_COMPANY_ID = ARSCHKSU:COMPANY_ID
+If ARSCHKSU:POLICY_NO > 0 Then G_POLICY_NO = ARSCHKSU:POLICY_NO ;
+
+Procedure Definition
+
+Procedure GET_TOTALS
+Begin
+
+L_TOTAL_CHECKS = 0
+
+Access ARSCHKSU_ALIAS, Set ARSCHKSU_alias:POLICY_NO  = G_POLICY_NO, approximate, USING FOURTH INDEX
+
+while ARSCHKSU_alias:POLICY_NO = g_policy_no
+      {
+       if arschksu_alias:internal_check not one of 1 then
+       {
+          l_total_checks = l_total_checks + arschksu_alias:check_amount
+       }
+          Next arschksu_alias
+      }
+End
+
+End

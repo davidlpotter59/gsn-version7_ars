@@ -1,0 +1,3415 @@
+%%
+Program
+        Name = "arsup001" ;
+        Type = "File" ;
+        Domain = "PRSTRANS" ;
+        Padcharacter = Space ;
+/*
+        arsup001.sd
+
+        scips.com, inc.
+
+        december 12, 2000
+
+        This program "posts" premium transaction file records to the
+        prsmaster file and creates the A/R.  At this point the installment
+        (Payment plan) is decided.
+
+        Deposit premiums are applied here
+
+        Changes for Reinstatements
+        if prstrans:trans_code one of 16 then
+        begin
+            go to arscancel, all records with a status of "P"
+            make them a "R" and set the trans date to todaysdate
+        end
+
+*/
+        Global Unsigned Ascii Number G_POLICY_NO[9],
+                                     G_POL_YEAR[4],
+                                     G_END_SEQUENCE[4];
+        Array [20] Of Wdate L_DUE_DATE ;
+        Array [20] Of String L_DUE_DATE_STATUS ;
+        Array [20] Of Wdate L_HOLD_DUE_DATE ;
+        Array [20] Of Wdate L_13_DUE_DATE ;
+        Array [20] Of Signed Ascii Number L_INSTALLMENT[9]/decimals=2;
+
+        Number COUNTER = 0,
+               L_ENDORSEMENT_INSTALLMENTS[1]=1/decimals=0;
+
+        Unsigned Ascii Number L_CHECK_REFERENCE[7]=0/decimals=0;
+
+/* 10/30/2003 -  hold the last check payor for return premium checks */
+        Unsigned Ascii Number L_HOLD_CHKSU_CHECK_REFERENCE[7]=0/decimals=0;
+        String L_HOLD_CHKSU_COMPANY_ID[10];
+
+        String L_COMPANY_ID[10]="";
+
+        Unsigned Ascii Number L_SUB_CODE[4] = 0,
+                              L_CTR[4]=0 ,
+                              L_SKIPPED_PERIODS[3]=0,
+                              L_TOTAL_REMAINING_PERIODS[3]=0,
+                              L_MAX_CTR[2]=20;
+
+        Signed Ascii Number L_DIFFERENT_PREMIUM[9]=0/decimals=2,
+                            L_TOTAL_INSTALLMENT[9]=0/decimals=2;
+
+        Wdate L_TRANS_EFF=00.00.0000,
+              L_TRANS_EXP=00.00.0000,
+              L_TRANS_DATE=00.00.0000;
+
+--  l_update_file is used to log which file had an error, if any
+        String L_UPDATE_FILE[80]="" ;
+
+        Unsigned Ascii Number L_ERR_CTR[6]=0;
+        String L_ENTER[1];
+        Unsigned Ascii Number L_PRMAST_SUB_CODE[4]=0/decimals=0;
+        Unsigned Ascii Number L_CTR_2[2]=0/decimals=0;
+        Unsigned Ascii Number L_CTR_3[2]=0/decimals=0;
+        String L_FOUND[1]="N";
+        Unsigned Ascii Number L_RETURN_CHECK_CTR[4]=0;
+        Unsigned Ascii Number L_INSTALLMENT_CHARGE[5]=0;
+        Unsigned Ascii Number L_HOLD_POLICY_NO[9]=0;
+        Unsigned ascii number l_hold_trans_code[4]=0;
+        String L_FIRST_PASS[1]="Y";
+        String L_OFFSET_PAYMENT[1] = "N";
+        Unsigned Ascii Number L_NUMBER_OF_PAYMENTS[4]=0;
+        Unsigned Ascii Number L_TRANS_CODE[2]=0;
+        Signed Ascii Number L_TOTAL_PAYMENTS[9]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_ANNUAL[9]=0/decimals=2;
+        Unsigned Ascii Number L_CX_BALANCE_DUE_PAID_OFFSET[9]=0/decimals=2;
+--        Unsigned Ascii Number L_PAST_INSTALLMENTS[2]=0/decimals=0;
+        Signed Ascii Number L_CX_INSTALLMENTS[4]=0/decimals=0;
+--        Unsigned Ascii Number L_CX_TRANS[2]=28;
+        String L_INSTALLMENT_UPDATED[1]="N";
+        Signed Ascii Number L_NET_PAYMENTS[9]=0/decimals=2;
+        Signed Ascii Number L_NET_PAYMENTS_BALANCE[9]=0/decimals=2;
+        String L_HIT[1] = "N";
+        Unsigned Ascii Number L_PERIODS[2]=0/decimals=0;
+        Signed Ascii Number L_INSTALLMENT_AMOUNT[9]=0/decimals=2;
+        String L_HOLD_COMPANY_ID[10]="";
+        Unsigned Ascii Number L_CX_BILLED_TRANS[2]=0/decimals=0;
+        Signed Ascii Number L_NET_PREMIUMS[9]=0/decimals=2;
+        Signed Ascii Number L_PREMIUMS[9]=0/decimals=2;
+        Signed Ascii Number L_SUR_CHARGE[9]=0/decimals=2;
+        Signed Ascii Number L_CX_PREMIUMS[9]=0/decimals=2;
+--        Signed Ascii Number L_CX_INSTALLMENT_AMOUNT[9]=0/decimals=2;
+        Signed Ascii Number L_CX_SUR_CHARGE[9]=0/decimals=2;
+        Unsigned Ascii Number L_BILLING_CTR[4]=0/decimals=0;
+        Unsigned Ascii Number L_TRANS_CODE_HOLD[4]=0/decimals=0;
+        Signed Ascii Number L_NET_AMOUNT[9]=0/decimals=2;
+        Wdate L_HOLD_TRANS_EFF=00.00.0000;
+        Wdate L_HOLD_TRANS_EXP=00.00.0000;
+        Wdate L_HOLD_TRANS_DATE=00.00.0000;
+        Unsigned Ascii Number L_HOLD_LINE_OF_BUSINESS[4]=0;
+        Unsigned Ascii Number L_HOLD_PAYMENT_PLAN[4]=0;
+        String L_HIT_BILLING[1]="N";
+        String L_FORCE_INVOICE[1]="N";
+        Unsigned Ascii Number L_START_BILLING_CTR[4]=0/decimals=0;
+        Unsigned Ascii Number L_BUCKET_CTR[2]=0/decimals=0;
+        Unsigned Ascii Number L_TEMP_TRANS_CODE[4]=0/decimals=0;
+        Signed Ascii Number L_TEMP_PREMIUM[9]=0/decimals=2;
+        Signed Ascii Number L_TEMP_REINSTATEMENT_AMOUNT[9]=0/decimals=2;
+        Signed Ascii Number L_PENDING_DISBURSEMENTS[9]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_DISBURSEMENTS[9]=0/decimals=2;
+        Signed Ascii Number L_CHECKS_ISSUED[9]=0/decimals=2;
+        Signed Ascii Number L_CX_BALANCE_DUE_PAID[9]=0/decimals=2;
+        String L_DEFAULT_RELEASE[1]="";
+        Signed Ascii Number L_NET_AMOUNT_DUE[9]=0/decimals=2;
+
+/* new variables for trans code 13 offset - july 14, 2003 */
+        Unsigned Ascii Number L_HOLD_LAST_BILLING_CTR[4]=0/dec=0;
+        String L_HOLD_LAST_BILLING_STATUS[1]="";
+        Wdate L_HOLD_LAST_DUE_DATE=00.00.0000;
+
+/* new variables for trans code 16 fudge - July 17, 2003 */
+--        unsigned ascii number l_16_loop_ctr[3]=0/dec=0;
+        Signed Ascii Number L_16_DIFF_PREM[9]=0/dec=2;
+        Signed Ascii Number L_16_REMAINING_PREM[9]=0/dec=2;
+        Signed Ascii Number L_UNISSUED_CHECK[9]=0/dec=2;
+        Signed Ascii Number L_19_DIFF_PREM[9]=0/dec=2,
+                            L_19_REMAINING_PREM[9]=0/dec=2;
+
+/* new var for whole dollar rounding of installments
+   added July 29, 2003 */
+
+        Array [20] Of Signed Ascii Number L_INSTALLMENT_NO_CENTS[9]/decimals=0;
+        Signed Ascii Number L_TOTAL_INSTALLMENT_NO_CENTS[9]/decimals=0,
+                            L_DIFF_INSTALLMENT_NO_CENTS[9]/decimals=0;
+        String L_HOLD_SUBLINE[4]="";
+        Signed Ascii Number L_TOTAL_RETURN[9]=0/decimals=2;
+        String L_FLAT_CX[1]="";
+        Signed Ascii Number L_TOTAL_AMOUNT_APPLIED[9]=0/decimals=2;
+        Signed Ascii Number L_REINSTATE_AR[9]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_REAL_CHECKS[9]=0/decimals=2;
+        Unsigned Ascii Number L_HOLD_POL_YEAR[4]=0/decimals=0;
+        Unsigned Ascii Number L_POL_YEAR[4]=0/decimals=0;
+        Signed Ascii Number L_TOTAL_UNEARNED[9]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_AMOUNT_PAID[9]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_WRITTEN[9]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_EARNED[9]=0/decimals=2;
+        Wdate L_ENDORSEMENT_TRANS_EXP;
+        Unsigned Ascii Number L_PRIOR_YEAR[1]=0/decimals=0;
+        Signed Ascii Number L_NSF_CHARGE[6]=0/decimals=2;
+        Unsigned Ascii Number L_USE_RECORD[1]=0/decimals=0;
+        Unsigned Ascii Number L_ORIGINAL_TRANS_CODE[2]=0/decimals=0;
+        Signed Ascii Number L_DISBURSEMENTS2[9]=0/decimals=2;
+        Signed Ascii Number L_AC_ROUNDED_AMOUNT[9]=0/decimals=0;
+        Signed Ascii Number L_COMMISSION_AMOUNT[9]=0/decimals=2;
+        Signed Ascii Number L_COMMISSION_RATE[5]=0/decimals=4;
+        Signed Ascii Number L_HOLD_PREMIUM[9]=0/decimals=2;
+
+        Include "sfscsexec.var"
+
+        String L_COMMANDLINE[255];
+        Unsigned Ascii Number L_TAB_POS[4];
+
+Access PRSTRANS, Set PRSTRANS:COMPANY_ID = L_COMPANY_ID , Approximate
+
+Initialisation
+
+L_COMMANDLINE = COMMANDLINE
+L_TAB_POS=Pos("<tab>",L_COMMANDLINE)
+
+--Write ("<014>")
+--Write ("%c%s%S%n",05001,"commandline = ",L_COMMANDLINE,L_TAB_POS)
+--Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+
+Write ("%c%s",15001,"INITIALISATION")
+If PRSTRANS:ERRORNUMBER <> 0 Then
+Begin
+    Stop("")
+End
+
+
+Update
+
+Write ("%c%s",15001,"UPDATE - VERSION 4.51")
+
+COUNTER = COUNTER + 1
+/* If COUNTER = 1 Then
+    Begin
+        Writefile (L_OUTFILE,"Starting arsup001.log <NL><NL>")
+    End
+*/
+
+Write ("%c%s",05001,"arsup001")
+
+If L_HOLD_POLICY_NO = 0 Then  -- should only happen when first entering
+    Begin
+        L_HOLD_COMPANY_ID       = PRSTRANS:COMPANY_ID
+        L_HOLD_POLICY_NO        = PRSTRANS:POLICY_NO
+        L_HOLD_TRANS_EFF        = PRSTRANS:TRANS_EFF
+        L_HOLD_TRANS_EXP        = PRSTRANS:TRANS_EXP
+        L_HOLD_TRANS_DATE       = PRSTRANS:TRANS_DATE
+        L_HOLD_LINE_OF_BUSINESS = PRSTRANS:LINE_OF_BUSINESS
+        L_HOLD_PAYMENT_PLAN     = PRSTRANS:PAYMENT_PLAN
+        L_INSTALLMENT_UPDATED   = "N"
+        L_16_REMAINING_PREM     = 0
+        L_16_DIFF_PREM          = 0
+        L_HOLD_POL_YEAR         = PRSTRANS:POL_YEAR
+        L_TOTAL_UNEARNED        = 0.00
+    End
+
+If L_HOLD_POLICY_NO <> PRSTRANS:POLICY_NO Then
+   Begin
+
+       If L_TRANS_CODE_HOLD One Of 10,14 And
+          ARSBILLING:PAYMENT_PLAN > 1 Then
+          Begin
+              Do CREATE_INSTALLMENT_CHARGE
+          End
+
+       If L_TRANS_CODE_HOLD One Of 16 Then
+       Begin
+           Do CHECK_FOR_CX_REINSTATEMENT
+           Do REINSTATE_PRIOR_RECORDS
+           Do CHECK_FOR_CX_RETURN_PREMIUMS
+       End
+
+       L_HOLD_COMPANY_ID       = PRSTRANS:COMPANY_ID
+       L_HOLD_POLICY_NO        = PRSTRANS:POLICY_NO
+       L_HOLD_TRANS_EFF        = PRSTRANS:TRANS_EFF
+       L_HOLD_TRANS_EXP        = PRSTRANS:TRANS_EXP
+       L_HOLD_TRANS_DATE       = PRSTRANS:TRANS_DATE
+       L_HOLD_LINE_OF_BUSINESS = PRSTRANS:LINE_OF_BUSINESS
+       L_HOLD_PAYMENT_PLAN     = PRSTRANS:PAYMENT_PLAN
+       L_16_REMAINING_PREM     = 0.00
+       L_16_DIFF_PREM          = 0.00
+       L_HOLD_POL_YEAR         = PRSTRANS:POL_YEAR
+       L_TOTAL_UNEARNED        = 0.00
+
+       If L_TRANS_CODE_HOLD One Of 12 Then
+       Begin
+           Do CHECK_FOR_CX_RETURN_PREMIUMS
+       End
+
+       If L_TRANS_CODE_HOLD One Of 13, 15 Then
+       Begin
+           Do CHECK_FOR_RETURN_PREMIUMS
+           If L_NET_PAYMENTS > ARSCONTROL:WAIVE_AMOUNT_CREDIT And
+              L_NET_PAYMENTS > 0 Then
+           Begin
+               Do CREATE_ACCOUNTS_PAYABLE
+           End
+       End
+
+       If L_TRANS_CODE_HOLD One Of 11 Then
+       Begin
+           Do CHECK_FOR_CX_BALANCE
+       End
+
+       L_HOLD_POLICY_NO  = PRSTRANS:POLICY_NO
+       L_HOLD_COMPANY_ID = PRSTRANS:COMPANY_ID
+       L_FIRST_PASS = "Y"
+       L_INSTALLMENT_UPDATED = "N"
+   End
+
+If PRSTRANS:TRANS_CODE One Of 10,11,12,13,14,15,16 Then
+Begin
+    L_16_DIFF_PREM      = L_16_DIFF_PREM + (PRSTRANS:ANN_PREMIUM - PRSTRANS:PREMIUM)
+    L_16_REMAINING_PREM = L_16_DIFF_PREM
+    L_TOTAL_UNEARNED    = L_TOTAL_UNEARNED + (PRSTRANS:ANN_PREMIUM  - PRSTRANS:PREMIUM)
+End
+
+If PRSTRANS:TRANS_CODE One Of 19,22,23,29 Then
+Begin
+    L_19_DIFF_PREM      = L_19_DIFF_PREM + (PRSTRANS:ANN_PREMIUM - PRSTRANS:PREMIUM)
+    L_19_REMAINING_PREM = L_19_DIFF_PREM
+    L_TOTAL_UNEARNED    = L_TOTAL_UNEARNED + (PRSTRANS:ANN_PREMIUM - PRSTRANS:PREMIUM)
+End
+
+If PRSTRANS:EFF_DATE = PRSTRANS:TRANS_EFF And
+   PRSTRANS:TRANS_CODE One Of 19,22,23,29 Then
+Begin
+    L_19_DIFF_PREM      = L_19_DIFF_PREM + PRSTRANS:PREMIUM
+    L_19_REMAINING_PREM = L_19_DIFF_PREM
+    L_TOTAL_UNEARNED    = L_TOTAL_UNEARNED + PRSTRANS:PREMIUM
+End
+
+-- June 10, 2001 - removed hard coded 30 and replaced with the
+-- arscontrol information
+
+Access ARSCONTROL, Set ARSCONTROL:COMPANY_ID = PRSTRANS:COMPANY_ID, Approximate
+
+If PRSTRANS:TRANS_CODE < ARSCONTROL:ASSUMED_TRANS_CODE_RANGE[1] And
+-- feb 6, 2002 - per Debbie, workers comp needs to write out 0 premium records
+-- need to allow for zero amount records so that claims can see sublines
+-- that are required for certain causes of losses.
+--   PRSTRANS:PREMIUM <> 0 And
+   PRSTRANS:TRANS_CODE Not One Of 18,28   Then
+    Begin
+        Do UPDATE_MASTER_FILE
+        Do UPDATE_CANCEL_FILE
+    End
+
+/* have to post the reinsurance transactions */
+   Else
+   If PRSTRANS:TRANS_CODE >= ARSCONTROL:CEDED_TRANS_CODE_RANGE[1] And
+      PRSTRANS:PREMIUM <> 0 Then
+      Begin
+         Do POST_TO_PREMIUMS
+      End
+
+Screen Exit
+/* reprocess the billing file to create finder records */
+-- instead of recreating the prstrans file delet the records processed
+
+If L_TRANS_CODE_HOLD One Of 10,14 And
+   L_HOLD_PAYMENT_PLAN > 1 Then
+    Begin
+        Do CREATE_INSTALLMENT_CHARGE
+    End
+
+If L_TRANS_CODE_HOLD One Of 16 Then
+Begin
+    Do CHECK_FOR_CX_REINSTATEMENT
+    Do REINSTATE_PRIOR_RECORDS
+    Do CHECK_FOR_CX_RETURN_PREMIUMS
+    if arscontrol2:remove_ar_cx_on_reinstate one of 1 then
+    begin
+        do update_arscancel
+    end
+End
+
+If L_TRANS_CODE_HOLD One Of 12 Then
+Begin
+    Do CHECK_FOR_CX_RETURN_PREMIUMS
+End
+
+L_PRIOR_YEAR = 0 -- not true
+
+Access SFPCURRENT, Set SFPCURRENT:POLICY_NO = PRSTRANS:POLICY_NO
+
+If PRSTRANS:POL_YEAR < SFPCURRENT:POL_YEAR Then
+Begin
+    L_PRIOR_YEAR = 1
+End
+Else
+Begin
+    L_PRIOR_YEAR = 0
+End
+
+If L_TRANS_CODE_HOLD One Of 13, 15 Then
+Begin
+    Do CHECK_FOR_RETURN_PREMIUMS
+    If L_NET_PAYMENTS > ARSCONTROL:WAIVE_AMOUNT_CREDIT And
+       L_NET_PAYMENTS > 0 Then
+    Begin
+        Do CREATE_ACCOUNTS_PAYABLE
+
+--        If L_PRIOR_YEAR One Of 1 Then
+--        Begin
+--            Do CREATE_PRIOR_YEAR_INTERNAL_CHECK
+--        End
+
+        Do APPLY_STATUS_UPDATE
+
+    End
+
+End
+
+If L_TRANS_CODE_HOLD One Of 11 Then
+Begin
+
+   Do CHECK_FOR_RETURN_PREMIUMS
+   Do CHECK_FOR_CX_BALANCE
+
+   If L_NET_PAYMENTS  > ARSCONTROL:WAIVE_AMOUNT_DEBIT Or
+      L_NET_PAYMENTS  < ARSCONTROL:WAIVE_AMOUNT_CREDIT  Then
+   Begin
+      If L_NET_PREMIUMS < ARSCONTROL:WAIVE_AMOUNT_CREDIT Then
+      Begin
+          Do CREATE_ACCOUNTS_PAYABLE
+      End
+
+   End
+End
+
+/* 12/17/2002 - dlp - added reinsurance processing here
+   as reinsurance changes are made this will make it easier
+   so that nothing is missed */
+
+Access SFSCOMPANY, Set SFSCOMPANY:COMPANY_ID = PRSTRANS:COMPANY_ID
+If SFSCOMPANY:REINSURANCE One Of "1" Then
+Begin
+--     Access SFPCURRENT, Set SFPCURRENT:POLICY_NO = PRSTRANS:POLICY_NO
+     G_POLICY_NO    = PRSTRANS:POLICY_NO
+     G_POL_YEAR     = Year(PRSTRANS:EFF_DATE)
+
+     Access SFPPOINT, Set SFPPOINT:POLICY_NO = PRSTRANS:POLICY_NO,
+                          SFPPOINT:POL_YEAR  = G_POL_YEAR
+
+--     G_END_SEQUENCE = SFPCURRENT:END_SEQUENCE
+    G_END_SEQUENCE    = SFPPOINT:END_SEQUENCE
+--     G_POL_YEAR     = SFPCURRENT:POL_YEAR
+
+     Proc ("prstrans_cnv.mk")/noconsole
+
+     If SFSCOMPANY:DEBUG_MODE One Of 0 Then
+     Begin
+         Proc ("csbatch prsup610 %s%s%s%s%s",Str(PRSTRANS:TRANS_CODE,"99"),Str(G_POLICY_NO,"999999999"),Str(G_POL_YEAR,"9999"),Str(G_END_SEQUENCE,"9999"),PRSTRANS:COMPANY_ID)/noconsole
+     End
+     Else
+     If SFSCOMPANY:DEBUG_MODE One Of 1 Then
+     Begin
+         Proc ("csbatch prsup610 %s%s%s%s%s",Str(PRSTRANS:TRANS_CODE,"99"),Str(G_POLICY_NO,"999999999"),Str(G_POL_YEAR,"9999"),Str(G_END_SEQUENCE,"9999"),PRSTRANS:COMPANY_ID)
+     End
+
+     Do POST_TO_PREMIUMS_TREATY_REINSURANCE
+
+End -- end of sfscompany:reinsurance checking
+
+Do CLEANUP_PRSTRANS
+
+--Writefile (L_OUTFILE,"%s%n%s","<NL>Number of Errors Reported: ",L_ERR_CTR,"<NL>")
+--Writefile (L_OUTFILE,"%s%n%s","<NL><NL>Number of Records Read: ",COUNTER,"<NL>")
+
+Write ("%c%s",15020,"ARSUP001 is now exiting  ")
+
+Errors
+
+L_ERR_CTR = L_ERR_CTR + 1
+
+Procedure Definition
+
+Procedure CLEANUP_PRSTRANS
+Begin
+
+L_COMPANY_ID = ""
+L_HOLD_POLICY_NO = 0
+
+Access PRSTRANS_ALT, Set PRSTRANS_ALT:COMPANY_ID = L_COMPANY_ID, Approximate
+
+While PRSTRANS_ALT:COMPANY_ID <> ""  -- No more records in database
+      Begin
+      If L_HOLD_POLICY_NO <> PRSTRANS_ALT:POLICY_NO Then
+          Begin
+              L_HOLD_POLICY_NO = PRSTRANS_ALT:POLICY_NO
+
+              Do CHECK_FOR_PAYMENTS
+          End
+          Delete PRSTRANS_ALT
+
+          Next PRSTRANS_ALT
+      End
+
+If SYSTEM[1,3] = "Win" Then
+Begin
+   Proc ("prstrans")/noconsole
+   Proc ("prstrans_cnv")/noconsole
+End
+Else
+Begin
+   Proc ("prstrans.mk")/noconsole
+   Proc ("prstrans_cnv.mk")/noconsole
+End
+
+End
+
+Procedure UPDATE_MASTER_FILE
+Begin
+
+L_UPDATE_FILE = "arsmaster - update_master_file"
+L_TRANS_EFF   = PRSTRANS:TRANS_EFF
+L_TRANS_EXP   = PRSTRANS:TRANS_EXP
+L_TRANS_DATE  = PRSTRANS:TRANS_DATE
+L_COMPANY_ID  = PRSTRANS:COMPANY_ID
+
+L_TEMP_TRANS_CODE = PRSTRANS:TRANS_CODE
+
+If L_TEMP_TRANS_CODE = 29 And
+   PRSTRANS:PREMIUM >= 0.00 Then
+   Begin
+      L_TEMP_TRANS_CODE = 27
+   End
+
+Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = L_COMPANY_ID
+
+Access ARSMASTER, Set ARSMASTER:COMPANY_ID       = L_COMPANY_ID,
+                      ARSMASTER:POLICY_NO        = PRSTRANS:POLICY_NO,
+                      ARSMASTER:TRANS_DATE       = L_TRANS_DATE ,
+                      ARSMASTER:TRANS_EFF        = L_TRANS_EFF,
+                      ARSMASTER:TRANS_EXP        = L_TRANS_EXP,
+                      ARSMASTER:TRANS_CODE       = L_TEMP_TRANS_CODE,
+                      ARSMASTER:LINE_OF_BUSINESS = PRSTRANS:LINE_OF_BUSINESS,
+                      ARSMASTER:COMM_RATE        = PRSTRANS:COMM_RATE, Approximate
+
+If (ARSMASTER:COMPANY_ID        <>   L_COMPANY_ID Or
+    ARSMASTER:POLICY_NO         <>   PRSTRANS:POLICY_NO Or
+    ARSMASTER:TRANS_DATE        <>   L_TRANS_DATE Or
+    ARSMASTER:TRANS_EFF         <>   L_TRANS_EFF Or
+    ARSMASTER:TRANS_EXP         <>   L_TRANS_EXP Or
+    ARSMASTER:TRANS_CODE        <>   L_TEMP_TRANS_CODE Or
+    ARSMASTER:LINE_OF_BUSINESS  <>   PRSTRANS:LINE_OF_BUSINESS Or
+    ARSMASTER:COMM_RATE         <>   PRSTRANS:COMM_RATE) And
+    -- no zero premiums to A/R - only in Premiums for claims processing
+    -- June 25, 2003 (DLP, DAP)
+    PRSTRANS:PREMIUM            <>   0.00 Then
+    Begin
+    Add ARSMASTER
+        Begin
+        ARSMASTER:COMPANY_ID         =    PRSTRANS:COMPANY_ID
+        ARSMASTER:POLICY_NO          =    PRSTRANS:POLICY_NO
+        ARSMASTER:TRANS_DATE         =    L_TRANS_DATE
+        ARSMASTER:TRANS_EFF          =    L_TRANS_EFF
+        ARSMASTER:TRANS_EXP          =    L_TRANS_EXP
+        ARSMASTER:TRANS_CODE         =    L_TEMP_TRANS_CODE
+        ARSMASTER:LINE_OF_BUSINESS   =    PRSTRANS:LINE_OF_BUSINESS
+        ARSMASTER:COMM_RATE          =    PRSTRANS:COMM_RATE
+        ARSMASTER:AGENT_NO           =    PRSTRANS:AGENT_NO
+        ARSMASTER:PAYMENT_PLAN       =    PRSTRANS:PAYMENT_PLAN
+        ARSMASTER:LOB_SUBLINE        =    PRSTRANS:LOB_SUBLINE
+        ARSMASTER:BILL_PLAN          =    PRSTRANS:BILL_PLAN
+        ARSMASTER:STATE              =    PRSTRANS:STATE
+        ARSMASTER:COUNTY             =    PRSTRANS:COUNTY
+        ARSMASTER:TRANS_EFF          =    PRSTRANS:TRANS_EFF
+        ARSMASTER:TRANS_EXP          =    PRSTRANS:TRANS_EXP
+        ARSMASTER:PREMIUM            =    PRSTRANS:PREMIUM
+
+     /* added December 6, 2005 */
+--       If ARSMASTER:COMM_RATE <> 0.00 Then
+--       Begin
+--            Switch (PRSTRANS:BILL_PLAN)
+--            Case "DB" : ARSMASTER:AC_NET_AMOUNT_DUE = 0.00
+--            Case "AC" : Begin
+--                        L_COMMISSION_RATE   = PRSTRANS:COMM_RATE * 0.01
+--                        L_COMMISSION_AMOUNT = PRSTRANS:PREMIUM *
+--                                              L_COMMISSION_RATE
+--                        arsmaster:ac_net_amount_due = prstrans:premium
+--                        arsmaster:premium           = prstrans:premium
+--                        ARSMASTER:AC_NET_AMOUNT_DUE = PRSTRANS:PREMIUM -
+--                                                      L_COMMISSION_AMOUNT
+--                        ARSMASTER:PREMIUM           = AC_NET_AMOUNT_DUE
+--                        ARSMASTER:AC_NET_AMOUNT_DUE = PRSTRANS:PREMIUM
+--                        End
+--            Default   : ARSMASTER:AC_NET_AMOUNT_DUE = 0.00
+--            End
+--       End
+
+--            If ARSCONTROL2:AC_ROUND One Of 1 Then
+--            if 1 = 2 then
+--            Begin
+--                L_AC_ROUNDED_AMOUNT = ARSMASTER:PREMIUM  * 1
+--                ARSMASTER:PREMIUM   = L_AC_ROUNDED_AMOUNT
+--            End
+
+--            Switch (ARSMASTER:COMM_RATE)
+--            Case 0.00 : ARSMASTER:AC_NET_AMOUNT_DUE = 0.00
+--            End
+
+        ARSMASTER:POL_YEAR           =    PRSTRANS:POL_YEAR
+        ARSMASTER:END_SEQUENCE       =    PRSTRANS:END_SEQUENCE
+        ARSMASTER:EXPANSION          =    PRSTRANS:EXPANSION/raw
+        End
+    End
+Else
+    Begin
+    Change ARSMASTER
+        Begin
+        ARSMASTER:PREMIUM            =    ARSMASTER:PREMIUM +
+                                          PRSTRANS:PREMIUM
+--        arsmaster:ac_net_amount_due  =    arsmaster:premium
+     /* added December 6, 2005 */
+--       If ARSMASTER:COMM_RATE <> 0.00 Then
+--       Begin
+--            Switch (PRSTRANS:BILL_PLAN)
+--            Case "DB" : ARSMASTER:AC_NET_AMOUNT_DUE = 0.00
+--            Case "AC" : Begin
+--                        L_COMMISSION_RATE   = PRSTRANS:COMM_RATE * 0.01
+--                        L_COMMISSION_AMOUNT = PRSTRANS:PREMIUM *
+--                                              L_COMMISSION_RATE
+--                        arsmaster:ac_net_amount_due = arsmaster:ac_net_amount_due + prstrans:premium
+--                        arsmaster:premium           = arsmaster:premium + prstrans:premium
+--                        ARSMASTER:AC_NET_AMOUNT_DUE = ARSMASTER:AC_NET_AMOUNT_DUE
+--                        + (PRSTRANS:PREMIUM - L_COMMISSION_AMOUNT)
+--                        L_HOLD_PREMIUM              = ARSMASTER:PREMIUM
+--                        ARSMASTER:PREMIUM           = AC_NET_AMOUNT_DUE
+--                        ARSMASTER:ac_net_amount_due = arsmaster:ac_net_amount_due +
+--                                                      prstrans:premium
+--                        End
+--            Default   : ARSMASTER:AC_NET_AMOUNT_DUE = 0.00
+--           End
+--     End
+
+            If ARSCONTROL2:AC_ROUND One Of 1 Then
+            Begin
+                L_AC_ROUNDED_AMOUNT = ARSMASTER:PREMIUM  * 1
+                ARSMASTER:PREMIUM   = L_AC_ROUNDED_AMOUNT
+            End
+
+--            Switch (ARSMASTER:COMM_RATE)
+--            Case 0.00 : ARSMASTER:AC_NET_AMOUNT_DUE = 0.00
+--            End
+
+        End
+
+    End
+
+/* reinstatements are done a different way so that SCIPS can
+   properly reinstatement the prior records*/
+
+L_TRANS_CODE = PRSTRANS:TRANS_CODE
+If PRSTRANS:TRANS_CODE One Of 29 And
+   PRSTRANS:PREMIUM  >= 0 Then
+Begin
+   L_TRANS_CODE = 27
+   L_NUMBER_OF_PAYMENTS = 1
+End
+
+If L_TRANS_CODE One Of 10,11,12,13,14,15,16 Then
+Begin
+   L_TRANS_CODE_HOLD = L_TRANS_CODE
+End
+
+If L_TRANS_CODE_HOLD Not One Of 16 Then
+Begin
+    Do CREATE_BILLING_RECORDS
+End
+
+-- august 5, 2001
+-- post outstanding checks so that current invoices reflect this
+-- Do CHECK_FOR_PAYMENTS
+
+If PRSTRANS:TRANS_CODE <> ARSCONTROL:INSTALLMENT_CHARGE_TRANS_CODE And
+   PRSTRANS:TRANS_CODE <> ARSCONTROL:INSTALLMENT_CHARGE_TRANS_CX   Then
+Begin
+    Do POST_TO_PREMIUMS
+End
+
+End
+
+Procedure UPDATE_CANCEL_FILE
+Begin
+
+Access ARSCANCEL, Set ARSCANCEL:COMPANY_ID = PRSTRANS:COMPANY_ID,
+                      ARSCANCEL:POLICY_NO  = PRSTRANS:POLICY_NO, Approximate
+
+While ARSCANCEL:COMPANY_ID = PRSTRANS:COMPANY_ID And
+      ARSCANCEL:POLICY_NO  = PRSTRANS:POLICY_NO
+      Begin
+         If PRSTRANS:TRANS_CODE One Of 11 And
+            ARSCANCEL:CX_STATUS One Of "P" Then
+            Change ARSCANCEL
+            Begin
+                ARSCANCEL:CX_STATUS = "C"
+            End
+
+        If PRSTRANS:TRANS_CODE One Of 16 And
+           ARSCANCEL:CX_STATUS One Of "C" Then
+           Change ARSCANCEL
+           Begin
+               ARSCANCEL:CX_STATUS = "R"
+           End
+        Next ARSCANCEL
+
+End -- end of while
+
+End -- end of procedure
+
+Procedure CREATE_BILLING_RECORDS
+Begin
+
+L_UPDATE_FILE = "arsbilling - create_billing_records"
+
+/* access arspayplan here since all of the conditions below
+   will require the pay_plan information */
+
+Access ARSPAYPLAN, Set ARSPAYPLAN:COMPANY_ID       = ARSMASTER:COMPANY_ID,
+                       ARSPAYPLAN:LINE_OF_BUSINESS = ARSMASTER:LINE_OF_BUSINESS,
+                       ARSPAYPLAN:PAYMENT_PLAN     = ARSMASTER:PAYMENT_PLAN
+
+/* Create billing records for new and renewal business */
+/* Create billing records for Installment charges processed */
+/* Create billing records for endorsements processed */
+
+L_NUMBER_OF_PAYMENTS = ARSPAYPLAN:NUMBER_OF_PAYMENTS
+
+/*If ARSMASTER:TRANS_CODE = ARSCONTROL:SURCHARGE_TRANS_CODE Or
+   ARSMASTER:TRANS_CODE = ARSCONTROL:SURCHARGE_TRANS_CX Then */
+If ARSMASTER:TRANS_CODE One Of 19,22,23,29 Then
+   Begin
+       L_NUMBER_OF_PAYMENTS = 1
+   End
+
+/* ac should only be annual bill */
+
+If ARSMASTER:BILL_PLAN = "AC" Then
+Begin
+    L_NUMBER_OF_PAYMENTS = 1
+End
+
+/* need to establish whether or not there is Mortgagee that is a
+   payor on the policy at this point */
+-- 99999
+
+Do GET_PAYOR_TYPE
+
+L_TRANS_CODE = PRSTRANS:TRANS_CODE
+
+If L_TRANS_CODE_HOLD One Of 11 And -- only change if in fact it is a cx
+   (PRSTRANS:TRANS_CODE = ARSCONTROL:INSTALLMENT_CHARGE_TRANS_CX Or
+    PRSTRANS:TRANS_CODE = ARSCONTROL:SURCHARGE_TRANS_CX) Then
+    Begin
+        L_TRANS_CODE = ARSCONTROL:CANCELLATION_TRANS_CODE
+    End
+
+Switch(L_TRANS_CODE)
+Case ARSCONTROL:ANNUAL_TRANS_CODE,
+     ARSCONTROL:RENEWAL_TRANS_CODE,
+--     ARSCONTROL:REINSTATEMENT_TRANS_CODE,
+     ARSCONTROL:INSTALLMENT_CHARGE_TRANS_CODE,
+     ARSCONTROL:SURCHARGE_TRANS_CODE : Begin
+                                       Do CALCULATE_NEW_RENEWAL_PERIODS
+                                       Do CALCULATE_INSTALLMENT_AMOUNTS
+                     End
+  Case ARSCONTROL:DECREASE_TRANS_CODE,
+       ARSCONTROL:INCREASE_TRANS_CODE,15,22,23  : Do CALCULATE_ENDORSEMENT_PERIODS
+  Case CANCELLATION_TRANS_CODE,27
+                                       : Do CALCULATE_CANCELLATION
+  Default       : Do CALCULATE_ENDORSEMENT_PERIODS
+  End
+
+L_SUB_CODE = 10 -- current records will always be 10
+
+-- Do GET_BILLING_SUBCODE
+
+-- change 2/16/2002
+-- for endorsements the billing ctr was not being aligned with the correct
+-- billing ctr per the "remaining" unbilled buckets.
+
+L_START_BILLING_CTR = 1 -- this sets this for annual, renewal and reinstatements
+
+-- added audits - april 27, 2005
+If L_TRANS_CODE One Of 12,13,15,22,23 And
+   L_START_BILLING_CTR < L_TOTAL_REMAINING_PERIODS Then
+Begin
+    L_START_BILLING_CTR = L_SKIPPED_PERIODS + 1
+End
+
+L_BUCKET_CTR = 0
+
+If L_TRANS_CODE One Of 22,23 Then
+Begin
+    L_TOTAL_REMAINING_PERIODS = 1
+End
+
+For L_CTR = 1 To L_TOTAL_REMAINING_PERIODS
+    Begin
+
+    L_BUCKET_CTR = L_BUCKET_CTR + 1
+
+If L_TRANS_CODE One Of 12,13,15,18 Then
+Begin
+    Do GET_BILLING_SUBCODE
+    L_SUB_CODE = L_SUB_CODE + 10
+End
+
+
+/* Write ("<014>")
+Write ("%c%s%s",02001,"company       = ",ARSMASTER:COMPANY_ID)
+Write ("%c%s%n",03001,"policy no     = ",ARSMASTER:POLICY_NO)
+Write ("%c%s%d",04001,"trans date    = ",ARSMASTER:TRANS_DATE)
+Write ("%c%s%d",05001,"trans eff     = ",ARSMASTER:TRANS_EFF)
+Write ("%c%s%d",06001,"trans exp     = ",ARSMASTER:TRANS_EXP)
+Write ("%c%s%n",07001,"trans code    = ",ARSMASTER:TRANS_CODE)
+Write ("%c%s%n",08001,"line          = ",ARSMASTER:LINE_OF_BUSINESS)
+Write ("%c%s%n",09001,"comm rate     = ",ARSMASTER:COMM_RATE)
+Write ("%c%s%n",10001,"sub code      = ",L_SUB_CODE)
+Write ("%c%s%n",11001,"billing ctr   = ",L_START_BILLING_CTR)
+Write ("%c%s%n",12001,"return check  = ",L_RETURN_CHECK_CTR)
+Write ("%c%s%n",13001,"l ctr         = ",L_CTR)
+Write ("%c%s%n",14001,"installment   = ",L_INSTALLMENT[L_CTR])
+Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+*/
+
+Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = ARSMASTER:COMPANY_ID
+
+    Access ARSBILLING, Set ARSBILLING:COMPANY_ID       = ARSMASTER:COMPANY_ID,
+                           ARSBILLING:POLICY_NO        = ARSMASTER:POLICY_NO,
+                           ARSBILLING:TRANS_DATE       = ARSMASTER:TRANS_DATE,
+                           ARSBILLING:TRANS_EFF        = ARSMASTER:TRANS_EFF,
+                           ARSBILLING:TRANS_EXP        = ARSMASTER:TRANS_EXP,
+                           ARSBILLING:TRANS_CODE       = ARSMASTER:TRANS_CODE,
+                           ARSBILLING:LINE_OF_BUSINESS = ARSMASTER:LINE_OF_BUSINESS,
+                           ARSBILLING:COMM_RATE        = ARSMASTER:COMM_RATE,
+                           ARSBILLING:SUB_CODE         = L_SUB_CODE,
+                           ARSBILLING:BILLING_CTR      = L_START_BILLING_CTR,
+                           ARSBILLING:RETURN_CHECK_CTR  = L_RETURN_CHECK_CTR,Approximate
+
+  L_UPDATE_FILE = "ADD"
+
+    If (ARSBILLING:COMPANY_ID       <> ARSMASTER:COMPANY_ID Or
+        ARSBILLING:POLICY_NO        <> ARSMASTER:POLICY_NO Or
+        ARSBILLING:TRANS_DATE       <> ARSMASTER:TRANS_DATE Or
+        ARSBILLING:TRANS_EFF        <> ARSMASTER:TRANS_EFF Or
+        ARSBILLING:TRANS_EXP        <> ARSMASTER:TRANS_EXP Or
+        ARSBILLING:TRANS_CODE       <> ARSMASTER:TRANS_CODE Or
+        ARSBILLING:LINE_OF_BUSINESS <> ARSMASTER:LINE_OF_BUSINESS Or
+        ARSBILLING:COMM_RATE        <> ARSMASTER:COMM_RATE Or
+        ARSBILLING:SUB_CODE         <> L_SUB_CODE Or
+        ARSBILLING:BILLING_CTR      <> L_START_BILLING_CTR Or
+        ARSBILLING:RETURN_CHECK_CTR <> L_RETURN_CHECK_CTR)  And -- record does not exist
+        L_INSTALLMENT[L_CTR] <> 0 Then -- record value is not $0.00
+        Begin
+        Add ARSBILLING
+            Begin
+            ARSBILLING:COMPANY_ID           =    ARSMASTER:COMPANY_ID
+            ARSBILLING:POLICY_NO            =    ARSMASTER:POLICY_NO
+            ARSBILLING:TRANS_DATE           =    ARSMASTER:TRANS_DATE
+            ARSBILLING:TRANS_EFF            =    ARSMASTER:TRANS_EFF
+            ARSBILLING:TRANS_EXP            =    ARSMASTER:TRANS_EXP
+            ARSBILLING:TRANS_CODE           =    ARSMASTER:TRANS_CODE
+            ARSBILLING:LINE_OF_BUSINESS     =    ARSMASTER:LINE_OF_BUSINESS
+            ARSBILLING:AGENT_NO             =    ARSMASTER:AGENT_NO
+            ARSBILLING:COMM_RATE            =    ARSMASTER:COMM_RATE
+            ARSBILLING:SUB_CODE             =    L_SUB_CODE
+            ARSBILLING:BILLING_CTR          =    L_START_BILLING_CTR
+            ARSBILLING:RETURN_CHECK_CTR     =    L_RETURN_CHECK_CTR
+            ARSBILLING:LOB_SUBLINE          =    ARSMASTER:LOB_SUBLINE
+            ARSBILLING:DUE_DATE             =    L_DUE_DATE[L_BUCKET_CTR]
+            ARSBILLING:BILL_PLAN            =    ARSMASTER:BILL_PLAN
+            ARSBILLING:PAYMENT_PLAN         =    ARSMASTER:PAYMENT_PLAN
+            ARSBILLING:POL_YEAR             =    ARSMASTER:POL_YEAR
+            ARSBILLING:END_SEQUENCE         =    ARSMASTER:END_SEQUENCE
+
+
+            If ((L_CTR = 1 And
+            -- added audits april 27, 2005
+                ARSBILLING:TRANS_CODE Not One Of 12, 13, 15, 22, 23) Or
+                L_FORCE_INVOICE = "Y") Then
+               -- 12 = endorsement increase
+               -- 13 = endorsement decrease
+               -- 22 = surcharge increase
+               -- 23 = surcharge decrease
+                Begin
+                ARSBILLING:STATUS           =    "B" -- billed
+                ARSBILLING:STATUS_DATE      =    ARSMASTER:TRANS_DATE
+                ARSBILLING:BILLED_DATE      =    ARSMASTER:TRANS_DATE
+
+                /* cancellations must have a status = "C" - cancelled */
+                If ARSMASTER:TRANS_CODE = ARSCONTROL:CANCELLATION_TRANS_CODE Or
+                   L_TRANS_CODE = ARSCONTROL:CANCELLATION_TRANS_CODE Then
+                   Begin
+                      ARSBILLING:STATUS = "C"
+                   End
+                End
+/* october 23, 2002 added to force and open status on endorsements processed
+   after the last installment was processed */
+            Else
+
+            If ((L_CTR = 1 And
+                 ARSBILLING:TRANS_CODE One Of 12, 15, 22) And
+                 L_FORCE_INVOICE  = "X") Then
+               -- 12 = endorsement increase
+               -- 22 = surcharge increase
+                Begin
+                    ARSBILLING:BILLING_CTR      = ARSBILLING:BILLING_CTR + 1
+                    ARSBILLING:STATUS           =    "O" -- billed
+                    ARSBILLING:STATUS_DATE      =    ARSMASTER:TRANS_DATE
+                    ARSBILLING:BILLED_DATE      =    00.00.0000
+                End
+
+/* october 31, 2002 added to force and paid status on endorsements processed
+   after the last installment was processed.  Disbursement will be created so
+   this transaction should never have an invoice created on it. */
+            Else
+
+            If ((L_CTR = 1 And
+                 ARSBILLING:TRANS_CODE One Of 13, 23) And
+                 L_FORCE_INVOICE  = "X") Then
+               -- 13 = endorsement decrease
+               -- 23 = surchareg decrease
+                Begin
+                    ARSBILLING:BILLING_CTR      = ARSBILLING:BILLING_CTR + 1
+                    ARSBILLING:STATUS           =    "P" -- billed
+                    ARSBILLING:STATUS_DATE      =    ARSMASTER:TRANS_DATE
+                    ARSBILLING:BILLED_DATE      =    00.00.0000
+                    ARSBILLING:DUE_DATE         =    00.00.0000
+                End
+
+/* july 14, 2003 */
+            If (L_CTR One Of 1 And
+                PRSTRANS:TRANS_CODE        One Of 12,13,22,23 And
+                L_HOLD_LAST_BILLING_STATUS One Of "B" And
+                L_PERIODS         = 1 And
+                L_SKIPPED_PERIODS = 0) Then
+                Begin
+                    ARSBILLING:STATUS = "B"
+                    ARSBILLING:STATUS_DATE = ARSMASTER:TRANS_DATE
+                    ARSBILLING:BILLED_DATE = ARSMASTER:TRANS_DATE
+                    ARSBILLING:DUE_DATE    = L_HOLD_LAST_DUE_DATE
+                End
+
+            Else
+                If (L_CTR > 1 And
+                    L_DUE_DATE[L_CTR] <= L_DUE_DATE[1]) Then
+                    Begin
+                    ARSBILLING:STATUS       =    "B"
+                    ARSBILLING:STATUS_DATE  =    ARSMASTER:TRANS_DATE
+                    ARSBILLING:BILLED_DATE  =    ARSMASTER:TRANS_DATE
+                    End
+                Else
+                   If ((L_CTR > 1 And
+                        L_DUE_DATE[L_CTR] > L_DUE_DATE[1]) Or
+                        ARSBILLING:TRANS_CODE One Of 12, 13, 15, 22, 23) Then
+                    Begin
+                    ARSBILLING:STATUS       =   "O" -- not billed
+                    ARSBILLING:STATUS_DATE  =   ARSMASTER:TRANS_DATE
+                    ARSBILLING:BILLED_DATE  = 00.00.0000
+                    End
+
+            ARSBILLING:INSTALLMENT_AMOUNT   =    L_INSTALLMENT[L_CTR]
+
+            ARSBILLING:AC_NET_AMOUNT_DUE    = ARSMASTER:AC_NET_AMOUNT_DUE
+
+            ARSBILLING:TOTAL_AMOUNT_PAID    =    0.00
+            ARSBILLING:WRITE_OFF            = 0
+            ARSBILLING:WRITE_OFF_AMOUNT     = 0.00
+            ARSBILLING:WRITE_OFF_DATE       = 00.00.0000
+            ARSBILLING:PRIOR_STATUS         = ARSBILLING:STATUS
+            ARSBILLING:PRIOR_STATUS_DATE    = ARSBILLING:STATUS_DATE
+            ARSBILLING:REINSTATED           = "N"
+
+            End
+        End
+    Else
+        Begin
+        L_UPDATE_FILE = "Change"
+        Change ARSBILLING
+            Begin
+            ARSBILLING:INSTALLMENT_AMOUNT   = ARSBILLING:INSTALLMENT_AMOUNT +
+                                              L_INSTALLMENT[L_CTR]
+            ARSBILLING:AC_NET_AMOUNT_DUE    = ARSBILLING:AC_NET_AMOUNT_DUE  +
+                                              ARSMASTER:AC_NET_AMOUNT_DUE
+            End
+        End
+
+        L_START_BILLING_CTR = L_START_BILLING_CTR + 1
+
+    End
+
+End
+
+-- added august 5, 2001 (DLP)
+Procedure GET_BILLING_SUBCODE
+Begin
+
+Access ARSBILLING_ALT, Set ARSBILLING_ALT:COMPANY_ID = ARSMASTER:COMPANY_ID,
+                           ARSBILLING_ALT:POLICY_NO  = ARSMASTER:POLICY_NO,
+                           ARSBILLING_ALT:TRANS_DATE = ARSMASTER:TRANS_DATE,
+                           ARSBILLING_ALT:TRANS_EFF  = ARSMASTER:TRANS_EFF,
+                           ARSBILLING_ALT:TRANS_EXP  = ARSMASTER:TRANS_EXP,
+                           ARSBILLING_ALT:TRANS_CODE = ARSMASTER:TRANS_CODE,
+                           ARSBILLING_ALT:LINE_OF_BUSINESS = ARSMASTER:LINE_OF_BUSINESS,
+                           ARSBILLING_ALT:COMM_RATE  = ARSMASTER:COMM_RATE, Approximate
+
+While ARSBILLING_ALT:COMPANY_ID = ARSMASTER:COMPANY_ID And
+      ARSBILLING_ALT:POLICY_NO  = ARSMASTER:POLICY_NO And
+      ARSBILLING_ALT:TRANS_DATE = ARSMASTER:TRANS_DATE And
+      ARSBILLING_ALT:TRANS_EFF  = ARSMASTER:TRANS_EFF And
+      ARSBILLING_ALT:TRANS_EXP  = ARSMASTER:TRANS_EXP And
+      ARSBILLING_ALT:TRANS_CODE = ARSMASTER:TRANS_CODE And
+      ARSBILLING_ALT:LINE_OF_BUSINESS = ARSMASTER:LINE_OF_BUSINESS And
+      ARSBILLING_ALT:COMM_RATE   = ARSMASTER:COMM_RATE
+      Begin
+        L_SUB_CODE = ARSBILLING_ALT:SUB_CODE
+        Next ARSBILLING_ALT
+      End
+
+End
+
+Procedure CHECK_FOR_PAYMENTS
+Begin
+
+Access ARSCHKSU, Set ARSCHKSU:POLICY_NO = PRSTRANS_ALT:POLICY_NO,Approximate,Using Fourth Index
+
+
+If PRSTRANS_ALT:TRANS_CODE Not One Of 11 Then
+Begin
+While ARSCHKSU:POLICY_NO = PRSTRANS_ALT:POLICY_NO
+Begin
+
+-- the following line was changed from
+-- if arschksu:disposition = "OPEN" then
+-- if the check is having multiple pulls on it then the
+-- checks disposition would be "INPROCESS"
+-- change made 10/17/2001 - DLP
+
+Access SFPCURRENT, Set SFPCURRENT:POLICY_NO = ARSCHKSU:POLICY_NO
+
+Access SFPNAME, Set SFPNAME:POLICY_NO = SFPCURRENT:POLICY_NO,
+                    SFPNAME:POL_YEAR  = SFPCURRENT:POL_YEAR,
+                    SFPNAME:END_SEQUENCE = SFPCURRENT:END_SEQUENCE
+
+If PRSTRANS_ALT:TRANS_CODE One Of 14 And
+   SFPNAME:USER_ID Not One Of "AUTO RENEWAL" And
+   ARSCHKSU:BALANCE  <> 0 Then
+       Begin
+       If SFSCOMPANY:DEBUG_MODE One Of 1 Then
+       Begin
+           Proc ("csbatch arsup010 %n",ARSCHKSU:POLICY_NO)
+       End
+       Else
+       If SFSCOMPANY:DEBUG_MODE One Of 0 Then
+       Begin
+           Proc ("csbatch arsup010 %n",ARSCHKSU:POLICY_NO)/noconsole
+       End
+       End
+
+If PRSTRANS_ALT:TRANS_CODE Not One Of 14 And
+   ARSCHKSU:BALANCE  <> 0 Then
+       Begin
+       If SFSCOMPANY:DEBUG_MODE One Of 1 Then
+       Begin
+           Proc ("csbatch arsup010 %n",ARSCHKSU:POLICY_NO)
+       End
+       Else
+       If SFSCOMPANY:DEBUG_MODE One Of 0 Then
+       Begin
+           Proc ("csbatch arsup010 %n",ARSCHKSU:POLICY_NO)/noconsole
+       End
+       End
+
+    Next ARSCHKSU
+End
+
+End
+
+End
+
+Procedure CHECK_FOR_RETURN_PREMIUMS
+Begin
+
+L_TOTAL_ANNUAL      = 0
+L_TOTAL_PAYMENTS    = 0
+L_NET_PAYMENTS      = 0
+L_FLAT_CX           = "N"
+L_TOTAL_REAL_CHECKS = 0
+
+
+/*
+Write ("<014>")
+Write ("%c%s%n",11001,"prstrans:pol_year      = ",PRSTRANS:POL_YEAR )
+Write ("%c%s%d",12001,"prstrans:eff_date      = ",PRSTRANS:EFF_DATE)
+Write ("%c%s%d",13001,"prstrans:trans_eff     = ",PRSTRANS:TRANS_EFF)
+Write ("%c%s%n",14001,"prstrans:trans_code    = ",PRSTRANS:TRANS_CODE)
+Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+*/
+
+--If PRSTRANS:PREMIUM = PRSTRANS:ANN_PREMIUM Then -- flat cx
+
+If PRSTRANS:TRANS_EFF = PRSTRANS:EFF_DATE And
+   PRSTRANS:TRANS_CODE Not One Of 12,13,15,18,22,23 Then
+Begin
+   L_FLAT_CX = "Y"
+End
+Else
+Begin
+   L_FLAT_CX = "N"
+End
+
+/*
+Write ("<014>")
+Write ("%c%s%s",01001,"FLAT CX  = ",L_FLAT_CX)
+Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+*/
+
+Access ARSBILLING_ALT, Set ARSBILLING_ALT:COMPANY_ID = L_HOLD_COMPANY_ID,
+                           ARSBILLING_ALT:POLICY_NO  = L_HOLD_POLICY_NO,Approximate
+
+While ARSBILLING_ALT:COMPANY_ID = L_HOLD_COMPANY_ID And
+      ARSBILLING_ALT:POLICY_NO  = L_HOLD_POLICY_NO
+      Begin
+      -- do not use installment charge (18)
+      -- c/x balance due (25)
+      -- installment charge credit (28)
+      /* checking for flat cancellation */
+
+      If ((Month(ARSBILLING_ALT:TRANS_EFF) = Month(PRSTRANS:TRANS_EXP) And
+          Day(ARSBILLING_ALT:TRANS_EFF) = Day(PRSTRANS:TRANS_EXP) And
+          Year(ARSBILLING_ALT:TRANS_EXP) - Year(PRSTRANS:TRANS_EXP) = 0) Or
+
+         (Month(ARSBILLING_ALT:TRANS_EFF) = Month(ARSBILLING_ALT:TRANS_EXP) And
+          Day(ARSBILLING_ALT:TRANS_EFF) = Day(ARSBILLING_ALT:TRANS_EXP) And
+          ARSBILLING_ALT:STATUS = "D"))  Then
+         Begin
+         -- do not include disbursements
+--         If ARSBILLING_ALT:TRANS_CODE Not One Of 18, 25, 28, 30, 35 And
+         If ARSBILLING_ALT:TRANS_CODE Not One Of 25, 30, 35 And
+            ARSBILLING_ALT:STATUS Not One Of  "C" Then -- removed 1
+         Begin
+--             L_FLAT_CX = "Y"
+             L_TOTAL_ANNUAL   = L_TOTAL_ANNUAL   + ARSBILLING_ALT:INSTALLMENT_AMOUNT
+             L_TOTAL_PAYMENTS = L_TOTAL_PAYMENTS + ARSBILLING_ALT:TOTAL_AMOUNT_PAID
+             L_TOTAL_RETURN   = L_TOTAL_RETURN   + ARSBILLING_ALT:DISBURSEMENT_AMOUNT
+         End
+         End -- end of checking for flat
+    --  Else
+
+      If L_FLAT_CX Not One Of "Y" Then
+      Begin
+      If ARSBILLING_ALT:TRANS_CODE Not One Of 18, 25, 28 And
+         Year(ARSBILLING_ALT:TRANS_EXP) - Year(PRSTRANS:TRANS_EXP) = 0 And
+         ARSBILLING_ALT:STATUS  Not One Of  "C" Then -- removed 18
+      Begin
+          L_TOTAL_ANNUAL   = L_TOTAL_ANNUAL   + ARSBILLING_ALT:INSTALLMENT_AMOUNT
+          L_TOTAL_PAYMENTS = L_TOTAL_PAYMENTS + ARSBILLING_ALT:TOTAL_AMOUNT_PAID
+          L_TOTAL_RETURN   = L_TOTAL_RETURN   + ARSBILLING_ALT:DISBURSEMENT_AMOUNT
+      End
+      End
+
+      If L_FLAT_CX One Of "Y" And
+         ARSBILLING_ALT:TRANS_CODE One Of 50 Then
+         Begin
+              L_NSF_CHARGE = L_NSF_CHARGE + ARSBILLING_ALT:INSTALLMENT_AMOUNT
+      End
+
+      If ARSBILLING_ALT:TRANS_CODE One Of 18 And
+          (Year(ARSBILLING_ALT:TRANS_EXP) - Year(PRSTRANS:TRANS_EXP) = 0 Or
+           ARSBILLING_ALT:POL_YEAR = PRSTRANS:POL_YEAR) And
+          (ARSBILLING_ALT:INSTALLMENT_AMOUNT
+                          + ARSBILLING_ALT:TOTAL_AMOUNT_PAID
+                          - ARSBILLING_ALT:WRITE_OFF_AMOUNT <> 0) Then
+      Begin
+
+--      If L_FLAT_CX Not One Of "Y" Then
+--         Begin
+--                L_INSTALLMENT_CHARGE = 0.00
+--         End
+
+--      If L_FLAT_CX Not One Of "Y" Then
+         Begin
+                L_INSTALLMENT_CHARGE = L_INSTALLMENT_CHARGE +
+                                       ARSBILLING_ALT:TOTAL_AMOUNT_PAID -
+                                       ARSBILLING_ALT:WRITE_OFF_AMOUNT
+                L_NSF_CHARGE = 0.00
+         End
+
+      End
+
+      Next ARSBILLING_ALT
+      End
+
+/*
+Write ("<014>")
+Write ("%c%s%n",01001,"l total annual    = ",L_TOTAL_ANNUAL)
+Write ("%c%s%n",02001,"l total Payments  = ",L_TOTAL_PAYMENTS)
+Write ("%c%s%n",03001,"l total return    = ",L_TOTAL_RETURN)
+Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+*/
+
+Access ARSPAYMENT, Set ARSPAYMENT:COMPANY_ID = PRSTRANS:COMPANY_ID,
+                       ARSPAYMENT:POLICY_NO  = PRSTRANS:POLICY_NO, Approximate
+
+While ARSPAYMENT:COMPANY_ID = PRSTRANS:COMPANY_ID And
+      ARSPAYMENT:POLICY_NO  = PRSTRANS:POLICY_NO
+      Begin
+         If ARSPAYMENT:TRANS_EXP = PRSTRANS:TRANS_EXP Then
+         Begin
+
+             Access ARSCHKSU, Set ARSCHKSU:COMPANY_ID      = ARSPAYMENT:COMPANY_ID,
+                                  ARSCHKSU:CHECK_REFERENCE = ARSPAYMENT:CHECK_REFERENCE
+
+             If L_FLAT_CX One Of "Y" Then
+             Begin
+             If ARSCHKSU:DISPOSITION Not One Of "NSF" And
+                ARSCHKSU:INTERNAL_CHECK  Not One Of 1 Then
+             Begin
+                 L_TOTAL_REAL_CHECKS = L_TOTAL_REAL_CHECKS + ARSPAYMENT:AMOUNT
+             End
+             End
+
+             If L_FLAT_CX Not One Of "Y" Then
+             Begin
+             If ARSCHKSU:DISPOSITION Not One Of "NSF" And
+                ARSPAYMENT:TRANS_CODE Not One Of  18, 28, 68 And
+                ARSCHKSU:INTERNAL_CHECK  Not One Of 1 Then
+             Begin
+                 L_TOTAL_REAL_CHECKS = L_TOTAL_REAL_CHECKS + ARSPAYMENT:AMOUNT
+             End
+             End
+         End
+      Next ARSPAYMENT
+      End
+
+L_TOTAL_UNEARNED = 0
+L_TOTAL_WRITTEN  = 0
+L_TOTAL_EARNED   = 0
+
+Access PRSMASTER, Set PRSMASTER:COMPANY_ID = PRSTRANS:COMPANY_ID,
+                      PRSMASTER:POLICY_NO  = PRSTRANS:POLICY_NO, Approximate
+
+While PRSMASTER:COMPANY_ID = PRSTRANS:COMPANY_ID And
+      PRSMASTER:POLICY_NO  = PRSTRANS:POLICY_NO
+      Begin
+         If PRSMASTER:TRANS_EXP = PRSTRANS:TRANS_EXP And
+            PRSMASTER:TRANS_CODE < 50 Then
+         Begin
+             L_TOTAL_WRITTEN = L_TOTAL_WRITTEN + PRSMASTER:PREMIUM
+         End
+         Next PRSMASTER
+      End
+
+/*  process arsbilling to capture current processed disbursements
+    for the current period - use arsbilling:pol_year = prstrans:pol_year
+    to decide current term/period */
+
+L_DISBURSEMENTS2 = 0.00
+
+Access ARSBILLING_ALT2, Set ARSBILLING_ALT2:COMPANY_ID = PRSTRANS:COMPANY_ID,
+                            ARSBILLING_ALT2:POLICY_NO  = PRSTRANS:POLICY_NO, Approximate
+
+While ARSBILLING_ALT2:COMPANY_ID = PRSTRANS:COMPANY_ID And
+      ARSBILLING_ALT2:POLICY_NO  = PRSTRANS:POLICY_NO
+      Begin
+      If ARSBILLING_ALT2:POL_YEAR = PRSTRANS:POL_YEAR And
+         ARSBILLING_ALT2:STATUS   One Of "D" Then
+         Begin
+            L_DISBURSEMENTS2 = L_DISBURSEMENTS2
+                               + ARSBILLING_ALT2:DISBURSEMENT_AMOUNT
+         End
+      Next ARSBILLING_ALT2
+      End
+
+If L_FLAT_CX Not One Of "Y" Then
+Begin
+    L_TOTAL_EARNED = L_TOTAL_WRITTEN -- + L_INSTALLMENT_CHARGE
+End
+
+--L_TOTAL_AMOUNT_PAID = (L_TOTAL_REAL_CHECKS - L_TOTAL_RETURN) - L_DISBURSEMENTS2
+L_TOTAL_AMOUNT_PAID = (L_TOTAL_REAL_CHECKS - L_TOTAL_RETURN)
+
+L_NET_PAYMENTS = 0
+
+If L_TOTAL_AMOUNT_PAID >= L_TOTAL_EARNED Then
+Begin
+    L_NET_PAYMENTS = L_TOTAL_AMOUNT_PAID - L_TOTAL_EARNED
+End
+
+Write ("<014>")
+Write ("%c%s%s",01001,"l flat CX              = ",L_FLAT_CX)
+Write ("%c%s%n",02001,"l total amount paid    = ",L_TOTAL_AMOUNT_PAID)
+Write ("%c%s%n",03001,"l total earned         = ",L_TOTAL_EARNED)
+Write ("%c%s%n",04001,"l total written        = ",L_TOTAL_WRITTEN)
+Write ("%c%s%n",05001,"l total real checks    = ",L_TOTAL_REAL_CHECKS)
+Write ("%c%s%n",06001,"l total return         = ",L_TOTAL_RETURN)
+Write ("%c%s%n",07001,"l net payments         = ",L_NET_PAYMENTS)
+Write ("%c%s%s",08001,"l hold company id      = ",L_HOLD_COMPANY_ID)
+Write ("%c%s%s",09001,"l company id           = ",L_COMPANY_ID)
+Write ("%c%s%n",10001,"l installment charge   = ",L_INSTALLMENT_CHARGE)
+Write ("%c%s%n",11001,"prstrans:pol_year      = ",PRSTRANS:POL_YEAR )
+Write ("%c%s%d",12001,"prstrans:eff_date      = ",PRSTRANS:EFF_DATE)
+Write ("%c%s%d",13001,"prstrans:trans_eff     = ",PRSTRANS:TRANS_EFF)
+Write ("%c%s%n",14001,"l total disbursements  = ",L_TOTAL_DISBURSEMENTS)
+Write ("%c%s%n",15001,"l total disbursements2 = ",L_DISBURSEMENTS2)
+Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+
+If L_FLAT_CX One Of "Y" And
+   L_INSTALLMENT_CHARGE <> 0 Then
+   Begin
+--       Do CREATE_OFFSET_INSTALLMENT_CHARGE
+       Do CREATE_CANCELLATION_INSTALLMENT_CHARGE
+   End
+/*   Else If L_FLAT_CX One Of "Y" And
+        L_INSTALLMENT_CHARGE = 0 Then
+        Begin
+            Do CREATE_CANCELLATION_INSTALLMENT_CHARGE
+        End
+*/
+
+If L_FLAT_CX One Of "Y" And
+   L_NSF_CHARGE <> 0 Then
+   Begin
+       Do CREATE_NSF_WRITEOFF
+   End
+
+End
+
+Procedure CREATE_OFFSET_INSTALLMENT_CHARGE
+Begin
+
+Access ARSBILLING_ALT, Set ARSBILLING_ALT:COMPANY_ID       = L_HOLD_COMPANY_ID,
+                           ARSBILLING_ALT:POLICY_NO        = L_HOLD_POLICY_NO, Approximate
+
+While ARSBILLING_ALT:COMPANY_ID = L_HOLD_COMPANY_ID And
+      ARSBILLING_ALT:POLICY_NO  = L_HOLD_POLICY_NO
+Begin
+
+If ARSBILLING_ALT:POL_YEAR = PRSTRANS:POL_YEAR And
+   ARSBILLING_ALT:TRANS_CODE One Of 18, 68
+   Then
+   Begin
+
+  Access ARSBILLING_ALT2, Set
+  ARSBILLING_ALT2:COMPANY_ID       = ARSBILLING_ALT:COMPANY_ID,
+  ARSBILLING_ALT2:POLICY_NO        = ARSBILLING_ALT:POLICY_NO,
+  ARSBILLING_ALT2:TRANS_DATE       = ARSBILLING_ALT:TRANS_DATE,
+  ARSBILLING_ALT2:TRANS_EFF        = ARSBILLING_ALT:TRANS_EFF,
+  ARSBILLING_ALT2:TRANS_EXP        = ARSBILLING_ALT:TRANS_EXP,
+  ARSBILLING_ALT2:TRANS_CODE       = ARSBILLING_ALT:TRANS_CODE,
+  ARSBILLING_ALT2:LINE_OF_BUSINESS = ARSBILLING_ALT:LINE_OF_BUSINESS,
+  ARSBILLING_ALT2:COMM_RATE        = ARSBILLING_ALT:COMM_RATE,
+  ARSBILLING_ALT2:SUB_CODE         = ARSBILLING_ALT:SUB_CODE,
+  ARSBILLING_ALT2:BILLING_CTR      = ARSBILLING_ALT:BILLING_CTR,
+  ARSBILLING_ALT2:RETURN_CHECK_CTR = ARSBILLING_ALT:RETURN_CHECK_CTR, Exact
+
+  If ARSBILLING_ALT2:COMPANY_ID       = ARSBILLING_ALT:COMPANY_ID And
+     ARSBILLING_ALT2:POLICY_NO        = ARSBILLING_ALT:POLICY_NO And
+     ARSBILLING_ALT2:TRANS_DATE       = ARSBILLING_ALT:TRANS_DATE And
+     ARSBILLING_ALT2:TRANS_EFF        = ARSBILLING_ALT:TRANS_EFF And
+     ARSBILLING_ALT2:TRANS_EXP        = ARSBILLING_ALT:TRANS_EXP And
+     ARSBILLING_ALT2:TRANS_CODE       = ARSBILLING_ALT:TRANS_CODE And
+     ARSBILLING_ALT2:LINE_OF_BUSINESS = ARSBILLING_ALT:LINE_OF_BUSINESS And
+     ARSBILLING_ALT2:COMM_RATE        = ARSBILLING_ALT:COMM_RATE And
+     ARSBILLING_ALT2:SUB_CODE         = ARSBILLING_ALT:SUB_CODE And
+     ARSBILLING_ALT2:BILLING_CTR      = ARSBILLING_ALT:BILLING_CTR And
+     ARSBILLING_ALT2:RETURN_CHECK_CTR = ARSBILLING_ALT:RETURN_CHECK_CTR Then
+
+     Begin
+         Change ARSBILLING_ALT2
+         Begin
+             ARSBILLING_ALT2:WRITE_OFF_AMOUNT = ARSBILLING_ALT:INSTALLMENT_AMOUNT -
+                                                ARSBILLING_ALT:TOTAL_AMOUNT_PAID -
+                                                ARSBILLING_ALT:WRITE_OFF_AMOUNT
+             ARSBILLING_ALT2:WRITE_OFF        = ARSBILLING_ALT:WRITE_OFF
+             arsbilling_alt2:write_off_date   = arsbilling_alt:write_off_date
+         End
+     End
+
+   End -- end of pol year checking
+
+   Next ARSBILLING_ALT
+
+   End
+
+End
+
+Procedure CREATE_CANCELLATION_INSTALLMENT_CHARGE
+Begin
+
+Access ARSBILLING_ALT, Set ARSBILLING_ALT:COMPANY_ID       = L_HOLD_COMPANY_ID,
+                           ARSBILLING_ALT:POLICY_NO        = L_HOLD_POLICY_NO, Approximate
+
+While ARSBILLING_ALT:COMPANY_ID = L_HOLD_COMPANY_ID And
+      ARSBILLING_ALT:POLICY_NO  = L_HOLD_POLICY_NO
+Begin
+
+If ARSBILLING_ALT:POL_YEAR = PRSTRANS:POL_YEAR And
+   ARSBILLING_ALT:TRANS_CODE One Of 18, 68 And
+   ARSBILLING_ALT:CONSENT_ORDER Not One Of 9
+   Then
+   Begin
+
+
+L_BILLING_CTR = ARSBILLING_ALT:BILLING_CTR + 100
+
+  Access ARSBILLING_ALT2, Set
+  ARSBILLING_ALT2:COMPANY_ID       = ARSBILLING_ALT:COMPANY_ID,
+  ARSBILLING_ALT2:POLICY_NO        = ARSBILLING_ALT:POLICY_NO,
+  ARSBILLING_ALT2:TRANS_DATE       = ARSBILLING_ALT:TRANS_DATE,
+  ARSBILLING_ALT2:TRANS_EFF        = ARSBILLING_ALT:TRANS_EFF,
+  ARSBILLING_ALT2:TRANS_EXP        = ARSBILLING_ALT:TRANS_EXP,
+  ARSBILLING_ALT2:TRANS_CODE       = ARSBILLING_ALT:TRANS_CODE,
+  ARSBILLING_ALT2:LINE_OF_BUSINESS = ARSBILLING_ALT:LINE_OF_BUSINESS,
+  ARSBILLING_ALT2:COMM_RATE        = ARSBILLING_ALT:COMM_RATE,
+  ARSBILLING_ALT2:SUB_CODE         = ARSBILLING_ALT:SUB_CODE,
+  ARSBILLING_ALT2:BILLING_CTR      = L_BILLING_CTR,
+  ARSBILLING_ALT2:RETURN_CHECK_CTR = ARSBILLING_ALT:RETURN_CHECK_CTR, Exact
+
+  If ARSBILLING_ALT2:COMPANY_ID       <> ARSBILLING_ALT:COMPANY_ID Or
+     ARSBILLING_ALT2:POLICY_NO        <> ARSBILLING_ALT:POLICY_NO Or
+     ARSBILLING_ALT2:TRANS_DATE       <> ARSBILLING_ALT:TRANS_DATE Or
+     ARSBILLING_ALT2:TRANS_EFF        <> ARSBILLING_ALT:TRANS_EFF Or
+     ARSBILLING_ALT2:TRANS_EXP        <> ARSBILLING_ALT:TRANS_EXP Or
+     ARSBILLING_ALT2:TRANS_CODE       <> ARSBILLING_ALT:TRANS_CODE Or
+     ARSBILLING_ALT2:LINE_OF_BUSINESS <> ARSBILLING_ALT:LINE_OF_BUSINESS Or
+     ARSBILLING_ALT2:COMM_RATE        <> ARSBILLING_ALT:COMM_RATE Or
+     ARSBILLING_ALT2:SUB_CODE         <> ARSBILLING_ALT:SUB_CODE Or
+     ARSBILLING_ALT2:BILLING_CTR      <> L_BILLING_CTR Or
+     ARSBILLING_ALT2:RETURN_CHECK_CTR <> ARSBILLING_ALT:RETURN_CHECK_CTR Then
+
+     Begin
+         Add ARSBILLING_ALT2
+         Begin
+             ARSBILLING_ALT2:RECORD            = ARSBILLING_ALT:RECORD/raw
+             ARSBILLING_ALT2:BILLING_CTR       = L_BILLING_CTR
+             ARSBILLING_ALT2:STATUS            = "C"
+             ARSBILLING_ALT2:USER              = USERNAME
+             ARSBILLING_ALT2:CONSENT_ORDER     = 9
+             ARSBILLING_ALT2:INSTALLMENT_AMOUNT = ARSBILLING_ALT2:INSTALLMENT_AMOUNT * -1
+             ARSBILLING_ALT2:TOTAL_AMOUNT_PAID = 0.00
+             ARSBILLING_ALT2:WRITE_OFF_AMOUNT  = 0.00
+             arsbilling_alt2:write_off_date    = 00.00.0000
+             ARSBILLING_ALT2:BILLED_DATE       = 00.00.0000
+         End
+     End
+
+   End -- end of pol year checking
+
+   Next ARSBILLING_ALT
+
+   End
+
+End
+
+Procedure CREATE_NSF_WRITEOFF
+Begin
+
+Access ARSBILLING_ALT, Set ARSBILLING_ALT:COMPANY_ID       = L_HOLD_COMPANY_ID,
+                           ARSBILLING_ALT:POLICY_NO        = L_HOLD_POLICY_NO, Approximate
+
+While ARSBILLING_ALT:COMPANY_ID = L_HOLD_COMPANY_ID And
+      ARSBILLING_ALT:POLICY_NO  = L_HOLD_POLICY_NO
+Begin
+
+    If ARSBILLING_ALT:TRANS_CODE One Of 50 And
+       ARSBILLING_ALT:STATUS     One Of "C","O","B" And
+       ARSBILLING_ALT:POL_YEAR   = PRSTRANS:POL_YEAR Then
+       Begin
+  Access ARSBILLING_ALT2, Set
+  ARSBILLING_ALT2:COMPANY_ID       = ARSBILLING_ALT:COMPANY_ID,
+  ARSBILLING_ALT2:POLICY_NO        = ARSBILLING_ALT:POLICY_NO,
+  ARSBILLING_ALT2:TRANS_DATE       = ARSBILLING_ALT:TRANS_DATE,
+  ARSBILLING_ALT2:TRANS_EFF        = ARSBILLING_ALT:TRANS_EFF,
+  ARSBILLING_ALT2:TRANS_EXP        = ARSBILLING_ALT:TRANS_EXP,
+  ARSBILLING_ALT2:TRANS_CODE       = ARSBILLING_ALT:TRANS_CODE,
+  ARSBILLING_ALT2:LINE_OF_BUSINESS = ARSBILLING_ALT:LINE_OF_BUSINESS,
+  ARSBILLING_ALT2:COMM_RATE        = ARSBILLING_ALT:COMM_RATE,
+  ARSBILLING_ALT2:SUB_CODE         = ARSBILLING_ALT:SUB_CODE,
+  ARSBILLING_ALT2:BILLING_CTR      = ARSBILLING_ALT:BILLING_CTR,
+  ARSBILLING_ALT2:RETURN_CHECK_CTR = ARSBILLING_ALT:RETURN_CHECK_CTR, Exact
+  If ARSBILLING_ALT2:ERRORNUMBER = 0 Then
+  Begin
+       Change ARSBILLING_ALT2
+       Begin
+           ARSBILLING_ALT2:WRITE_OFF        = 1
+           ARSBILLING_ALT2:WRITE_OFF_AMOUNT = ARSBILLING_ALT:INSTALLMENT_AMOUNT
+           arsbilling_alt2:write_off_date   = todaysdate
+       End
+       End
+       End
+       Next ARSBILLING_ALT
+       End
+
+End -- end of procedure
+
+Procedure POST_TO_PREMIUMS
+Begin
+
+L_UPDATE_FILE = "prsmaster - post to premiums"
+
+L_PRMAST_SUB_CODE = 0 -- set to 0
+
+Access PRSMASTER, Set PRSMASTER:COMPANY_ID= PRSTRANS:COMPANY_ID,
+                      PRSMASTER:POLICY_NO = PRSTRANS:POLICY_NO, Approximate
+
+While PRSMASTER:COMPANY_ID = PRSTRANS:COMPANY_ID And
+      PRSMASTER:POLICY_NO  = PRSTRANS:POLICY_NO
+Begin
+       L_PRMAST_SUB_CODE = PRSMASTER:SUB_CODE + 1
+       Next PRSMASTER
+End
+
+L_PRMAST_SUB_CODE = L_PRMAST_SUB_CODE + 1
+
+-- update prsmaster file
+
+Add PRSMASTER
+Begin
+     PRSMASTER:POLICY_NO           =       PRSTRANS:POLICY_NO
+     PRSMASTER:RECORD              =       PRSTRANS:RECORD/raw
+     PRSMASTER:SUB_CODE            =       L_PRMAST_SUB_CODE
+End
+
+End
+
+Procedure POST_TO_PREMIUMS_TREATY_REINSURANCE
+Begin
+
+L_UPDATE_FILE = "prsmaster - post to premiums treaty reinsurance"
+
+L_PRMAST_SUB_CODE = 0 -- set to 0
+
+Access PRSTRANS_CNV, Set PRSTRANS_CNV:COMPANY_ID = PRSTRANS:COMPANY_ID,
+                         PRSTRANS_CNV:POLICY_NO  = PRSTRANS:POLICY_NO, Approximate
+
+While PRSTRANS_CNV:COMPANY_ID = PRSTRANS:COMPANY_ID And
+      PRSTRANS_CNV:POLICY_NO  = PRSTRANS:POLICY_NO
+Begin
+
+If PRSTRANS_CNV:TRANS_CODE >= 70 Then
+Begin
+
+Access PRSMASTER, Set PRSMASTER:COMPANY_ID= PRSTRANS_CNV:COMPANY_ID,
+                      PRSMASTER:POLICY_NO = PRSTRANS_CNV:POLICY_NO, Approximate
+
+While PRSMASTER:COMPANY_ID = PRSTRANS_CNV:COMPANY_ID And
+      PRSMASTER:POLICY_NO  = PRSTRANS_CNV:POLICY_NO
+Begin
+       L_PRMAST_SUB_CODE = PRSMASTER:SUB_CODE + 1
+       Next PRSMASTER
+End
+
+L_PRMAST_SUB_CODE = L_PRMAST_SUB_CODE + 1
+
+-- update prsmaster file
+
+Add PRSMASTER
+Begin
+     PRSMASTER:POLICY_NO           =       PRSTRANS_CNV:POLICY_NO
+     PRSMASTER:RECORD              =       PRSTRANS_CNV:RECORD/raw
+     PRSMASTER:SUB_CODE            =       L_PRMAST_SUB_CODE
+End
+
+End -- end of transaction code check
+
+Next PRSTRANS_CNV
+End
+
+End
+
+Procedure CALCULATE_NEW_RENEWAL_PERIODS
+Begin
+
+/* house cleaning */
+
+L_UPDATE_FILE = "calculate new renewal periods"
+
+Do CLEANUP_DUE_DATE_ARRAY
+L_TOTAL_REMAINING_PERIODS = L_NUMBER_OF_PAYMENTS
+
+/* calculate due dates, use eff date */
+
+For L_CTR = 1 To L_NUMBER_OF_PAYMENTS
+    Begin
+    If L_CTR = 1 Then
+        Begin
+        Do CALCULATE_FIRST_PERIOD
+        End
+    Else
+        If L_CTR > 1 Then
+            Begin
+            Do CALCULATE_PERIOD_2_ON
+            End
+    End
+
+End
+
+Procedure CALCULATE_INSTALLMENT_AMOUNTS
+Begin
+
+L_UPDATE_FILE = "calculate installment amounts "
+
+Do CLEANUP_INSTALLMENT_AMOUNT_ARRAY
+
+L_TEMP_PREMIUM = PRSTRANS:PREMIUM
+
+            Switch (PRSTRANS:BILL_PLAN)
+            Case "AC" : Begin
+                        L_COMMISSION_RATE   = PRSTRANS:COMM_RATE * 0.01
+                        L_COMMISSION_AMOUNT = PRSTRANS:PREMIUM *
+                                              L_COMMISSION_RATE
+                        L_TEMP_PREMIUM      = PRSTRANS:PREMIUM -
+                                              L_COMMISSION_AMOUNT
+                        End
+            Default   : L_TEMP_PREMIUM      = PRSTRANS:PREMIUM
+            End
+
+For L_CTR = 1 To 20
+Begin
+   L_INSTALLMENT_NO_CENTS[L_CTR] = 0.00
+   L_INSTALLMENT[L_CTR]          = 0.00
+End
+
+For L_CTR = 1 To L_NUMBER_OF_PAYMENTS
+    Begin
+        L_INSTALLMENT[L_CTR] =
+        (L_TEMP_PREMIUM * ARSPAYPLAN:DISTRIBUTION[L_CTR])
+        L_INSTALLMENT_NO_CENTS[L_CTR] =
+        (L_TEMP_PREMIUM * ARSPAYPLAN:DISTRIBUTION[L_CTR])
+
+If PRSTRANS:TRANS_CODE = ARSCONTROL:INSTALLMENT_CHARGE_TRANS_CODE And
+   ARSPAYPLAN:INSTALLMENT_CHARGE_TYPE   = "FLAT" Then
+   Begin
+       L_INSTALLMENT[L_CTR] = (L_TEMP_PREMIUM Divide L_NUMBER_OF_PAYMENTS)
+   End
+
+End
+
+/* make sure that the total of the no cents installment buckets equal
+   the total premium, if not apply the difference to the first bucket */
+
+For L_CTR = 1 To L_NUMBER_OF_PAYMENTS
+Begin
+    L_TOTAL_INSTALLMENT_NO_CENTS = L_TOTAL_INSTALLMENT_NO_CENTS +
+                                   L_INSTALLMENT_NO_CENTS[L_CTR]
+End
+
+L_DIFF_INSTALLMENT_NO_CENTS = L_TEMP_PREMIUM - L_TOTAL_INSTALLMENT_NO_CENTS
+L_INSTALLMENT_NO_CENTS[1] = L_INSTALLMENT_NO_CENTS[1] + L_DIFF_INSTALLMENT_NO_CENTS
+
+L_DIFF_INSTALLMENT_NO_CENTS  = 0.00
+L_TOTAL_INSTALLMENT_NO_CENTS = 0.00
+
+If ARSCONTROL2:WHOLE_DOLLAR_INSTALLMENTS One Of 1 Then  -- put the control file check here
+Begin
+For L_CTR = 1 To L_NUMBER_OF_PAYMENTS
+Begin
+    L_INSTALLMENT[L_CTR] = L_INSTALLMENT_NO_CENTS[L_CTR]
+End
+End
+
+If PRSTRANS:TRANS_CODE One Of 19,22,23 Then
+Begin
+    L_INSTALLMENT[1] = L_TEMP_PREMIUM
+End
+
+Access ARSCONTROL, Set ARSCONTROL:COMPANY_ID = L_COMPANY_ID, Exact
+If ARSCONTROL:COMPANY_ID <> "" Then
+Begin
+    If ARSMASTER:TRANS_EFF < ARSCONTROL:INVOICE_APPLY_END_EFF Then
+    Begin
+        L_INSTALLMENT[L_CTR] = L_TEMP_PREMIUM
+    End
+End
+
+End
+
+Procedure CALCULATE_CANCELLATION
+Begin
+
+/* need to set the prior records, if they exist */
+
+Do ARSBILLING_PERIODS
+
+If L_TRANS_CODE = 11 Then
+Begin
+    Do SET_PRIOR_RECORDS
+End
+
+L_CTR = 1
+L_TOTAL_REMAINING_PERIODS = 1
+Do CALCULATE_FIRST_PERIOD
+L_INSTALLMENT[1] = PRSTRANS:PREMIUM
+
+If L_TRANS_CODE One Of 27 Then -- reinstatement of sur charge
+Begin
+    L_INSTALLMENT[1]=PRSTRANS:ANN_PREMIUM
+End
+
+If ARSPAYPLAN:NUMBER_OF_PAYMENTS <> 1 And
+   L_INSTALLMENT_UPDATED = "N" Then
+Begin
+--  added 10/27/2001 - this is new logic to calculate that remaining
+--  billing periods without using a work file - very cool indead
+    L_INSTALLMENT_UPDATED = "Y"
+End
+
+End
+
+Procedure CALCULATE_ENDORSEMENT_PERIODS
+Begin
+
+L_FORCE_INVOICE = "N"
+
+Do CLEANUP_DUE_DATE_ARRAY
+Do CLEANUP_INSTALLMENT_AMOUNT_ARRAY
+
+For L_CTR = 1 To 20
+Begin
+   L_INSTALLMENT_NO_CENTS[L_CTR] = 0.00
+   L_INSTALLMENT[L_CTR]          = 0.00
+   L_DUE_DATE_STATUS[L_CTR]      = " "
+End
+
+-- added 10/26/2001
+
+Do ARSBILLING_PERIODS
+
+-- added 2/9/2002 - if the endorsement was done and there was no more
+-- due dates to apply this logic would not bill this endorsement.  this was
+-- caused by the new logic to space out the installments evenly
+
+If L_PERIODS = 0 Then
+Begin
+    L_PERIODS = 1
+    L_FORCE_INVOICE = "Y"
+End
+
+-- this is checking to see the effective of when the a/r system
+-- will put endorsements on installments.  this should not be
+-- an issue with new clients just existing ones
+If ARSCONTROL:INVOICE_APPLY_END_EFF > PRSTRANS:TRANS_EFF Then
+Begin
+    L_ENDORSEMENT_INSTALLMENTS = 1
+End
+Else
+Begin
+--    L_ENDORSEMENT_INSTALLMENTS = L_NUMBER_OF_PAYMENTS
+      L_ENDORSEMENT_INSTALLMENTS = L_PERIODS
+End
+
+L_SKIPPED_PERIODS = L_NUMBER_OF_PAYMENTS - L_PERIODS
+
+L_TOTAL_REMAINING_PERIODS = L_NUMBER_OF_PAYMENTS - L_SKIPPED_PERIODS
+
+/*
+Write ("<014>")
+Write ("%c%s%n",01001,"l periods             = ",L_PERIODS)
+Write ("%c%s%n",02001,"l number of payments  = ",L_NUMBER_OF_PAYMENTS )
+Write ("%c%s%n",03001,"remaining period      = ",L_TOTAL_REMAINING_PERIODS)
+Write ("%c%s%n",04001,"l_skipped_periods     = ",L_SKIPPED_PERIODS)
+Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+*/
+
+If L_FORCE_INVOICE = "Y" And
+   L_NUMBER_OF_PAYMENTS > 1 Then
+   Begin
+      L_SKIPPED_PERIODS = 0
+   End
+
+/* do not put surcharges on installments */
+If PRSTRANS:TRANS_CODE Not One Of 22,23 Then
+Begin
+
+For L_CTR = 1 To L_PERIODS
+    Begin
+
+    L_INSTALLMENT[L_CTR] = PRSTRANS:PREMIUM Divide L_PERIODS
+
+-- put no-cents calc here
+
+    L_INSTALLMENT_NO_CENTS[L_CTR] = PRSTRANS:PREMIUM Divide L_PERIODS
+
+    L_DUE_DATE[L_CTR]    = L_HOLD_DUE_DATE[L_CTR + (L_NUMBER_OF_PAYMENTS - L_PERIODS)]
+
+/* logic added 10/24/2002 - due date needs normal calculation if no more
+   buckets are available */
+    If L_SKIPPED_PERIODS = 0 Then -- no more buckets
+    Begin
+        L_FORCE_INVOICE = "X"
+        L_DUE_DATE[1] = 00.00.0000
+        L_DUE_DATE[L_CTR] = PRSTRANS:TRANS_EFF
+
+        If L_DUE_DATE_STATUS[L_CTR + (L_NUMBER_OF_PAYMENTS - L_PERIODS)] One Of "B" Then
+        Begin
+        L_DUE_DATE[L_CTR] = L_HOLD_DUE_DATE[L_CTR + (L_NUMBER_OF_PAYMENTS - L_PERIODS)]
+        End
+
+        If Dateadd(PRSTRANS:TRANS_DATE,1) > L_DUE_DATE[L_CTR] Then
+        Begin
+            L_DUE_DATE[L_CTR] = Dateadd(PRSTRANS:TRANS_DATE,1)
+        End
+
+--        If L_DUE_DATE[L_CTR] > PRSTRANS:EXP_DATE Then
+--        Begin
+--            L_DUE_DATE[L_CTR] = PRSTRANS:EXP_DATE
+--        End
+
+        If L_NET_AMOUNT_DUE > 0.00 Then
+        Begin
+            L_FORCE_INVOICE = "E"
+        End
+
+    End
+
+    End
+End
+Else
+If PRSTRANS:TRANS_CODE One Of 22,23 Then
+Begin
+
+L_INSTALLMENT[1] = PRSTRANS:PREMIUM
+
+For L_CTR = 1 To 20
+Begin
+
+/* logic added 10/24/2002 - due date needs normal calculation if no more
+   buckets are available */
+
+--If L_SKIPPED_PERIODS => 0 then
+If L_HOLD_DUE_DATE[L_CTR]   <> 00.00.0000 And
+   L_DUE_DATE_STATUS[L_CTR] One Of "O" And
+   L_DUE_DATE[1]            = 00.00.0000 Then
+    Begin
+        L_DUE_DATE[1] = L_HOLD_DUE_DATE[L_CTR]
+    End
+End -- end of l_ctr
+
+If L_DUE_DATE[1] = 00.00.0000 Then
+Begin
+L_DUE_DATE[1] = PRSTRANS:TRANS_EFF
+If L_DUE_DATE[1] < Dateadd(PRSTRANS:TRANS_DATE,1) Then
+Begin
+    L_DUE_DATE[1] = Dateadd(PRSTRANS:TRANS_DATE,1)
+End
+
+-- calculate AC due from arscontrol2
+If PRSTRANS:BILL_PLAN One Of "AC" Then
+Begin
+    Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = PRSTRANS:COMPANY_ID
+    L_DUE_DATE[1] = PRSTRANS:TRANS_EFF
+    If L_DUE_DATE[1] < PRSTRANS:TRANS_DATE + ARSCONTROL2:AC_DAYS_DUE Then
+    Begin
+        L_DUE_DATE[1] = PRSTRANS:TRANS_DATE + ARSCONTROL2:AC_DAYS_DUE
+    End
+End -- end of AC due date calculations
+
+If Dateadd(PRSTRANS:TRANS_DATE,1) > L_DUE_DATE[1] Then
+       Begin
+            L_DUE_DATE[1] = Dateadd(PRSTRANS:TRANS_DATE,1)
+        End
+        If L_DUE_DATE[1] > PRSTRANS:EXP_DATE Then
+        Begin
+            L_DUE_DATE[1] = PRSTRANS:EXP_DATE
+        End
+
+End -- end of due date = 00.00.0000 checking
+
+End
+
+/* September 9, 2003 - zero rounding calc */
+
+For L_CTR = 1 To L_PERIODS
+Begin
+    L_TOTAL_INSTALLMENT_NO_CENTS = L_TOTAL_INSTALLMENT_NO_CENTS +
+                                   L_INSTALLMENT_NO_CENTS[L_CTR]
+End
+
+L_DIFF_INSTALLMENT_NO_CENTS = PRSTRANS:PREMIUM - L_TOTAL_INSTALLMENT_NO_CENTS
+L_INSTALLMENT_NO_CENTS[1] = L_INSTALLMENT_NO_CENTS[1] + L_DIFF_INSTALLMENT_NO_CENTS
+
+L_DIFF_INSTALLMENT_NO_CENTS  = 0.00
+L_TOTAL_INSTALLMENT_NO_CENTS = 0.00
+
+If ARSCONTROL2:WHOLE_DOLLAR_INSTALLMENTS One Of 1 Then  -- put the control file check here
+Begin
+For L_CTR = 1 To L_PERIODS
+Begin
+    L_INSTALLMENT[L_CTR] = L_INSTALLMENT_NO_CENTS[L_CTR]
+End
+End
+
+/* july 14, 2003 */
+
+If PRSTRANS:TRANS_CODE One Of 13 And
+   L_HOLD_LAST_BILLING_STATUS One Of "B" And
+   L_PERIODS = 1 And
+   L_SKIPPED_PERIODS = 0 Then
+   Begin
+       L_DUE_DATE[1] = L_HOLD_LAST_DUE_DATE
+   End
+
+/* make sure that the total installments equal the written premium
+   if not add / subtract the difference to the last bucket billed */
+
+L_TOTAL_INSTALLMENT = 0 -- house cleaning
+
+For L_CTR = 1 To L_PERIODS
+    Begin
+    L_TOTAL_INSTALLMENT = L_TOTAL_INSTALLMENT + L_INSTALLMENT[L_CTR]
+    End
+
+If L_TOTAL_INSTALLMENT <> PRSTRANS:PREMIUM Then
+    Begin
+    L_DIFFERENT_PREMIUM = PRSTRANS:PREMIUM - L_TOTAL_INSTALLMENT
+    L_INSTALLMENT[L_PERIODS] = L_INSTALLMENT[L_PERIODS] +
+                                               L_DIFFERENT_PREMIUM
+    End
+
+/* a little more house cleaning, clean out buckets that were not
+   filled with data */
+
+/* logic for endorsements to be billed like the old system goes here
+   for testing purposes and balancing do not place endorsements on
+   installments until the date noted in the arscontrol file
+*/
+
+For L_CTR = (L_TOTAL_REMAINING_PERIODS + 1) To L_NUMBER_OF_PAYMENTS
+    Begin
+    L_DUE_DATE[L_CTR] = 00.00.0000
+    L_INSTALLMENT[L_CTR] = 0
+    End
+
+End
+
+Procedure CALCULATE_FIRST_PERIOD
+Begin
+
+If ARSMASTER:TRANS_EFF > Dateadd(ARSMASTER:TRANS_DATE,1) Then
+    L_DUE_DATE[L_CTR] = ARSMASTER:TRANS_EFF
+Else
+    L_DUE_DATE[L_CTR] = Dateadd(ARSMASTER:TRANS_DATE,1)
+
+If ARSMASTER:BILL_PLAN One Of "AC" Then
+Begin
+    Access ARSCONTROL, Set ARSCONTROL2:COMPANY_ID = ARSMASTER:COMPANY_ID
+    If ARSMASTER:TRANS_EFF > ARSMASTER:TRANS_DATE + ARSCONTROL2:AC_DAYS_DUE Then
+    Begin
+        L_DUE_DATE[L_CTR] = ARSMASTER:TRANS_EFF
+    End
+    Else
+    Begin
+        L_DUE_DATE[L_CTR] = ARSMASTER:TRANS_DATE + ARSCONTROL2:AC_DAYS_DUE
+    End
+
+End
+
+End
+
+Procedure CALCULATE_PERIOD_2_ON
+Begin
+
+/* calculate the subsequent due dates using the policy effective date
+   changed 10/13/2001
+*/
+
+If ARSPAYPLAN:INSTALLMENT_MONTHS_BETWEEN <> 0 Then
+Begin
+L_DUE_DATE[L_CTR] = Dateadd(SFPNAME:EFF_DATE,
+                      ARSPAYPLAN:INSTALLMENT_MONTHS_BETWEEN * (L_CTR -1))
+
+               /* if other installment due dates are prior
+                  to the first installment then change
+                  the installment due dates to be due the
+                  same as the first installment so they
+                  are billed
+               */
+
+If L_DUE_DATE[L_CTR] < L_DUE_DATE[1] Then
+    L_DUE_DATE[L_CTR] = L_DUE_DATE[1]
+
+End
+
+/* payplan uses days betweeen each due date to calculate the
+   next due date -- this was changed 10/13/2001
+*/
+
+If ARSPAYPLAN:INVOICE_DAYS_BETWEEN <> 0 Then
+Begin
+    L_DUE_DATE[L_CTR] = L_DUE_DATE[L_CTR - 1] + ARSPAYPLAN:INVOICE_DAYS_BETWEEN
+    If L_DUE_DATE[L_CTR] > SFPNAME:EXP_DATE Then
+    { L_DUE_DATE[L_CTR] = L_DUE_DATE[L_CTR -1] }
+End
+
+If ARSMASTER:TRANS_CODE = 13  Then -- decrease in premium
+Begin
+L_CTR_2 = 0
+
+While L_CTR_2 < L_MAX_CTR
+Begin
+    L_CTR_2 = L_CTR_2 + 1
+    L_13_DUE_DATE[L_CTR_2] = 00.00.0000
+End
+
+L_CTR_2 = 0
+While L_CTR_2 < L_NUMBER_OF_PAYMENTS
+Begin
+    L_CTR_2 = L_CTR_2 + 1
+    If L_CTR_2 = 1 Then
+    Begin
+        L_13_DUE_DATE[L_CTR_2] = SFPNAME:EFF_DATE
+    End
+    Else
+    If L_CTR_2 > 1 Then
+    Begin
+       L_13_DUE_DATE[L_CTR_2] = Dateadd(SFPNAME:EFF_DATE,
+        ARSPAYPLAN:INSTALLMENT_MONTHS_BETWEEN * (L_CTR_2 - 1))
+    End
+End
+
+L_FOUND = "N"
+L_CTR_2 = 0
+L_CTR_3 = 0
+
+While L_FOUND = "N" And
+      L_CTR_2 < L_NUMBER_OF_PAYMENTS -- changed from "4" 02/13/2001
+Begin
+   L_CTR_2 = L_CTR_2 + 1
+   L_CTR_3 = L_CTR_2 + 1
+
+   If L_DUE_DATE[1] >= L_13_DUE_DATE[L_CTR_2] And
+      L_DUE_DATE[1] <= L_13_DUE_DATE[L_CTR_3] Then
+      Begin
+         L_FOUND = "Y"
+      End
+End
+
+/* if the loop worked then realign the due dates.  However,
+   in the event that the first due date for the transaction
+   is past the last due calculated based on the sfpname:eff_date
+   and the months between then use the calculated due date based
+   on the original calculate_first_period procedure
+*/
+
+If L_FOUND = "Y" Then
+Begin
+L_CTR_2 = 0
+While L_CTR_2 < ARSPAYPLAN:INSTALLMENT_MONTHS_BETWEEN
+Begin
+    L_CTR_2 = L_CTR_2 + 1
+    L_DUE_DATE[L_CTR_2] = L_13_DUE_DATE[L_CTR_3]
+    L_CTR_3 = L_CTR_3 + 1
+End
+End
+
+End
+
+End
+
+/*Procedure CALCULATE_INSTALLMENT_PERIODS
+Begin
+
+If ARSPAYPLAN:INSTALLMENT_MONTHS_BETWEEN <> 0 Then
+Begin
+For L_CTR = 1 To L_MAX_CTR
+    Begin
+    If L_CTR = 1 Then
+        Begin
+        L_HOLD_DUE_DATE[L_CTR] = SFPNAME:EFF_DATE
+        End
+    Else
+        If L_CTR > 1 Then
+            Begin
+            L_HOLD_DUE_DATE[L_CTR] = Dateadd(L_HOLD_DUE_DATE[L_CTR -1],
+                                     ARSPAYPLAN:INSTALLMENT_MONTHS_BETWEEN)
+            End
+    End
+End
+
+If ARSPAYPLAN:INVOICE_DAYS_BETWEEN <> 0 Then
+Begin
+    For L_CTR = 1 To L_MAX_CTR
+    Begin
+        L_HOLD_DUE_DATE[L_CTR] = L_DUE_DATE[L_CTR]
+        If L_HOLD_DUE_DATE[L_CTR] > SFPNAME:EXP_DATE Then
+        {  L_HOLD_DUE_DATE[L_CTR] = L_DUE_DATE[L_CTR - 1] }
+    End
+End
+
+End
+*/
+
+Procedure SET_PRIOR_RECORDS
+Begin
+
+L_UPDATE_FILE = "arsbilling_alt - set_prior_records"
+
+    Access ARSBILLING_ALT, Set ARSBILLING_ALT:COMPANY_ID       = ARSMASTER:COMPANY_ID,
+                               ARSBILLING_ALT:POLICY_NO        = ARSMASTER:POLICY_NO, Generic
+
+    While ARSBILLING_ALT:COMPANY_ID = ARSMASTER:COMPANY_ID And
+          ARSBILLING_ALT:POLICY_NO = ARSMASTER:POLICY_NO
+    Begin
+           Change ARSBILLING_ALT
+           Begin
+           If ARSBILLING_ALT:STATUS      One Of "B", "P", "O" Then
+           Begin
+               ARSBILLING_ALT:PRIOR_STATUS      = ARSBILLING_ALT:STATUS
+               ARSBILLING_ALT:PRIOR_STATUS_DATE = ARSBILLING_ALT:STATUS_DATE
+               ARSBILLING_ALT:STATUS            = "C"
+               ARSBILLING_ALT:STATUS_DATE       = ARSMASTER:TRANS_DATE
+               If ARSBILLING_ALT:REINSTATED Not One Of "Y" Then
+               Begin
+                   ARSBILLING_ALT:REINSTATED        = "N"
+               End
+
+               If ARSBILLING_ALT:TRANS_CODE One Of 18 Then
+               Begin
+                   If ARSBILLING_ALT:INSTALLMENT_AMOUNT - (ARSBILLING_ALT:TOTAL_AMOUNT_PAID +
+                                                           ARSBILLING_ALT:WRITE_OFF_AMOUNT) <> 0 Then
+                   Begin -- july 17 2003 changes at ficof
+                   ARSBILLING_ALT:WRITE_OFF        = 1
+                   ARSBILLING_ALT:WRITE_OFF_AMOUNT = (ARSBILLING_ALT:INSTALLMENT_AMOUNT - (ARSBILLING_ALT:TOTAL_AMOUNT_PAID +
+                                                          ARSBILLING_ALT:WRITE_OFF_AMOUNT))
+--                   ARSBILLING_ALT:WRITE_OFF_AMOUNT = ARSBILLING_ALT:INSTALLMENT_AMOUNT
+                   ARSBILLING_ALT:WRITE_OFF_DATE   = TODAYSDATE
+                   End
+               End
+           End
+           End
+           Next ARSBILLING_ALT
+    End
+End
+
+Procedure REINSTATE_PRIOR_RECORDS
+Begin
+
+L_UPDATE_FILE = "reinstate_prior_records 1"
+
+L_PENDING_DISBURSEMENTS = 0.00 -- house cleaning
+L_TOTAL_DISBURSEMENTS   = 0.00
+L_USE_RECORD            = 1 -- set to on, reset to 0 if not true
+
+Access ARSBILLING_ALT, Set ARSBILLING_ALT:COMPANY_ID = L_HOLD_COMPANY_ID,
+                           ARSBILLING_ALT:POLICY_NO  = L_HOLD_POLICY_NO, Approximate
+
+While ARSBILLING_ALT:COMPANY_ID = L_HOLD_COMPANY_ID And
+      ARSBILLING_ALT:POLICY_NO  = L_HOLD_POLICY_NO
+      Begin
+      /* new procedure to check prstrans transaction codes to the
+         arsbilling transaction codes.  Must be reinstated in
+         premiums before it can be reinstated in arsbilling
+         October 18, 2005   */
+
+      Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = ARSBILLING_ALT:COMPANY_ID
+
+      If ARSCONTROL2:SELECTIVE_REINSTATEMENTS One Of 1 Then
+      Begin
+      If ARSBILLING_ALT:TRANS_CODE > 16 Then
+      Begin
+          Do CONFIRM_TRANS_CODE
+      End
+      Else
+      Begin
+          L_USE_RECORD = 1
+      End
+      End
+
+      If ARSBILLING_ALT:CONSENT_ORDER One Of 9 Then
+      Begin
+          L_USE_RECORD = 0
+      End
+
+      If L_USE_RECORD One Of 1 Then
+      Begin
+      If ARSBILLING_ALT:COMPANY_ID       = L_HOLD_COMPANY_ID And
+         ARSBILLING_ALT:POLICY_NO        = L_HOLD_POLICY_NO And
+--         ARSBILLING_ALT:TRANS_EFF        = L_HOLD_TRANS_EFF And
+         ARSBILLING_ALT:TRANS_EXP        = L_HOLD_TRANS_EXP And
+         ARSBILLING_ALT:LINE_OF_BUSINESS = L_HOLD_LINE_OF_BUSINESS And
+         ARSBILLING_ALT:STATUS           = "C" And
+         ARSBILLING_ALT:PRIOR_STATUS     Not One Of "C","E" And
+--         ARSBILLING_ALT:REINSTATED       Not One Of "Y" And
+         ARSBILLING_ALT:TRANS_CODE       Not One Of 21,25,30,50,55,99 Then
+         Begin
+         Access ARSBILLING_ALIAS,
+     Set ARSBILLING_ALIAS:COMPANY_ID = ARSBILLING_ALT:COMPANY_ID,
+         ARSBILLING_ALIAS:POLICY_NO  = ARSBILLING_ALT:POLICY_NO,
+-- trans date must be prstrans:trans_date not the original trans date
+--         ARSBILLING_ALIAS:TRANS_DATE = ARSBILLING_ALT:TRANS_DATE,
+         ARSBILLING_ALIAS:TRANS_DATE = PRSTRANS:TRANS_DATE,
+         ARSBILLING_ALIAS:TRANS_EFF  = L_HOLD_TRANS_EFF, -- ARSBILLING_ALT:TRANS_EFF,
+         ARSBILLING_ALIAS:TRANS_EXP  = L_HOLD_TRANS_EXP, -- arsbilling_alt:trans_exp,
+         ARSBILLING_ALIAS:TRANS_CODE = ARSBILLING_ALT:TRANS_CODE,
+         ARSBILLING_ALIAS:LINE_OF_BUSINESS = ARSBILLING_ALT:LINE_OF_BUSINESS,
+         ARSBILLING_ALIAS:COMM_RATE  = ARSBILLING_ALT:COMM_RATE,
+         ARSBILLING_ALIAS:SUB_CODE   = ARSBILLING_ALT:SUB_CODE,
+         ARSBILLING_ALIAS:BILLING_CTR = ARSBILLING_ALT:BILLING_CTR,
+         ARSBILLING_ALIAS:RETURN_CHECK_CTR = ARSBILLING_ALT:RETURN_CHECK_CTR
+
+         Add ARSBILLING_ALIAS
+         Begin
+--  after this move need to adjust the first, second buckets from the difference of annual premium and reinstated premium
+             ARSBILLING_ALIAS:RECORD         = ARSBILLING_ALT:RECORD/raw
+--             Do GET_BILLING_SUB_CODE
+--             ARSBILLING_ALIAS:SUB_CODE       = L_SUB_CODE
+             ARSBILLING_ALIAS:COMPANY_ID     = L_HOLD_COMPANY_ID
+             ARSBILLING_ALIAS:POLICY_NO      = L_HOLD_POLICY_NO
+             ARSBILLING_ALIAS:LINE_OF_BUSINESS = L_HOLD_LINE_OF_BUSINESS
+--             ARSBILLING_ALIAS:TRANS_CODE     = L_TRANS_CODE_HOLD
+             ARSBILLING_ALIAS:TRANS_EFF      = L_HOLD_TRANS_EFF
+             ARSBILLING_ALIAS:TRANS_EXP      = L_HOLD_TRANS_EXP
+
+If ARSCONTROL2:REINSTATE_PREMIUMS One Of 1 Then
+Begin
+              If ((Month(ARSBILLING_ALIAS:TRANS_EFF) <> Month(ARSBILLING_ALIAS:TRANS_EXP) Or
+                  Day(ARSBILLING_ALIAS:TRANS_EFF)   <> Day(ARSBILLING_ALIAS:TRANS_EXP)) And
+                  ARSBILLING_ALIAS:TRANS_CODE One Of 18) Then
+                Begin
+                     ARSBILLING_ALIAS:INSTALLMENT_AMOUNT = 0.00
+                End
+
+             If ARSBILLING_ALIAS:TRANS_CODE One Of 10,11,12,13,14,16 Then
+             Begin
+             If L_16_REMAINING_PREM <> 0 And
+                ARSBILLING_ALIAS:TRANS_CODE One Of 10,11,12,13,14,16 Then
+             Begin
+                 If ARSBILLING_ALIAS:INSTALLMENT_AMOUNT => L_16_REMAINING_PREM Then
+                 Begin
+                      ARSBILLING_ALIAS:INSTALLMENT_AMOUNT = ARSBILLING_ALIAS:INSTALLMENT_AMOUNT - L_16_REMAINING_PREM
+                      L_16_REMAINING_PREM = 0.00
+                End
+                Else If ARSBILLING_ALIAS:INSTALLMENT_AMOUNT < L_16_REMAINING_PREM Then
+                Begin
+                     L_16_REMAINING_PREM = L_16_REMAINING_PREM  - ARSBILLING_ALIAS:INSTALLMENT_AMOUNT
+                     ARSBILLING_ALIAS:INSTALLMENT_AMOUNT = 0.00
+                End
+             End
+             End
+
+/*
+Write ("<014>")
+Write ("%c%s%n",01001,"l 19 remaining prem                 = ",L_19_REMAINING_PREM)
+Write ("%c%s%n",03001,"arsbilling_alias:installment_amount = ",ARSBILLING_ALIAS:INSTALLMENT_AMOUNT)
+Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+*/
+             If ARSBILLING_ALIAS:TRANS_CODE One Of 19,29 Then
+             Begin
+             If L_19_REMAINING_PREM <> 0 And
+                ARSBILLING_ALIAS:TRANS_CODE One Of 19,29 Then
+             Begin
+                 If ARSBILLING_ALIAS:INSTALLMENT_AMOUNT > L_19_REMAINING_PREM Then
+                 Begin
+                      ARSBILLING_ALIAS:INSTALLMENT_AMOUNT = ARSBILLING_ALIAS:INSTALLMENT_AMOUNT - L_19_REMAINING_PREM
+                      L_19_REMAINING_PREM = 0.00
+                End
+                Else If ARSBILLING_ALIAS:INSTALLMENT_AMOUNT < L_19_REMAINING_PREM Then
+                Begin
+                     L_19_REMAINING_PREM = L_19_REMAINING_PREM  - ARSBILLING_ALIAS:INSTALLMENT_AMOUNT
+                     ARSBILLING_ALIAS:INSTALLMENT_AMOUNT = 0.00
+                End
+             End
+             End
+             ARSBILLING_ALIAS:TRANS_DATE     = PRSTRANS:TRANS_DATE
+
+End -- end of arscontrol2:reinstate_premiums one of 1 checking
+
+
+             L_PENDING_DISBURSEMENTS         = L_PENDING_DISBURSEMENTS +
+                                               ARSBILLING_ALT:TOTAL_AMOUNT_PAID
+
+         If ARSBILLING_ALT:TRANS_CODE One Of 30 Then
+         {
+             L_TOTAL_DISBURSEMENTS           = L_TOTAL_DISBURSEMENTS +
+                                               (ARSBILLING_ALT:INSTALLMENT_AMOUNT * -1)
+         }
+
+             ARSBILLING_ALIAS:TOTAL_AMOUNT_PAID = 0.00
+             ARSBILLING_ALIAS:TRANS_CODE     = L_TRANS_CODE_HOLD
+             ARSBILLING_ALIAS:PRIOR_TRANS_CODE = ARSBILLING_ALT:TRANS_CODE
+--             If ARSBILLING_ALIAS:PRIOR_TRANS_CODE One Of 18 Then
+--             Begin
+                 ARSBILLING_ALIAS:WRITE_OFF        = 0
+                 ARSBILLING_ALIAS:WRITE_OFF_AMOUNT = 0.00
+                 ARSBILLING_ALIAS:WRITE_OFF_DATE   = 00.00.0000
+--             End
+             ARSBILLING_ALIAS:STATUS         = ARSBILLING_ALT:PRIOR_STATUS
+-- need to set the status to "B" so that the check processing will apply
+-- the money correct
+             If ARSBILLING_ALT:PRIOR_STATUS = "P" Then
+             Begin
+                 ARSBILLING_ALIAS:STATUS = "B"
+                 If ARSBILLING_ALIAS:BILLED_DATE = 00.00.0000 Then
+                 Begin
+                     ARSBILLING_ALIAS:STATUS = "O"
+                 End
+             End
+             ARSBILLING_ALIAS:STATUS_DATE    = ARSBILLING_ALT:PRIOR_STATUS_DATE
+             ARSBILLING_ALIAS:REINSTATED     = "Y"
+--             Do GET_REINSTATEMENT_SUB_CODE
+L_UPDATE_FILE = "reinstate prior records 2"
+--             L_SUB_CODE = L_SUB_CODE + 10
+             L_SUB_CODE = ARSBILLING_ALIAS:SUB_CODE + 1
+--             Do GET_BILLING_SUB_CODE
+             ARSBILLING_ALIAS:SUB_CODE       = L_SUB_CODE
+             If ARSBILLING_ALIAS:PRIOR_TRANS_CODE One Of 12,13,18,19,22,23,28,29 Then
+             Begin
+                 ARSBILLING_ALIAS:TRANS_CODE       = ARSBILLING_ALIAS:PRIOR_TRANS_CODE
+             End
+         If ARSBILLING_ALIAS:INSTALLMENT_AMOUNT = 0 Then
+         Begin
+             ARSBILLING_ALIAS:STATUS = "^"
+         End
+
+         End -- end of add
+
+     End -- end of If conditions
+
+     End -- end of l_use_record checking
+
+     Next ARSBILLING_ALT
+
+     End -- end of while
+
+/* let's clean up the "^" status records here */
+
+Access ARSBILLING_ALT, Set ARSBILLING_ALT:COMPANY_ID = L_HOLD_COMPANY_ID,
+                           ARSBILLING_ALT:POLICY_NO  = L_HOLD_POLICY_NO, Approximate
+
+While ARSBILLING_ALT:COMPANY_ID = L_HOLD_COMPANY_ID And
+      ARSBILLING_ALT:POLICY_NO  = L_HOLD_POLICY_NO
+      Begin
+      If ARSBILLING_ALT:STATUS One Of "^" Then
+      Begin
+          Delete ARSBILLING_ALT
+      End
+      Next ARSBILLING_ALT
+End
+
+End -- end of procedure
+
+Procedure CHECK_FOR_CX_RETURN_PREMIUMS
+Begin
+
+/* procedure will check for pending disbursements and reverse the amount
+   if exists */
+
+L_UPDATE_FILE = "check_for_cx_return_premiums 1"
+L_CHECKS_ISSUED           = 0.00
+L_UNISSUED_CHECK          = 0.00
+
+Access ARSCHECK, Set ARSCHECK:COMPANY_ID = L_HOLD_COMPANY_ID,
+                     ARSCHECK:POLICY_NO  = L_HOLD_POLICY_NO, Approximate
+
+While ARSCHECK:COMPANY_ID = L_HOLD_COMPANY_ID And
+      ARSCHECK:POLICY_NO  = L_HOLD_POLICY_NO
+      Begin
+      If ARSCHECK:RELEASE Not One Of "V","Y" And
+         ARSCHECK:APS_TRANS_CODE One Of "OVER", "CANCEL", "ENDORSE","RETURN" And
+         Val(ARSCHECK:CHECK_NO) One Of 0 Then -- found a pending disbursement
+         Begin
+            Access ARSCHECK_ALIAS, Set ARSCHECK_ALIAS:COMPANY_ID = ARSCHECK:COMPANY_ID,
+                                       ARSCHECK_ALIAS:POLICY_NO  = ARSCHECK:POLICY_NO,
+                                       ARSCHECK_ALIAS:SUB_CODE   = ARSCHECK:SUB_CODE
+           Change ARSCHECK_ALIAS
+           Begin
+                ARSCHECK_ALIAS:RELEASE = "V"
+                ARSCHECK_ALIAS:COMMENTS = "Reapplied to A/R from Reinstatement"
+                L_UNISSUED_CHECK = L_UNISSUED_CHECK + ARSCHECK_ALIAS:CHECK_AMOUNT
+           End
+
+         End
+      Else
+      If ARSCHECK:RELEASE One Of "Y" And
+         ARSCHECK:APS_TRANS_CODE One Of "CANCEL" And
+         Val(ARSCHECK:CHECK_NO) <> 0 Then
+         Begin
+             L_CHECKS_ISSUED = L_CHECKS_ISSUED + ARSCHECK:CHECK_AMOUNT
+         End
+
+      Next ARSCHECK
+
+End
+
+-- l_pending_disbursements is now updated in
+-- check_for_cx_return_premiums (1190)
+-- March 12, 2002
+
+--L_PENDING_DISBURSEMENTS = L_PENDING_DISBURSEMENTS - L_CHECKS_ISSUED +
+--                          L_CX_BALANCE_DUE_PAID
+
+/*
+Write ("<014>")
+Write ("%c%s%n",01001,"Unissued Checks      = ",L_UNISSUED_CHECK)
+Write ("%c%s%n",02001,"Issued Checks        = ",L_CHECKS_ISSUED)
+Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+*/
+
+Access ARSBILLING_ALIAS, Set ARSBILLING_ALIAS:COMPANY_ID = L_HOLD_COMPANY_ID,
+                             ARSBILLING_ALIAS:POLICY_NO  = L_HOLD_POLICY_NO, Approximate
+
+While ARSBILLING_ALIAS:COMPANY_ID = L_HOLD_COMPANY_ID And
+      ARSBILLING_ALIAS:POLICY_NO  = L_HOLD_POLICY_NO
+      Begin
+
+          L_POL_YEAR = ARSBILLING_ALIAS:POL_YEAR
+          If L_POL_YEAR = 0 Then
+          Begin
+              L_POL_YEAR = Year(ARSBILLING_ALIAS:TRANS_EFF)
+          End
+          If L_POL_YEAR = L_HOLD_POL_YEAR Then
+          Begin
+              L_TOTAL_AMOUNT_APPLIED = L_TOTAL_AMOUNT_APPLIED  +
+                                       ARSBILLING_ALIAS:TOTAL_AMOUNT_PAID
+          End
+
+          Next ARSBILLING_ALIAS
+End
+
+L_REINSTATE_AR = L_TOTAL_AMOUNT_APPLIED - L_CHECKS_ISSUED
+Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = L_HOLD_COMPANY_ID
+
+/* Write ("%c%s%n",01001,"l total amount applied      = ",L_TOTAL_AMOUNT_APPLIED)
+Write ("%c%s%n",02001,"l reinstate ar              = ",L_REINSTATE_AR)
+Write ("%c%s%n",03001,"arscontrol2:reinstate_prem  = ",ARSCONTROL2:REINSTATE_PREMIUMS)
+Write ("%c%s%s",04001,"l_hold_company              = ",L_HOLD_COMPANY_ID)
+Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+*/
+
+-- L_PENDING_DISBURSEMENTS = L_UNISSUED_CHECK
+L_PENDING_DISBURSEMENTS = 0
+
+If ARSCONTROL2:REINSTATE_PREMIUMS One Of 1 Then
+Begin
+--    L_UNISSUED_CHECK        = 0
+    L_REINSTATE_AR          = 0
+    L_PENDING_DISBURSEMENTS = 0
+End
+
+If L_UNISSUED_CHECK <> 0 Then
+Begin
+    Do CREATE_VOIDED_DISBURSEMENT_OFFSET
+End
+
+If L_PENDING_DISBURSEMENTS > 0 Or
+   L_REINSTATE_AR  > 0 Then -- need to create "dummy" check and process
+Begin
+
+L_UPDATE_FILE = "csexec_application"
+I_CSEXEC_APPLICATION = "CHECK_REFERENCE"
+Include "sfscsexec.pro"
+L_UPDATE_FILE = "check_for_cx_return_premiums 2"
+L_CHECK_REFERENCE = I_CSEXEC_NUMBER
+
+Access ARSCHKSU, Set ARSCHKSU:COMPANY_ID      = L_HOLD_COMPANY_ID,
+                     ARSCHKSU:CHECK_REFERENCE = L_CHECK_REFERENCE, Exact
+
+If ARSCHKSU:COMPANY_ID      <> L_HOLD_COMPANY_ID And
+   ARSCHKSU:CHECK_REFERENCE <> L_CHECK_REFERENCE Then -- new record
+   Begin
+   Add ARSCHKSU
+   Begin
+       ARSCHKSU:COMPANY_ID          = L_HOLD_COMPANY_ID
+       ARSCHKSU:CHECK_REFERENCE     = L_CHECK_REFERENCE
+       ARSCHKSU:POLICY_NO           = L_HOLD_POLICY_NO
+       ARSCHKSU:AGENT_NO            = SFSAGENT:AGENT_NO
+       ARSCHKSU:BANK_NO             = "DO NOT DEPOSIT"
+       ARSCHKSU:TRANS_DATE          = TODAYSDATE
+       ARSCHKSU:POSTED_DATE         = 00.00.0000
+       ARSCHKSU:CHECK_NO            = "REINSTATED FROM A/P"
+       ARSCHKSU:CHECK_AMOUNT        = L_PENDING_DISBURSEMENTS + L_REINSTATE_AR
+       ARSCHKSU:COMMENTS            = "Not A check - Reinstatement of A/P"
+       ARSCHKSU:PAYOR_NAME          = SFSCOMPANY:NAME[1]
+       ARSCHKSU:PAYOR_CARE_OF       = SFSCOMPANY:NAME[2]
+       ARSCHKSU:PAYOR_ADDRESS       = SFSCOMPANY:ADDRESS[1]
+       ARSCHKSU:PAYOR_CITY          = SFSCOMPANY:CITY
+       ARSCHKSU:PAYOR_STR_STATE     = SFSCOMPANY:STR_STATE
+       ARSCHKSU:PAYOR_ZIP_CODE_STR  = SFSCOMPANY:STR_ZIPCODE
+       ARSCHKSU:PAYOR_TYPE          = "O" -- other
+       ARSCHKSU:DEPOSIT_DATE        = 00.00.0000
+       ARSCHKSU:DISPOSITION         = "OPEN"
+       ARSCHKSU:MONEY_ORDER         = "N"
+       ARSCHKSU:BALANCE             = L_PENDING_DISBURSEMENTS + L_REINSTATE_AR
+       ARSCHKSU:CHECK_HOLD          = "N"
+       ARSCHKSU:USER                = USERNAME
+       ARSCHKSU:USER_CONSOLE        = CONSOLE
+       ARSCHKSU:ENTER_TIME          = SYSTEMTIME
+       ARSCHKSU:ENTER_DATE          = SYSTEMDATE
+       ARSCHKSU:QUOTE_NO            = 0
+       ARSCHKSU:DEPOSIT_PREMIUM     = 0
+       ARSCHKSU:MORTGAGE_ID         = " "
+       ARSCHKSU:CREDIT_INSTALLMENT_CHAGE = 0
+       ARSCHKSU:CHECK_PAYS_TOTAL    = 0
+       ARSCHKSU:INTERNAL_CHECK      = 1 -- this is done so no deposit slip is created
+   End -- end of add
+   End -- end of checking for record exists
+
+End -- end of checking for l_pending_disbursements > 0
+
+End -- end of procedure
+
+Procedure CLEANUP_DUE_DATE_ARRAY
+Begin
+
+For L_CTR = 1 To L_MAX_CTR
+    Begin
+    L_DUE_DATE[L_CTR] = 00.00.0000
+    End
+
+End
+
+Procedure CLEANUP_INSTALLMENT_AMOUNT_ARRAY
+Begin
+
+For L_CTR = 1 To L_MAX_CTR
+    Begin
+    L_INSTALLMENT[L_CTR] = 0.00
+    End
+
+End
+
+Procedure GET_PAYOR_TYPE
+Begin
+/* if other than the insured is the payor then the payment plan
+   will be annual only - payment plan = 1 */
+
+Access SFPSUPP, Set SFPSUPP:POLICY_NO = PRSTRANS:POLICY_NO,
+                    SFPSUPP:POL_YEAR  = PRSTRANS:EFF_DATE_YYYY,
+                    Approximate
+
+While SFPSUPP:POLICY_NO = PRSTRANS:POLICY_NO And
+      SFPSUPP:POL_YEAR  = PRSTRANS:EFF_DATE_YYYY
+      Begin
+      If SFPSUPP:MORTGAGE_TYPE_1 = "B" Or
+         SFPSUPP:MORTGAGE_TYPE_1 = "C" Or
+         SFPSUPP:MORTGAGE_TYPE_1 = "F" Then
+         { L_NUMBER_OF_PAYMENTS = 1 }
+      Next SFPSUPP
+      End
+End
+
+Procedure CREATE_ACCOUNTS_PAYABLE
+Begin
+
+/*
+Write ("<014>")
+Write ("%c%s%n",01001,"L Net Payments           = ",L_NET_PAYMENTS)
+Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+*/
+
+L_NET_PAYMENTS_BALANCE = L_NET_PAYMENTS
+
+Access ARSCHKSU, Set ARSCHKSU:POLICY_NO = PRSTRANS:POLICY_NO, Using Fourth Index, Approximate
+/* grab the very last record in arschksu and reaccess arschksu to use for
+   return check
+   */
+While ARSCHKSU:POLICY_NO = PRSTRANS:POLICY_NO
+Begin
+    If ARSCHKSU:POLICY_NO = PRSTRANS:POLICY_NO Then
+    Begin
+         L_HOLD_CHKSU_COMPANY_ID = ARSCHKSU:COMPANY_ID
+         L_HOLD_CHKSU_CHECK_REFERENCE = ARSCHKSU:CHECK_REFERENCE
+    End
+    Next ARSCHKSU
+End
+
+Access ARSCHKSU, Set ARSCHKSU:COMPANY_ID      = L_HOLD_CHKSU_COMPANY_ID,
+                     ARSCHKSU:CHECK_REFERENCE = L_HOLD_CHKSU_CHECK_REFERENCE
+
+Do GET_ARSCHECK_SUB_CODE
+Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = ARSCHKSU:COMPANY_ID, Approximate
+L_DEFAULT_RELEASE = ARSCONTROL2:DEFAULT_CHECK_RELEASE
+
+L_UPDATE_FILE = "arscheck - create_accounts_payable"
+Write ("%c%s%s",05001,"<014>",L_UPDATE_FILE)
+
+While ARSCHKSU:POLICY_NO = PRSTRANS:POLICY_NO
+Begin
+If L_NET_PAYMENTS_BALANCE > 0 Then
+Begin
+    Add ARSCHECK
+    Begin
+        ARSCHECK:COMPANY_ID          = PRSTRANS:COMPANY_ID
+        ARSCHECK:POLICY_NO           = PRSTRANS:POLICY_NO
+        ARSCHECK:SUB_CODE            = L_SUB_CODE
+        ARSCHECK:ACCOUNT             = SFSCOMPANY:CHECKING_ACCOUNT_NO[2]
+        If L_TRANS_CODE_HOLD = 11 Then
+        Begin
+           ARSCHECK:APS_TRANS_CODE   = "CANCEL"
+        End
+        Else
+        Begin
+           ARSCHECK:APS_TRANS_CODE      = "ENDORSE"
+        End
+        ARSCHECK:TEN99               = 0
+        ARSCHECK:LOSS_PAYEE          = 0
+        ARSCHECK:PAYEE_NAME[1]       = ARSCHKSU:PAYOR_NAME/raw
+        ARSCHECK:PAYEE_NAME[2]       = ARSCHKSU:PAYOR_CARE_OF/raw
+        ARSCHECK:PAYEE_NAME[3]       = " "
+        ARSCHECK:PAYEE_NAME[4]       = " "
+        ARSCHECK:PAYEE_NAME[5]       = " "
+        ARSCHECK:PAYEE_NAME[6]       = " "
+        ARSCHECK:MAILTO_NAME[1]      = ARSCHKSU:PAYOR_NAME/raw
+        ARSCHECK:MAILTO_NAME[2]      = " "
+        ARSCHECK:MAILTO_NAME[3]      = " "
+        ARSCHECK:ADDRESS[1]          = ARSCHKSU:PAYOR_ADDRESS/raw
+        ARSCHECK:ADDRESS[2]          = " "
+        ARSCHECK:ADDRESS[3]          = " "
+        ARSCHECK:CITY                = ARSCHKSU:PAYOR_CITY/raw
+        ARSCHECK:STR_STATE           = ARSCHKSU:PAYOR_STR_STATE/raw
+        ARSCHECK:STR_ZIPCODE         = ARSCHKSU:PAYOR_ZIP_CODE_STR/raw
+        ARSCHECK:CHECK_DRAFT         = "C"
+        ARSCHECK:COMMENTS            = "Check Created by arsup001"
+        ARSCHECK:PAYMENT_MESSAGE     = "Return Premium Check for Cancellation"
+        ARSCHECK:CHECK_AMOUNT        = L_NET_PAYMENTS_BALANCE
+        ARSCHECK:CHECK_NO            = " "
+        ARSCHECK:CHECK_DATE          = 00.00.0000
+        ARSCHECK:RELEASE             = L_DEFAULT_RELEASE
+        ARSCHECK:RELEASE_DATE        = 00.00.0000
+        ARSCHECK:CHECK_CLEARED       = 0
+        ARSCHECK:CHECK_CLEARED_DATE  = 00.00.0000
+        ARSCHECK:ENTERING_USER_NAME  = USERNAME
+        ARSCHECK:CLEARING_USER_NAME  = " "
+        ARSCHECK:RELEASE_USER_NAME   = " "
+        ARSCHECK:PAYEE_TYPE[1]       = "I"
+        ARSCHECK:AGENT_NO[1]         = PRSTRANS:AGENT_NO
+        ARSCHECK:EFF_DATE            = PRSTRANS:EFF_DATE
+        ARSCHECK:TIN                 = " "
+        ARSCHECK:STATUS_AFTER_CHECK  = " "
+        ARSCHECK:MORTGAGE_SUB_CODE   = 0
+        ARSCHECK:ENTER_DATE          = TODAYSDATE
+    End
+
+-- using l_net_payments_balance as a control total
+    L_NET_PAYMENTS_BALANCE = L_NET_PAYMENTS_BALANCE - ARSCHKSU:CHECK_AMOUNT
+
+End
+
+      Next ARSCHKSU
+
+End
+
+/* create a/r disbursement here, using prstrans data */
+
+L_CTR              = 1
+L_SUB_CODE         = 0
+L_RETURN_CHECK_CTR = 0
+
+L_UPDATE_FILE = "arscheck - creating a/r disbursements "
+Write ("%c%s%s",05001,"<014>",L_UPDATE_FILE)
+
+Access ARSCONTROL, Set ARSCONTROL:COMPANY_ID = PRSTRANS:COMPANY_ID
+
+If L_NET_PAYMENTS <> 0 Then
+Begin
+
+Access ARSBILLING_ALT,
+Set ARSBILLING_ALT:COMPANY_ID       = PRSTRANS:COMPANY_ID,
+    ARSBILLING_ALT:POLICY_NO        = PRSTRANS:POLICY_NO,
+    ARSBILLING_ALT:TRANS_DATE       = PRSTRANS:TRANS_DATE,
+    ARSBILLING_ALT:TRANS_EFF        = PRSTRANS:TRANS_EFF,
+    ARSBILLING_ALT:TRANS_EXP        = PRSTRANS:TRANS_EXP,
+    ARSBILLING_ALT:TRANS_CODE       = ARSCONTROL:DISBURSEMENT_TRANS_CODE,
+    ARSBILLING_ALT:LINE_OF_BUSINESS = PRSTRANS:LINE_OF_BUSINESS,
+    ARSBILLING_ALT:COMM_RATE        = PRSTRANS:COMM_RATE, Approximate
+
+While ARSBILLING_ALT:COMPANY_ID   = PRSTRANS:COMPANY_ID And
+      ARSBILLING_ALT:POLICY_NO    = PRSTRANS:POLICY_NO And
+      ARSBILLING_ALT:TRANS_DATE   = PRSTRANS:TRANS_DATE And
+      ARSBILLING_ALT:TRANS_EFF    = PRSTRANS:TRANS_EFF And
+      ARSBILLING_ALT:TRANS_EXP    = PRSTRANS:TRANS_EXP And
+      ARSBILLING_ALT:TRANS_CODE   = ARSCONTROL:DISBURSEMENT_TRANS_CODE And
+      ARSBILLING_ALT:LINE_OF_BUSINESS = PRSTRANS:LINE_OF_BUSINESS And
+      ARSBILLING_ALT:COMM_RATE        = PRSTRANS:COMM_RATE
+      Begin
+          L_SUB_CODE = ARSBILLING_ALT:SUB_CODE
+          Next ARSBILLING_ALT
+      End
+
+L_SUB_CODE = L_SUB_CODE + 10
+
+Access ARSBILLING_ALIAS,
+Set ARSBILLING_ALIAS:COMPANY_ID       = PRSTRANS:COMPANY_ID,
+    ARSBILLING_ALIAS:POLICY_NO        = PRSTRANS:POLICY_NO,
+    ARSBILLING_ALIAS:TRANS_DATE       = PRSTRANS:TRANS_DATE,
+    ARSBILLING_ALIAS:TRANS_EFF        = PRSTRANS:TRANS_EFF,
+    ARSBILLING_ALIAS:TRANS_EXP        = PRSTRANS:TRANS_EXP,
+    ARSBILLING_ALIAS:TRANS_CODE       = ARSCONTROL:DISBURSEMENT_TRANS_CODE,
+    ARSBILLING_ALIAS:LINE_OF_BUSINESS = PRSTRANS:LINE_OF_BUSINESS,
+    ARSBILLING_ALIAS:COMM_RATE        = PRSTRANS:COMM_RATE,
+    ARSBILLING_ALIAS:SUB_CODE         = L_SUB_CODE
+
+   If ARSBILLING_ALIAS:COMPANY_ID   <> PRSTRANS:COMPANY_ID Or
+      ARSBILLING_ALIAS:POLICY_NO    <> PRSTRANS:POLICY_NO Or
+      ARSBILLING_ALIAS:TRANS_DATE   <> PRSTRANS:TRANS_DATE Or
+      ARSBILLING_ALIAS:TRANS_EFF    <> PRSTRANS:TRANS_EFF Or
+      ARSBILLING_ALIAS:TRANS_EXP    <> PRSTRANS:TRANS_EXP Or
+      ARSBILLING_ALIAS:TRANS_CODE   <> ARSCONTROL:DISBURSEMENT_TRANS_CODE Or
+      ARSBILLING_ALIAS:LINE_OF_BUSINESS <> PRSTRANS:LINE_OF_BUSINESS Or
+      ARSBILLING_ALIAS:COMM_RATE        <> PRSTRANS:COMM_RATE Or
+      ARSBILLING_ALIAS:SUB_CODE         <> L_SUB_CODE Then
+      Begin
+      Add ARSBILLING_ALIAS
+      Begin
+      ARSBILLING_ALIAS:COMPANY_ID       = PRSTRANS:COMPANY_ID
+      ARSBILLING_ALIAS:POLICY_NO        = PRSTRANS:POLICY_NO
+      ARSBILLING_ALIAS:TRANS_DATE       = PRSTRANS:TRANS_DATE
+      ARSBILLING_ALIAS:TRANS_EFF        = PRSTRANS:TRANS_EFF
+      ARSBILLING_ALIAS:TRANS_EXP        = PRSTRANS:TRANS_EXP
+      ARSBILLING_ALIAS:TRANS_CODE       = ARSCONTROL:DISBURSEMENT_TRANS_CODE
+      ARSBILLING_ALIAS:LINE_OF_BUSINESS = PRSTRANS:LINE_OF_BUSINESS
+      ARSBILLING_ALIAS:COMM_RATE        = PRSTRANS:COMM_RATE
+      ARSBILLING_ALIAS:SUB_CODE         = L_SUB_CODE
+      ARSBILLING_ALIAS:BILLING_CTR      = L_CTR
+      ARSBILLING_ALIAS:RETURN_CHECK_CTR = L_RETURN_CHECK_CTR
+      ARSBILLING_ALIAS:LOB_SUBLINE      = PRSTRANS:LOB_SUBLINE
+      ARSBILLING_ALIAS:DUE_DATE         = TODAYSDATE
+      ARSBILLING_ALIAS:BILL_PLAN        = PRSTRANS:BILL_PLAN
+      ARSBILLING_ALIAS:PAYMENT_PLAN     = PRSTRANS:PAYMENT_PLAN
+      ARSBILLING_ALIAS:STATUS           = "D"
+      ARSBILLING_ALIAS:STATUS_DATE      = TODAYSDATE
+      ARSBILLING_ALIAS:BILLED_DATE      = TODAYSDATE
+      ARSBILLING_ALIAS:INSTALLMENT_AMOUNT = 0
+      ARSBILLING_ALIAS:TOTAL_AMOUNT_PAID  = 0
+      ARSBILLING_ALIAS:DISBURSEMENT_AMOUNT = L_NET_PAYMENTS
+      ARSBILLING_ALIAS:WRITE_OFF          = 0
+      ARSBILLING_ALIAS:WRITE_OFF_AMOUNT   = 0.00
+      ARSBILLING_ALIAS:WRITE_OFF_DATE     = 00.00.0000
+      ARSBILLING_ALIAS:PRIOR_STATUS       = "D"
+      ARSBILLING_ALIAS:PRIOR_STATUS_DATE  = TODAYSDATE
+      ARSBILLING_ALIAS:PRIOR_TRANS_CODE   = ARSCONTROL:DISBURSEMENT_TRANS_CODE
+      ARSBILLING_ALIAS:REINSTATED         = "N"
+      ARSBILLING_ALIAS:USER               = USERNAME
+      ARSBILLING_ALIAS:USER_CONSOLE       = TERMINAL
+      ARSBILLING_ALIAS:POL_YEAR           = PRSTRANS:POL_YEAR
+      ARSBILLING_ALIAS:END_SEQUENCE       = PRSTRANS:END_SEQUENCE
+      End -- end of add
+
+      End -- end of access
+
+-- Write ("%c%s%",13001,"X'int ARSBILLING_ALIAS")
+
+End -- end of checking for l_net_payments <> 0
+
+End -- end of procedure
+
+Procedure CREATE_PRIOR_YEAR_INTERNAL_CHECK
+Begin
+
+L_UPDATE_FILE = "csexec_application"
+I_CSEXEC_APPLICATION = "CHECK_REFERENCE"
+Include "sfscsexec.pro"
+L_UPDATE_FILE = "check_for_cx_return_premiums 2"
+L_CHECK_REFERENCE = I_CSEXEC_NUMBER
+
+Access ARSCHKSU, Set ARSCHKSU:COMPANY_ID      = PRSTRANS:COMPANY_ID,
+                     ARSCHKSU:CHECK_REFERENCE = L_CHECK_REFERENCE, Exact
+
+If ARSCHKSU:COMPANY_ID      <> PRSTRANS:COMPANY_ID And
+   ARSCHKSU:CHECK_REFERENCE <> L_CHECK_REFERENCE Then -- new record
+   Begin
+   Add ARSCHKSU
+   Begin
+       ARSCHKSU:COMPANY_ID          = PRSTRANS:COMPANY_ID
+       ARSCHKSU:CHECK_REFERENCE     = L_CHECK_REFERENCE
+       ARSCHKSU:POLICY_NO           = PRSTRANS:POLICY_NO
+       ARSCHKSU:AGENT_NO            = SFSAGENT:AGENT_NO
+       ARSCHKSU:BANK_NO             = "DO NOT DEPOSIT"
+       ARSCHKSU:TRANS_DATE          = TODAYSDATE
+       ARSCHKSU:POSTED_DATE         = 00.00.0000
+       ARSCHKSU:CHECK_NO            = "Prior Year Disbursement"
+       ARSCHKSU:CHECK_AMOUNT        = L_NET_PAYMENTS_BALANCE
+       ARSCHKSU:COMMENTS            = "Not A check - Reinstatement of A/P"
+       ARSCHKSU:PAYOR_NAME          = SFSCOMPANY:NAME[1]
+       ARSCHKSU:PAYOR_CARE_OF       = SFSCOMPANY:NAME[2]
+       ARSCHKSU:PAYOR_ADDRESS       = SFSCOMPANY:ADDRESS[1]
+       ARSCHKSU:PAYOR_CITY          = SFSCOMPANY:CITY
+       ARSCHKSU:PAYOR_STR_STATE     = SFSCOMPANY:STR_STATE
+       ARSCHKSU:PAYOR_ZIP_CODE_STR  = SFSCOMPANY:STR_ZIPCODE
+       ARSCHKSU:PAYOR_TYPE          = "O" -- other
+       ARSCHKSU:DEPOSIT_DATE        = 00.00.0000
+       ARSCHKSU:DISPOSITION         = "OPEN"
+       ARSCHKSU:MONEY_ORDER         = "N"
+       ARSCHKSU:BALANCE             = ARSCHKSU:CHECK_AMOUNT
+       ARSCHKSU:CHECK_HOLD          = "N"
+       ARSCHKSU:USER                = USERNAME
+       ARSCHKSU:USER_CONSOLE        = CONSOLE
+       ARSCHKSU:ENTER_TIME          = SYSTEMTIME
+       ARSCHKSU:ENTER_DATE          = SYSTEMDATE
+       ARSCHKSU:QUOTE_NO            = 0
+       ARSCHKSU:DEPOSIT_PREMIUM     = 0
+       ARSCHKSU:MORTGAGE_ID         = " "
+       ARSCHKSU:CREDIT_INSTALLMENT_CHAGE = 0
+       ARSCHKSU:CHECK_PAYS_TOTAL    = 0
+       ARSCHKSU:INTERNAL_CHECK      = 1 -- this is done so no deposit slip is created
+   End -- end of add
+
+   End -- end of checking for record exists
+
+End -- end of procedure create prior period internal check
+
+Procedure APPLY_STATUS_UPDATE
+Begin
+
+Access ARSBILLING, Set ARSBILLING:COMPANY_ID = PRSTRANS:COMPANY_ID,
+                       ARSBILLING:POLICY_NO  = PRSTRANS:POLICY_NO, Approximate
+
+While ARSBILLING:COMPANY_ID = PRSTRANS:COMPANY_ID And
+      ARSBILLING:POLICY_NO  = PRSTRANS:POLICY_NO  Begin
+
+-- if the status is open or billed update with a paid status
+-- this will prevent the system from creating future notices
+-- since the policy is paid off
+
+      If ARSBILLING:STATUS One Of "O", "B" And
+         ARSBILLING:POL_YEAR = PRSTRANS:POL_YEAR Then
+      Begin
+      Access ARSBILLING_ALIAS,
+      Set ARSBILLING_ALIAS:COMPANY_ID       = ARSBILLING:COMPANY_ID,
+          ARSBILLING_ALIAS:POLICY_NO        = ARSBILLING:POLICY_NO,
+          ARSBILLING_ALIAS:TRANS_DATE       = ARSBILLING:TRANS_DATE,
+          ARSBILLING_ALIAS:TRANS_EFF        = ARSBILLING:TRANS_EFF,
+          ARSBILLING_ALIAS:TRANS_EXP        = ARSBILLING:TRANS_EXP,
+          ARSBILLING_ALIAS:TRANS_CODE       = ARSBILLING:TRANS_CODE,
+          ARSBILLING_ALIAS:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS,
+          ARSBILLING_ALIAS:COMM_RATE        = ARSBILLING:COMM_RATE,
+          ARSBILLING_ALIAS:SUB_CODE         = ARSBILLING:SUB_CODE,
+          ARSBILLING_ALIAS:BILLING_CTR      = ARSBILLING:BILLING_CTR,
+          ARSBILLING_ALIAS:RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR
+
+      If ARSBILLING_ALIAS:COMPANY_ID       = ARSBILLING:COMPANY_ID And
+         ARSBILLING_ALIAS:POLICY_NO        = ARSBILLING:POLICY_NO And
+         ARSBILLING_ALIAS:TRANS_DATE       = ARSBILLING:TRANS_DATE And
+         ARSBILLING_ALIAS:TRANS_EFF        = ARSBILLING:TRANS_EFF And
+         ARSBILLING_ALIAS:TRANS_EXP        = ARSBILLING:TRANS_EXP And
+         ARSBILLING_ALIAS:TRANS_CODE       = ARSBILLING:TRANS_CODE And
+         ARSBILLING_ALIAS:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS And
+         ARSBILLING_ALIAS:COMM_RATE        = ARSBILLING:COMM_RATE And
+         ARSBILLING_ALIAS:SUB_CODE         = ARSBILLING:SUB_CODE And
+         ARSBILLING_ALIAS:BILLING_CTR      = ARSBILLING:BILLING_CTR And
+         ARSBILLING_ALIAS:RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR Then
+         Begin
+         Change ARSBILLING_ALIAS
+         Begin
+             ARSBILLING_ALIAS:STATUS = "P" -- paid
+         End
+
+         End
+
+         End -- end of "O","B" checking
+
+         Next ARSBILLING
+
+End -- end of while
+
+End -- end of procedure
+
+Procedure GET_ARSCHECK_SUB_CODE
+Begin
+
+L_UPDATE_FILE = "arscheck - get_arscheck_sub_code "
+
+L_SUB_CODE = 0
+
+Access ARSCHECK_ALT, Set ARSCHECK_ALT:COMPANY_ID = PRSTRANS:COMPANY_ID,
+                         ARSCHECK_ALT:POLICY_NO  = PRSTRANS:POLICY_NO, Approximate
+
+While ARSCHECK_ALT:COMPANY_ID = PRSTRANS:COMPANY_ID And
+      ARSCHECK_ALT:POLICY_NO  = PRSTRANS:POLICY_NO
+      Begin
+         L_SUB_CODE = ARSCHECK_ALT:SUB_CODE + 10
+         Next ARSCHECK_ALT
+      End
+
+End -- end of get_arscheck_sub_code
+
+/*  new routine as of 10/25/2001 to process due dates based on current
+    due dates on the arsbilling file
+*/
+
+Procedure ARSBILLING_PERIODS
+Begin
+
+L_HIT                   = "N"
+L_PERIODS               = 0
+L_NET_AMOUNT_DUE        = 0.00
+L_ENDORSEMENT_TRANS_EXP = 00.00.0000
+
+L_HOLD_SUBLINE = ""
+
+-- align prior endorsements with current period
+
+/* july 14, 2003 */
+L_HOLD_LAST_BILLING_CTR = 0
+L_HOLD_LAST_DUE_DATE    = 00.00.0000
+L_HOLD_LAST_BILLING_STATUS = ""
+L_HOLD_PAYMENT_PLAN     = 0 -- use this to force correct payment plan
+                            -- since on decrease endorsements it seems as
+                            -- if the payment plan in sfpname and prstrans
+                            -- is being forced to 1
+
+For L_CTR = 1 To 13
+Begin
+    L_HOLD_DUE_DATE[L_CTR] = 00.00.0000
+    L_DUE_DATE_STATUS[L_CTR] = ""
+End
+
+Access SFPCURRENT, Set SFPCURRENT:POLICY_NO = PRSTRANS:POLICY_NO
+
+Access SFPNAME, Set SFPNAME:POLICY_NO    = PRSTRANS:POLICY_NO,
+                    SFPNAME:POL_YEAR     = SFPCURRENT:POL_YEAR,
+                    SFPNAME:END_SEQUENCE = SFPCURRENT:END_SEQUENCE
+
+L_ENDORSEMENT_TRANS_EXP = SFPNAME:EXP_DATE
+
+Access ARSBILLING, Set ARSBILLING:COMPANY_ID = PRSTRANS:COMPANY_ID,
+                       ARSBILLING:POLICY_NO  = PRSTRANS:POLICY_NO, Approximate
+
+While ARSBILLING:COMPANY_ID = PRSTRANS:COMPANY_ID And
+      ARSBILLING:POLICY_NO  = PRSTRANS:POLICY_NO
+      Begin
+      /* added 12/12/2002 - for trans code 13 */
+      L_NET_AMOUNT_DUE = L_NET_AMOUNT_DUE + (ARSBILLING:INSTALLMENT_AMOUNT -(
+                                             ARSBILLING:TOTAL_AMOUNT_PAID +
+                                             ARSBILLING:WRITE_OFF_AMOUNT))
+/* --      If ARSBILLING:TRANS_EXP = PRSTRANS:TRANS_EXP And */
+       If (ARSBILLING:TRANS_EXP = L_ENDORSEMENT_TRANS_EXP And
+           ARSBILLING:TRANS_CODE One Of 10, 14 And
+           L_HOLD_DUE_DATE[ARSBILLING:BILLING_CTR] = 00.00.0000 And
+           L_DUE_DATE_STATUS[ARSBILLING:BILLING_CTR] = "") Then -- annual transactions only
+            Begin
+                L_HIT = "Y"
+                L_HOLD_DUE_DATE[ARSBILLING:BILLING_CTR] = ARSBILLING:DUE_DATE
+                L_DUE_DATE_STATUS[ARSBILLING:BILLING_CTR] = ARSBILLING:STATUS
+                L_HOLD_PAYMENT_PLAN                       = ARSBILLING:PAYMENT_PLAN
+                L_NUMBER_OF_PAYMENTS                      = ARSBILLING:PAYMENT_PLAN
+
+/* july 14, 2003 */
+L_HOLD_LAST_BILLING_CTR    = ARSBILLING:BILLING_CTR
+L_HOLD_LAST_BILLING_STATUS = ARSBILLING:STATUS
+L_HOLD_LAST_DUE_DATE       = ARSBILLING:DUE_DATE
+
+If L_HOLD_SUBLINE = "" Then
+Begin
+   L_HOLD_SUBLINE = ARSBILLING:LOB_SUBLINE
+End
+
+                If L_DUE_DATE_STATUS[ARSBILLING:BILLING_CTR] ="O" And
+                   L_HOLD_SUBLINE  = ARSBILLING:LOB_SUBLINE  Then
+                Begin
+                    L_PERIODS = L_PERIODS + 1
+                End
+End
+        Next ARSBILLING
+    End
+
+End -- end of procedure
+
+Procedure CHECK_FOR_CX_BALANCE
+Begin
+
+L_CX_BILLED_TRANS = 25
+
+L_NET_PREMIUMS       = 0.00
+L_PREMIUMS           = 0.00
+L_INSTALLMENT_AMOUNT = 0.00
+L_SUR_CHARGE         = 0.00
+L_CX_PREMIUMS        = 0.00
+L_CX_INSTALLMENTS    = 0.00
+L_CX_SUR_CHARGE      = 0.00
+L_CTR                = 0
+L_BILLING_CTR        = 0
+L_SUB_CODE           = 0
+L_NET_AMOUNT         = 0
+L_CX_BALANCE_DUE_PAID_OFFSET   = 0.00
+
+Access ARSBILLING, Set ARSBILLING:COMPANY_ID = L_HOLD_COMPANY_ID,
+                       ARSBILLING:POLICY_NO  = L_HOLD_POLICY_NO, Generic
+
+While ARSBILLING:COMPANY_ID = L_HOLD_COMPANY_ID And
+      ARSBILLING:POLICY_NO  = L_HOLD_POLICY_NO
+      Begin
+      L_NET_AMOUNT = (ARSBILLING:INSTALLMENT_AMOUNT - ARSBILLING:TOTAL_AMOUNT_PAID
+                     - ARSBILLING:WRITE_OFF_AMOUNT + ARSBILLING:DISBURSEMENT_AMOUNT)
+          Switch(ARSBILLING:TRANS_CODE)
+          Case 10,12,13,14,15,16,17,25,26 : L_PREMIUMS = L_PREMIUMS + L_NET_AMOUNT
+          Case 11                   : L_CX_PREMIUMS = L_CX_PREMIUMS + L_NET_AMOUNT
+          Case 18                   : L_INSTALLMENT_AMOUNT = L_INSTALLMENT_AMOUNT + L_NET_AMOUNT
+          Case 19,22,23             : L_SUR_CHARGE = L_SUR_CHARGE + L_NET_AMOUNT
+          Case 28                   : L_CX_INSTALLMENTS = L_CX_INSTALLMENTS + L_NET_AMOUNT
+          Case 29                   : L_CX_SUR_CHARGE = L_CX_SUR_CHARGE + L_NET_AMOUNT
+          End
+
+      L_CX_BALANCE_DUE_PAID_OFFSET = L_CX_BALANCE_DUE_PAID_OFFSET + ARSBILLING:TOTAL_AMOUNT_PAID
+      L_BILLING_CTR = L_BILLING_CTR + 1
+      L_SUB_CODE = ARSBILLING:SUB_CODE
+
+      Next ARSBILLING
+
+End
+
+L_INSTALLMENT_CHARGE = L_INSTALLMENT_AMOUNT
+
+L_NET_PREMIUMS = L_PREMIUMS + L_CX_PREMIUMS + L_INSTALLMENT_CHARGE +
+                 L_SUR_CHARGE + L_CX_INSTALLMENTS + L_CX_SUR_CHARGE
+
+If L_NET_PREMIUMS > 0 Then
+Begin
+
+L_SUB_CODE = L_SUB_CODE  + 10
+
+Access ARSBILLING, Set ARSBILLING:COMPANY_ID       = PRSTRANS:COMPANY_ID,
+                       ARSBILLING:POLICY_NO        = PRSTRANS:POLICY_NO,
+                       ARSBILLING:TRANS_DATE       = PRSTRANS:TRANS_DATE,
+                       ARSBILLING:TRANS_EFF        = PRSTRANS:TRANS_EFF,
+                       ARSBILLING:TRANS_EXP        = PRSTRANS:TRANS_EXP,
+                       ARSBILLING:TRANS_CODE       = L_CX_BILLED_TRANS,
+                       ARSBILLING:LINE_OF_BUSINESS = PRSTRANS:LINE_OF_BUSINESS,
+                       ARSBILLING:COMM_RATE        = PRSTRANS:COMM_RATE,
+                       ARSBILLING:SUB_CODE         = L_SUB_CODE,
+                       ARSBILLING:BILLING_CTR      = L_CTR,
+                       ARSBILLING:RETURN_CHECK_CTR  = L_RETURN_CHECK_CTR,Approximate
+
+If ARSBILLING:COMPANY_ID       <> PRSTRANS:COMPANY_ID Or
+   ARSBILLING:POLICY_NO        <> PRSTRANS:POLICY_NO Or
+   ARSBILLING:TRANS_DATE       <> PRSTRANS:TRANS_DATE Or
+   ARSBILLING:TRANS_EFF        <> PRSTRANS:TRANS_EFF Or
+   ARSBILLING:TRANS_EXP        <> PRSTRANS:TRANS_EXP Or
+   ARSBILLING:TRANS_CODE       <> L_CX_BILLED_TRANS Or
+   ARSBILLING:LINE_OF_BUSINESS <> PRSTRANS:LINE_OF_BUSINESS Or
+   ARSBILLING:COMM_RATE        <> PRSTRANS:COMM_RATE Or
+   ARSBILLING:SUB_CODE         <> L_SUB_CODE Or
+   ARSBILLING:BILLING_CTR      <> L_CTR Or
+   ARSBILLING:RETURN_CHECK_CTR <> L_RETURN_CHECK_CTR Then -- record does not exist
+   Begin
+   Add ARSBILLING
+       Begin
+            ARSBILLING:COMPANY_ID           =    PRSTRANS:COMPANY_ID
+            ARSBILLING:POLICY_NO            =    PRSTRANS:POLICY_NO
+            ARSBILLING:TRANS_DATE           =    PRSTRANS:TRANS_DATE
+            ARSBILLING:TRANS_EFF            =    PRSTRANS:TRANS_EFF
+            ARSBILLING:TRANS_EXP            =    PRSTRANS:TRANS_EXP
+            ARSBILLING:TRANS_CODE           =    L_CX_BILLED_TRANS
+            ARSBILLING:LINE_OF_BUSINESS     =    PRSTRANS:LINE_OF_BUSINESS
+            ARSBILLING:AGENT_NO             =    PRSTRANS:AGENT_NO
+            ARSBILLING:COMM_RATE            =    PRSTRANS:COMM_RATE
+            ARSBILLING:SUB_CODE             =    L_SUB_CODE
+            ARSBILLING:BILLING_CTR          =    999
+            ARSBILLING:RETURN_CHECK_CTR     =    L_RETURN_CHECK_CTR
+            ARSBILLING:LOB_SUBLINE          =    PRSTRANS:LOB_SUBLINE
+            ARSBILLING:DUE_DATE             =    L_DUE_DATE[1]
+            ARSBILLING:BILL_PLAN            =    PRSTRANS:BILL_PLAN
+            ARSBILLING:PAYMENT_PLAN         =    1
+            ARSBILLING:STATUS               =    "B" -- billed
+            ARSBILLING:STATUS_DATE          =    PRSTRANS:TRANS_DATE
+            ARSBILLING:BILLED_DATE          =    PRSTRANS:TRANS_DATE
+            ARSBILLING:INSTALLMENT_AMOUNT   =    L_NET_PREMIUMS
+            ARSBILLING:TOTAL_AMOUNT_PAID    =    0.00
+            ARSBILLING:PAYMENT_OFFSET       =    L_CX_BALANCE_DUE_PAID_OFFSET -- added 10/17/2003
+            ARSBILLING:WRITE_OFF            =    0
+            ARSBILLING:WRITE_OFF_AMOUNT     =    0.00
+            ARSBILLING:WRITE_OFF_DATE       =    00.00.0000
+            ARSBILLING:PRIOR_STATUS         =    ARSBILLING:STATUS
+            ARSBILLING:PRIOR_STATUS_DATE    =    ARSBILLING:STATUS_DATE
+            ARSBILLING:USER                 =    USERNAME
+            ARSBILLING:REINSTATED           =    "N"
+            End
+        End
+
+End
+
+End
+
+Procedure CHECK_FOR_CX_REINSTATEMENT
+Begin
+
+/* procedure offsets cx balance due transactions only */
+
+L_CX_BALANCE_DUE_PAID = 0.00 -- house cleaning
+L_CX_BILLED_TRANS     = 26   -- reversal of the cx balance due transaction
+
+Access ARSBILLING, Set ARSBILLING:COMPANY_ID = PRSTRANS:COMPANY_ID,
+                       ARSBILLING:POLICY_NO  = PRSTRANS:POLICY_NO, Approximate
+
+While ARSBILLING:COMPANY_ID = PRSTRANS:COMPANY_ID And
+      ARSBILLING:POLICY_NO  = PRSTRANS:POLICY_NO
+      Begin
+          If (ARSBILLING:TRANS_CODE = 25 And
+              ARSBILLING:STATUS Not One Of  "X", "R") Or
+              L_OFFSET_PAYMENT One Of "Y" Then
+      Begin
+
+/* add the 26 trans code to offset the 25 - do not reverse sign the 25 */
+Access ARSBILLING_ALIAS, Set ARSBILLING_ALIAS:COMPANY_ID = ARSBILLING:COMPANY_ID,
+                             ARSBILLING_ALIAS:POLICY_NO  = ARSBILLING:POLICY_NO,
+                             ARSBILLING_ALIAS:TRANS_DATE = ARSBILLING:TRANS_DATE,
+                             ARSBILLING_ALIAS:TRANS_EFF = ARSBILLING:TRANS_EFF,
+                             ARSBILLING_ALIAS:TRANS_EXP = ARSBILLING:TRANS_EXP,
+                             ARSBILLING_ALIAS:TRANS_CODE = ARSBILLING:TRANS_CODE,
+                             ARSBILLING_ALIAS:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS,
+                             ARSBILLING_ALIAS:COMM_RATE = ARSBILLING:COMM_RATE,
+                             ARSBILLING_ALIAS:SUB_CODE = ARSBILLING:SUB_CODE,
+                             ARSBILLING_ALIAS:BILLING_CTR = ARSBILLING:BILLING_CTR,
+                             ARSBILLING_ALIAS:RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR
+
+If ARSBILLING_ALIAS:COMPANY_ID = ARSBILLING:COMPANY_ID And
+   ARSBILLING_ALIAS:POLICY_NO  = ARSBILLING:POLICY_NO And
+   ARSBILLING_ALIAS:TRANS_DATE = ARSBILLING:TRANS_DATE And
+   ARSBILLING_ALIAS:TRANS_EFF = ARSBILLING:TRANS_EFF And
+   ARSBILLING_ALIAS:TRANS_EXP = ARSBILLING:TRANS_EXP And
+   ARSBILLING_ALIAS:TRANS_CODE = ARSBILLING:TRANS_CODE And
+   ARSBILLING_ALIAS:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS And
+   ARSBILLING_ALIAS:COMM_RATE = ARSBILLING:COMM_RATE And
+   ARSBILLING_ALIAS:SUB_CODE = ARSBILLING:SUB_CODE And
+   ARSBILLING_ALIAS:BILLING_CTR = ARSBILLING:BILLING_CTR And
+   ARSBILLING_ALIAS:RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR
+   Then
+   Begin
+   Add ARSBILLING_ALIAS
+   Begin
+       ARSBILLING_ALIAS:COMPANY_ID           =    ARSBILLING:COMPANY_ID
+       ARSBILLING_ALIAS:POLICY_NO            =    ARSBILLING:POLICY_NO
+       ARSBILLING_ALIAS:TRANS_DATE           =    ARSBILLING:TRANS_DATE
+       ARSBILLING_ALIAS:TRANS_EFF            =    ARSBILLING:TRANS_EFF
+       ARSBILLING_ALIAS:TRANS_EXP            =    ARSBILLING:TRANS_EXP
+       ARSBILLING_ALIAS:TRANS_CODE           =    L_CX_BILLED_TRANS
+       ARSBILLING_ALIAS:LINE_OF_BUSINESS     =    ARSBILLING:LINE_OF_BUSINESS
+       ARSBILLING_ALIAS:AGENT_NO             =    ARSBILLING:AGENT_NO
+       ARSBILLING_ALIAS:COMM_RATE            =    ARSBILLING:COMM_RATE
+       ARSBILLING_ALIAS:SUB_CODE             =    ARSBILLING:SUB_CODE
+       ARSBILLING_ALIAS:BILLING_CTR          =    ARSBILLING:BILLING_CTR
+       ARSBILLING_ALIAS:RETURN_CHECK_CTR     =    ARSBILLING:RETURN_CHECK_CTR
+       ARSBILLING_ALIAS:LOB_SUBLINE          =    ARSBILLING:LOB_SUBLINE
+       ARSBILLING_ALIAS:DUE_DATE             =    ARSBILLING:DUE_DATE
+       ARSBILLING_ALIAS:BILL_PLAN            =    ARSBILLING:BILL_PLAN
+       ARSBILLING_ALIAS:PAYMENT_PLAN         =    ARSBILLING:PAYMENT_PLAN
+       ARSBILLING_ALIAS:STATUS               =    "Z" -- billed
+       ARSBILLING_ALIAS:STATUS_DATE          =    ARSBILLING:TRANS_DATE
+       ARSBILLING_ALIAS:BILLED_DATE          =    ARSBILLING:TRANS_DATE
+--       ARSBILLING_ALIAS:INSTALLMENT_AMOUNT   =    (ARSBILLING:INSTALLMENT_AMOUNT + ARSBILLING:PAYMENT_OFFSET) * -1
+       ARSBILLING_ALIAS:INSTALLMENT_AMOUNT   = ARSBILLING:INSTALLMENT_AMOUNT * -1
+       ARSBILLING_ALIAS:TOTAL_AMOUNT_PAID    =    ARSBILLING:TOTAL_AMOUNT_PAID
+       ARSBILLING_ALIAS:PAYMENT_OFFSET       =    ARSBILLING:PAYMENT_OFFSET
+       ARSBILLING_ALIAS:WRITE_OFF            =    ARSBILLING:WRITE_OFF
+       ARSBILLING_ALIAS:WRITE_OFF_AMOUNT     =    ARSBILLING:WRITE_OFF_AMOUNT
+       ARSBILLING_ALIAS:WRITE_OFF_DATE       =    ARSBILLING:WRITE_OFF_DATE
+       ARSBILLING_ALIAS:PRIOR_STATUS         =    ARSBILLING:STATUS
+       ARSBILLING_ALIAS:PRIOR_STATUS_DATE    =    ARSBILLING:STATUS_DATE
+       ARSBILLING_ALIAS:REINSTATED           =    ARSBILLING:REINSTATED
+   -- only do this if the record is trying to offset payment amount for reinstated premiums -- 10/17/2003
+       End -- end of add
+
+       End -- end of record does not exist
+
+Access ARSBILLING_ALT, Set ARSBILLING_ALT:COMPANY_ID       = ARSBILLING:COMPANY_ID,
+                           ARSBILLING_ALT:POLICY_NO        = ARSBILLING:POLICY_NO,
+                           ARSBILLING_ALT:TRANS_DATE       = ARSBILLING:TRANS_DATE,
+                           ARSBILLING_ALT:TRANS_EFF        = ARSBILLING:TRANS_EFF,
+                           ARSBILLING_ALT:TRANS_EXP        = ARSBILLING:TRANS_EXP,
+                           ARSBILLING_ALT:TRANS_CODE       = ARSBILLING:TRANS_CODE,
+                           ARSBILLING_ALT:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS,
+                           ARSBILLING_ALT:COMM_RATE        = ARSBILLING:COMM_RATE,
+                           ARSBILLING_ALT:SUB_CODE         = ARSBILLING:SUB_CODE,
+                           ARSBILLING_ALT:BILLING_CTR      = ARSBILLING:BILLING_CTR,
+                           ARSBILLING_ALT:RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR
+
+If ARSBILLING_ALT:COMPANY_ID       = ARSBILLING:COMPANY_ID And
+   ARSBILLING_ALT:POLICY_NO        = ARSBILLING:POLICY_NO And
+   ARSBILLING_ALT:TRANS_DATE       = ARSBILLING:TRANS_DATE And
+   ARSBILLING_ALT:TRANS_EFF        = ARSBILLING:TRANS_EFF And
+   ARSBILLING_ALT:TRANS_EXP        = ARSBILLING:TRANS_EXP And
+   ARSBILLING_ALT:TRANS_CODE       = ARSBILLING:TRANS_CODE And
+   ARSBILLING_ALT:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS And
+   ARSBILLING_ALT:COMM_RATE        = ARSBILLING:COMM_RATE And
+   ARSBILLING_ALT:SUB_CODE         = ARSBILLING:SUB_CODE And
+   ARSBILLING_ALT:BILLING_CTR      = ARSBILLING:BILLING_CTR And
+   ARSBILLING_ALT:RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR
+   Then
+   Begin
+   Change ARSBILLING_ALT
+   Begin
+
+              L_TEMP_REINSTATEMENT_AMOUNT = ARSBILLING_ALT:INSTALLMENT_AMOUNT
+--              ARSBILLING_ALIAS:PRIOR_STATUS      = ARSBILLING_ALIAS:STATUS
+--              ARSBILLING_ALIAS:PRIOR_STATUS_DATE = ARSBILLING_ALIAS:STATUS_DATE
+              ARSBILLING_ALT:STATUS            = "X" -- reinstated billing
+--              ARSBILLING_ALIAS:STATUS_DATE       = TODAYSDATE
+--              L_CX_BALANCE_DUE_PAID = L_CX_BALANCE_DUE_PAID +
+--                                      ARSBILLING_ALIAS:TOTAL_AMOUNT_PAID
+--              ARSBILLING_ALIAS:TOTAL_AMOUNT_PAID = 0.00
+          End
+          End
+          End
+
+      Next ARSBILLING
+
+End -- end of while
+
+End
+
+Procedure CREATE_INSTALLMENT_CHARGE
+Begin
+
+L_TRANS_CODE = 18 -- installment charge trans code
+L_HIT_BILLING = "N"
+
+Access ARSPAYPLAN, Set ARSPAYPLAN:COMPANY_ID       = L_HOLD_COMPANY_ID,
+                       ARSPAYPLAN:LINE_OF_BUSINESS = L_HOLD_LINE_OF_BUSINESS,
+                       ARSPAYPLAN:PAYMENT_PLAN     = L_HOLD_PAYMENT_PLAN
+
+Access ARSBILLING_ALIAS, Set ARSBILLING_ALIAS:COMPANY_ID = L_HOLD_COMPANY_ID,
+                             ARSBILLING_ALIAS:POLICY_NO  = L_HOLD_POLICY_NO,
+                             ARSBILLING_ALIAS:TRANS_DATE = L_HOLD_TRANS_DATE,
+                             ARSBILLING_ALIAS:TRANS_EFF  = L_HOLD_TRANS_EFF,
+                             ARSBILLING_ALIAS:TRANS_EXP  = L_HOLD_TRANS_EXP, Approximate
+
+While ARSBILLING_ALIAS:COMPANY_ID = L_HOLD_COMPANY_ID And
+      ARSBILLING_ALIAS:POLICY_NO  = L_HOLD_POLICY_NO And
+      ARSBILLING_ALIAS:TRANS_DATE = L_HOLD_TRANS_DATE And
+      ARSBILLING_ALIAS:TRANS_EFF  = L_HOLD_TRANS_EFF And
+      ARSBILLING_ALIAS:TRANS_EXP  = L_HOLD_TRANS_EXP And
+      L_HIT_BILLING              <> "Y"
+      Begin
+
+      Add ARSBILLING_ALT
+      Begin
+       ARSBILLING_ALT:COMPANY_ID              = ARSBILLING_ALIAS:COMPANY_ID
+       ARSBILLING_ALT:POLICY_NO               = ARSBILLING_ALIAS:POLICY_NO
+       ARSBILLING_ALT:TRANS_DATE              = TODAYSDATE
+       ARSBILLING_ALT:TRANS_EFF               = ARSBILLING_ALIAS:TRANS_EFF
+       ARSBILLING_ALT:TRANS_EXP               = ARSBILLING_ALIAS:TRANS_EXP
+       ARSBILLING_ALT:TRANS_CODE              = L_TRANS_CODE
+       ARSBILLING_ALT:LINE_OF_BUSINESS        = ARSBILLING_ALIAS:LINE_OF_BUSINESS
+       ARSBILLING_ALT:COMM_RATE               = 0.00
+       ARSBILLING_ALT:SUB_CODE                = ARSBILLING_ALIAS:SUB_CODE
+       ARSBILLING_ALT:BILLING_CTR             = ARSBILLING_ALIAS:BILLING_CTR
+       ARSBILLING_ALT:RETURN_CHECK_CTR        = ARSBILLING_ALIAS:RETURN_CHECK_CTR
+       ARSBILLING_ALT:AGENT_NO                = ARSBILLING_ALIAS:AGENT_NO
+       ARSBILLING_ALT:BILLED_DATE             = TODAYSDATE
+       ARSBILLING_ALT:DUE_DATE                = ARSBILLING_ALIAS:DUE_DATE
+       ARSBILLING_ALT:INSTALLMENT_AMOUNT      = ARSPAYPLAN:INSTALLMENT_CHARGE_RATE
+       ARSBILLING_ALT:STATUS                  = "B"
+       ARSBILLING_ALT:STATUS_DATE             = TODAYSDATE
+       ARSBILLING_ALT:TOTAL_AMOUNT_PAID       = 0.00
+       ARSBILLING_ALT:BILL_PLAN               = ARSBILLING_ALIAS:BILL_PLAN
+       ARSBILLING_ALT:PAYMENT_PLAN            = ARSBILLING_ALIAS:PAYMENT_PLAN
+       Switch (ARSBILLING_ALIAS:BILL_PLAN)
+       Case "DB" : ARSBILLING_ALT:AC_NET_AMOUNT_DUE = 0.00
+       Case "AC" : ARSBILLING_ALT:AC_NET_AMOUNT_DUE = 0.00
+       Default   : ARSBILLING_ALT:AC_NET_AMOUNT_DUE = 0.00
+       End
+       ARSBILLING_ALT:USER_CONSOLE            = TERMINAL
+       ARSBILLING_ALT:USER                    = USERNAME
+       ARSBILLING_ALT:PRINTED                 = 0
+       ARSBILLING_ALT:WRITE_OFF               = 0
+       ARSBILLING_ALT:WRITE_OFF_AMOUNT        = 0
+       ARSBILLING_ALT:WRITE_OFF_DATE          = 00.00.0000
+       ARSBILLING_ALT:PRIOR_STATUS            = ARSBILLING_ALT:STATUS
+       ARSBILLING_ALT:PRIOR_STATUS_DATE       = ARSBILLING_ALT:STATUS_DATE
+       ARSBILLING_ALT:REINSTATED              = "N"
+       ARSBILLING_ALT:POL_YEAR                = ARSMASTER:POL_YEAR
+      End  -- end of adding to arsbilling_alias
+
+      L_HIT_BILLING = "Y"
+
+      Next ARSBILLING
+
+End  -- end of looping
+
+End  -- end of create_installment_charge
+
+Procedure CREATE_VOIDED_DISBURSEMENT_OFFSET
+Begin
+
+L_CX_BILLED_TRANS = 36 -- use this queryname for the voided disbursement
+L_TRANS_DATE = TODAYSDATE
+
+Access ARSBILLING, Set ARSBILLING:COMPANY_ID = PRSTRANS:COMPANY_ID,
+                       ARSBILLING:POLICY_NO  = PRSTRANS:POLICY_NO, Approximate
+
+While ARSBILLING:COMPANY_ID = PRSTRANS:COMPANY_ID And
+      ARSBILLING:POLICY_NO  = PRSTRANS:POLICY_NO
+      Begin
+          If ARSBILLING:TRANS_CODE = 30 And
+             ARSBILLING:STATUS One Of  "D" Then
+          Begin
+
+/* add the 36 trans code to offset the 30  */
+Access ARSBILLING_ALIAS, Set ARSBILLING_ALIAS:COMPANY_ID       = ARSBILLING:COMPANY_ID,
+                             ARSBILLING_ALIAS:POLICY_NO        = ARSBILLING:POLICY_NO,
+                             ARSBILLING_ALIAS:TRANS_DATE       = ARSBILLING:TRANS_DATE,
+                             ARSBILLING_ALIAS:TRANS_EFF        = ARSBILLING:TRANS_EFF,
+                             ARSBILLING_ALIAS:TRANS_EXP        = ARSBILLING:TRANS_EXP,
+                             ARSBILLING_ALIAS:TRANS_CODE       = L_CX_BILLED_TRANS,
+                             ARSBILLING_ALIAS:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS,
+                             ARSBILLING_ALIAS:COMM_RATE        = ARSBILLING:COMM_RATE,
+                             ARSBILLING_ALIAS:SUB_CODE         = ARSBILLING:SUB_CODE,
+                             ARSBILLING_ALIAS:BILLING_CTR      = ARSBILLING:BILLING_CTR,
+                             ARSBILLING_ALIAS:RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR
+
+If ARSBILLING_ALIAS:COMPANY_ID       <> ARSBILLING:COMPANY_ID Or
+   ARSBILLING_ALIAS:POLICY_NO        <> ARSBILLING:POLICY_NO Or
+   ARSBILLING_ALIAS:TRANS_DATE       <> ARSBILLING:TRANS_DATE Or
+   ARSBILLING_ALIAS:TRANS_EFF        <> ARSBILLING:TRANS_EFF Or
+   ARSBILLING_ALIAS:TRANS_EXP        <> ARSBILLING:TRANS_EXP Or
+   ARSBILLING_ALIAS:TRANS_CODE       <> L_CX_BILLED_TRANS  Or
+   ARSBILLING_ALIAS:LINE_OF_BUSINESS <> ARSBILLING:LINE_OF_BUSINESS Or
+   ARSBILLING_ALIAS:COMM_RATE        <> ARSBILLING:COMM_RATE Or
+   ARSBILLING_ALIAS:SUB_CODE         <> ARSBILLING:SUB_CODE Or
+   ARSBILLING_ALIAS:BILLING_CTR      <> ARSBILLING:BILLING_CTR Or
+   ARSBILLING_ALIAS:RETURN_CHECK_CTR <> ARSBILLING:RETURN_CHECK_CTR
+   Then
+   Begin
+   Add ARSBILLING_ALIAS
+   Begin
+       ARSBILLING_ALIAS:COMPANY_ID           =    ARSBILLING:COMPANY_ID
+       ARSBILLING_ALIAS:POLICY_NO            =    ARSBILLING:POLICY_NO
+       ARSBILLING_ALIAS:TRANS_DATE           =    L_TRANS_DATE
+       ARSBILLING_ALIAS:TRANS_EFF            =    ARSBILLING:TRANS_EFF
+       ARSBILLING_ALIAS:TRANS_EXP            =    ARSBILLING:TRANS_EXP
+       ARSBILLING_ALIAS:TRANS_CODE           =    L_CX_BILLED_TRANS
+       ARSBILLING_ALIAS:LINE_OF_BUSINESS     =    ARSBILLING:LINE_OF_BUSINESS
+       ARSBILLING_ALIAS:AGENT_NO             =    ARSBILLING:AGENT_NO
+       ARSBILLING_ALIAS:COMM_RATE            =    ARSBILLING:COMM_RATE
+       ARSBILLING_ALIAS:SUB_CODE             =    ARSBILLING:SUB_CODE
+       ARSBILLING_ALIAS:BILLING_CTR          =    ARSBILLING:BILLING_CTR
+       ARSBILLING_ALIAS:RETURN_CHECK_CTR     =    ARSBILLING:RETURN_CHECK_CTR
+       ARSBILLING_ALIAS:LOB_SUBLINE          =    ARSBILLING:LOB_SUBLINE
+       ARSBILLING_ALIAS:DUE_DATE             =    ARSBILLING:DUE_DATE
+       ARSBILLING_ALIAS:BILL_PLAN            =    ARSBILLING:BILL_PLAN
+       ARSBILLING_ALIAS:PAYMENT_PLAN         =    ARSBILLING:PAYMENT_PLAN
+       ARSBILLING_ALIAS:STATUS               =    "T" -- billed
+       ARSBILLING_ALIAS:STATUS_DATE          =    L_TRANS_DATE
+       ARSBILLING_ALIAS:BILLED_DATE          =    L_TRANS_DATE
+--       ARSBILLING_alias:INSTALLMENT_AMOUNT   =    l_unissued_check * -1
+       ARSBILLING_ALIAS:DISBURSEMENT_AMOUNT  =    ARSBILLING:DISBURSEMENT_AMOUNT * -1
+       ARSBILLING_ALIAS:TOTAL_AMOUNT_PAID    =    ARSBILLING:DISBURSEMENT_AMOUNT * -1
+       ARSBILLING_ALIAS:PAYMENT_OFFSET       =    ARSBILLING:PAYMENT_OFFSET
+       ARSBILLING_ALIAS:WRITE_OFF            =    0
+       ARSBILLING_ALIAS:WRITE_OFF_AMOUNT     =    0
+       ARSBILLING_ALIAS:WRITE_OFF_DATE       =    00.00.0000
+       ARSBILLING_ALIAS:PRIOR_STATUS         =    ""
+       ARSBILLING_ALIAS:PRIOR_STATUS_DATE    =    00.00.0000
+       ARSBILLING_ALIAS:REINSTATED           =    ""
+       ARSBILLING_ALIAS:EXPANSION = "Status of T entered"
+       L_PENDING_DISBURSEMENTS = ARSBILLING:DISBURSEMENT_AMOUNT
+       End -- end of add
+
+       End -- end of record does not exist
+
+       Change ARSBILLING
+       Begin
+           ARSBILLING:STATUS = "V"
+       End
+       End
+       Next ARSBILLING
+       End
+
+End -- end of procedure
+
+Procedure CONFIRM_TRANS_CODE
+Begin
+
+L_USE_RECORD          = 0 -- initial the variable
+L_ORIGINAL_TRANS_CODE = 0
+
+Access PRSTRANS_ALT2, Set PRSTRANS_ALT2:COMPANY_ID = L_HOLD_COMPANY_ID,
+                          PRSTRANS_ALT2:POLICY_NO  = L_HOLD_POLICY_NO, Approximate
+
+While PRSTRANS_ALT2:COMPANY_ID = L_HOLD_COMPANY_ID And
+      PRSTRANS_ALT2:POLICY_NO  = L_HOLD_POLICY_NO And
+      L_USE_RECORD             = 0
+      Begin
+
+      Switch(PRSTRANS_ALT2:TRANS_CODE)
+      Case 19,22,23,29 : L_ORIGINAL_TRANS_CODE = 19
+      Case 18, 28      : L_ORIGINAL_TRANS_CODE = 18
+      Default          : L_ORIGINAL_TRANS_CODE = 99
+      End
+      /*
+      Write ("<014>")
+      Write ("%c%s%s",01001,"prstrans_alt2:company id           = ",PRSTRANS_ALT2:COMPANY_ID)
+      Write ("%c%s%n",02001,"prstrans_alt2:policy no            = ",PRSTRANS_ALT2:POLICY_NO)
+      Write ("%c%s%s",03001,"l hold company id                  = ",L_HOLD_COMPANY_ID)
+      Write ("%c%s%n",04001,"l hold policy no                   = ",L_HOLD_POLICY_NO)
+      Write ("%c%s%n",05001,"prstrans_alt2:trans_code           = ",PRSTRANS_ALT2:TRANS_CODE)
+      Write ("%c%s%n",06001,"arsbilling_alt:trans_code          = ",ARSBILLING_ALT:TRANS_CODE)
+      Write ("%c%s%n",07001,"l original trans code              = ",L_ORIGINAL_TRANS_CODE )
+      Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+      */
+
+      If L_ORIGINAL_TRANS_CODE = ARSBILLING_ALT:TRANS_CODE And
+         PRSTRANS_ALT2:PREMIUM  <> 0 Then
+      --    If PRSTRANS_ALT2:TRANS_CODE = ARSBILLING_ALT:TRANS_CODE Then
+          Begin
+              L_USE_RECORD = 1
+          End
+
+      Next PRSTRANS_ALT2
+
+      End
+
+
+End -- end of procedure
+
+Procedure GET_BILLING_SUB_CODE
+Begin
+
+    Access ARSBILLING_ALT2, Set ARSBILLING_ALT2:COMPANY_ID       = ARSBILLING_ALT:COMPANY_ID,
+                                ARSBILLING_ALT2:POLICY_NO        = ARSBILLING_ALT:POLICY_NO,
+                                ARSBILLING_ALT2:TRANS_DATE       = ARSBILLING_ALT:TRANS_DATE,
+                                ARSBILLING_ALT2:TRANS_EFF        = ARSBILLING_ALT:TRANS_EFF,
+                                ARSBILLING_ALT2:TRANS_EXP        = ARSBILLING_ALT:TRANS_EXP,
+                                ARSBILLING_ALT2:TRANS_CODE       = ARSBILLING_ALT:TRANS_CODE, Approximate
+
+    While ARSBILLING_ALT2:COMPANY_ID    = ARSBILLING_ALT:COMPANY_ID And
+          ARSBILLING_ALT2:POLICY_NO     = ARSBILLING_ALT:POLICY_NO And
+          ARSBILLING_ALT2:TRANS_DATE    = ARSBILLING_ALT:TRANS_DATE And
+          ARSBILLING_ALT2:TRANS_EFF     = ARSBILLING_ALT:TRANS_EFF And
+          ARSBILLING_ALT2:TRANS_EXP     = ARSBILLING_ALT:TRANS_EXP And
+          ARSBILLING_ALT2:TRANS_CODE    = ARSBILLING_ALT:TRANS_CODE
+    Begin
+          L_SUB_CODE = ARSBILLING_ALT:SUB_CODE
+          Next ARSBILLING_ALT
+    End
+
+    L_SUB_CODE = L_SUB_CODE + 10
+
+End -- end of procedure
+
+Procedure update_arscancel
+begin
+
+access arscancel, set arscancel:company_id = l_hold_company_id,
+                      arscancel:policy_no  = l_hold_policy_no, approximate
+
+while arscancel:company_id = l_hold_company_id and
+      arscancel:policy_no  = l_hold_policy_no
+      begin
+      if arscancel:cx_status one of "P" then
+      begin
+      change arscancel
+      begin
+         arscancel:cx_status           = "R"
+         arscancel:trans_date          = todaysdate
+         arscancel:automatic_cx_remove = 1
+      end
+      end
+      next arscancel
+end
+
+end -- end of procedure
+
+End -- end of program

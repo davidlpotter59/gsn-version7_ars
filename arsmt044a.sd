@@ -1,0 +1,136 @@
+%%
+Screen
+        Name = "Arsmt044a" ;
+        Type = "Detail" ;
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize = "dynamic";
+        domain = "arscontrol2" ;
+        Windowtitle="%a    %s  Additional Wording Control Maintenance - Ver 7.00     %m";
+--      resizeable = yes ;
+        iconline = 0 ;
+
+        Include "stdkeys7.inc"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        add/reuse  tagged add_fn;
+
+        Include "stdfunc7.inc"
+
+Menu Definition
+
+        Include "stdmenu7.inc"
+
+}
+
+Toolbar Definition
+
+        Include "stdtoolbar7.inc"
+}
+
+screen
+{
+%%
+                                                        _______________
+ Company Id: __________ __________________________________________________
+
+ Expiring Premium V Position    ____
+ Expiring Premium H Position    ____
+ Expiring Premium Wording
+          ____________________________________________________________________________
+
+ Renewal Premium V Position     ____
+ Renewal Premium H Position     ____
+ Renewal Premium Wording
+          ____________________________________________________________________________
+
+ Print Agent Number of Invoice Stub:  _
+ Print Agent Number V Pos:            ____
+ Print Agent Number H Pos:            ____
+
+ Non-Pay Notice Stub Indicator        ______________
+ Non-Pay Notice V Position            ____
+ Non-Pay Notice H Position            ____
+
+ Claim History Wording V Position     ____
+ Claim History Wording H Position     ____
+ Claim History Wording
+       _______________________________________________
+       _______________________________________________
+       _______________________________________________
+       _______________________________________________
+       _______________________________________________
+
+ Maryland commercial claim infor         _
+ MD Claim History Wording V Position     ____
+ MD Claim History Wording H Position     ____
+ MD Claim History Wording
+       _______________________________________________
+       _______________________________________________
+       _______________________________________________
+       _______________________________________________
+       _______________________________________________
+%%
+
+components
+
+Fields
+FUNCTION/noecho/showasguidetext ;
+ARSCONTROL2:COMPANY_ID                  Mandatory
+include "companyhlp.inc"
+SFSCOMPANY:NAME[1];
+
+-- expiring premiums opption
+-- this is triggered by sfsstate and sfsline only
+arscontrol2:expiring_premium_v_pos;
+arscontrol2:expiring_premium_h_pos;
+arscontrol2:expiring_premium_wording;
+
+-- renewal premiums opption
+-- this is triggered by sfsstate and sfsline only
+arscontrol2:renewal_premium_v_pos;
+arscontrol2:renewal_premium_h_pos;
+arscontrol2:renewal_premium_wording;
+
+-- Printing Agent Number on Invoices
+arscontrol2:print_agent_no_on_stub/checkbox/values="0,1";
+arscontrol2:agent_no_on_stub_v_pos;
+arscontrol2:agent_no_on_stub_h_pos;
+
+-- Printing an indicator on the non pay stub
+arscontrol2:nonpay_indicator;
+arscontrol2:nonpay_indicator_v_pos;
+arscontrol2:nonpay_indicator_h_pos;
+
+-- printing claim history
+-- this is triggered by sfsstate and sfsline only
+arscontrol2:claim_history_wording_v_pos;
+arscontrol2:claim_history_wording_h_pos;
+arscontrol2:claim_history_literal[1];
+arscontrol2:claim_history_literal[2];
+arscontrol2:claim_history_literal[3];
+arscontrol2:claim_history_literal[4];
+arscontrol2:claim_history_literal[5];
+
+-- printing Maryland claim history
+-- this is triggered by sfsstate and sfsline
+arscontrol2:md_claim_history/checkbox/values="0,1" ;
+arscontrol2:md_claim_history_wording_v_pos;
+arscontrol2:md_claim_history_wording_h_pos;
+arscontrol2:md_claim_history_literal[1];
+arscontrol2:md_claim_history_literal[2];
+arscontrol2:md_claim_history_literal[3];
+arscontrol2:md_claim_history_literal[4];
+arscontrol2:md_claim_history_literal[5];
+
+--
+
+
+}
+
+End

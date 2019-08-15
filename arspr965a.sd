@@ -1,0 +1,103 @@
+%%
+Screen
+        Name = "arspr965a" ;
+        Type = "Detail" ;
+        Padcharacter=Space;
+        Highlite=Underscore;
+        Domain="ARSPRINTER";
+        Screensize = "dynamic";
+        Windowtitle="%a     %s - Printer Selection - Version 7.00   %m";
+        iconline = 0;
+        errortype = nolock;
+
+        Global Wdate G_STARTING_DATE ;
+        Global Wdate G_ENDING_DATE ;
+        Global String G_COMPANY_ID[10];
+        Global String G_COMPANY[10];
+        Global String G_REPORT_DEVICE[10];
+        Global unsigned ascii number G_printer_no[4];
+
+        String L_USERNAME[15];
+        String L_ENTER[1];
+        String L_SFSCODE[3]="SFS";
+
+        Access ARSPRINTER,
+           Set ARSPRINTER:COMPANY_ID = G_COMPANY_ID, Approximate;
+
+        Include "STDKEYS.INC"
+        !F11="work";
+
+Functions
+
+        Include "STDFUNC7.INC"
+
+Menu Definition
+    include "stdmenu7.inc"
+}
+
+ToolBar Definition
+    include "stdtoolbar7.inc"
+}
+
+Screen
+Properties
+    {
+    LayOutType      = Column
+    }
+{
+
+Panel Tagged Header_pl
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = AsNeeded
+    }
+{
+%%
+                                                       ____________
+            *----------------------------------------*
+            |                                        |
+            |       Printer:       __________        |
+            |                                        |
+            *----------------------------------------*
+%%
+
+Components
+
+Fields
+    FUNCTION/noecho/showasguidetext ;
+    Begin
+      L_USERNAME = USERNAME
+      Access SFSDEFAULT,
+         Set SFSDEFAULT:SFS_CODE = L_SFSCODE
+      G_COMPANY_ID = SFSDEFAULT:COMPANY_ID
+
+      Access SFSPRINTER,
+         Set SFSPRINTER:COMPANY_ID = G_COMPANY_ID,
+             SFSPRINTER:USER_ID    = L_USERNAME, Generic
+    End
+    ARSPRINTER:PRINTER
+    Begin
+      G_REPORT_DEVICE = SFSPRINTER:REPORT_DEVICE
+      G_printer_no    = sfsprinter:printer_no
+    End
+    Activehelp  SFSPRINTER:REPORT_DEVICE ,
+                sfsprinter:printer_no;
+}
+}
+
+Screen Exit
+        If ARSPRINTER:COMPANY_ID <> ""
+            Then G_COMPANY_ID = ARSPRINTER:COMPANY_ID;
+            G_REPORT_DEVICE = ARSPRINTER:PRINTER ;
+
+  Access ARSPRINTER_ALT,
+     Set ARSPRINTER_ALT:COMPANY_ID = ARSPRINTER:COMPANY_ID
+
+  while arsprinter_alt:company_id = arsprinter:company_id
+    {
+      Delete ARSPRINTER_ALT -- cleans up file for next date entry
+      next arsprinter_alt
+    }
+
+End

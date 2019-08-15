@@ -1,0 +1,64 @@
+%%
+Screen
+        Name = "Arspr970" ;
+        Type = "Detail" ;
+        Padcharacter=Space;
+        Highlite=Underscore;
+        Domain="ARSPOLICY";
+        Screensize = "dynamic";
+        Windowtitle="%a     %s - A/R Policy Number Entry - Ver. 7.00    %m";
+        iconline = 0 ;
+
+        Global Unsigned Ascii Number G_POLICY_NO[9]/decimals=0 ;
+        Global String G_COMPANY_ID[10];
+
+        Access ARSPOLICY, Set ARSPOLICY:COMPANY_ID = G_COMPANY_ID, Approximate ;
+
+        Include "stdkeys7.inc"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        Include "stdfunc7.inc"
+
+Menu Definition
+
+        Include "stdmenu7.inc"
+
+}
+
+Toolbar Definition
+
+        Include "stdtoolbar7.inc"
+}
+
+screen
+{
+%%
+                                                        ____________
+            *----------------------------------------*
+            |                                        |
+            |       Policy Number: _________         |
+            |                                        |
+            *----------------------------------------*
+
+%%
+
+components
+
+Fields
+101     FUNCTION/noecho/showasguidetext ;
+401     G_POLICY_NO;
+
+}
+
+Screen Exit
+        If ARSPOLICY:COMPANY_ID <> ""
+            Then G_COMPANY_ID = ARSPOLICY:COMPANY_ID;
+        Access ARSPOLICY_ALT, Set ARSPOLICY_ALT:COMPANY_ID = ARSPOLICY:COMPANY_ID
+        Delete ARSPOLICY_ALT -- cleans up file for next date entry
+
+End

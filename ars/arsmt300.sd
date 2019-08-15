@@ -1,0 +1,217 @@
+%%
+Screen
+        Name = "Arsmt300" ;
+        Domain="ARSMENU";
+        Type = "Detail" ;
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize = "dynamic";
+        Windowtitle="%s     %a Direct Bill Invoice Printing Options (Ver 7.00)    %m";
+	iconline = 0;
+
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+        Global Wdate G_TRANS_DATE ;
+        Global Wdate G_TRANS_EFF ;
+        Global Wdate G_TRANS_EXP ;
+
+--        Global Wdate G_STARTING_DATE,
+--                     G_ENDING_DATE;
+
+        Global Unsigned Ascii Number G_TRANS_CODE[4] ;
+        Global Unsigned Ascii Number G_LINE_OF_BUSINESS[4] ;
+        Global Unsigned Ascii Number G_COMM_RATE[4]/decimals=2 ;
+        Global Unsigned Ascii Number G_SUB_CODE[4] ;
+        Global Unsigned Ascii Number G_BILLING_CTR[4] ;
+        Global Unsigned Ascii Number G_RETURN_CHECK_CTR[4] ;
+        Global String G_REPORT_DEVICE[10];
+
+	Include "arsmenu.var"
+
+        String L_ARSDATES[12]="arsdates.par";
+        String L_ARSBILLS[11]="arsbills.mf";
+        String L_OPTION[1]="";
+        String L_ENTER[1];
+
+        String L_COMPANY[10]="";
+
+        Unsigned Ascii Number L_RUN_OPTION[1]=0;
+        String L_DEC[13]="arsup930.pcl";
+        String L_SFS[3]="SFS";
+
+        Include "virtualdecs.var"
+
+        Access ARSMENU, Set ARSMENU:COMPANY_ID = G_COMPANY_ID
+
+        Include "STDKEYS7.INC"
+
+style definition
+
+	Include "styles.inc"
+
+Functions
+
+        Include "STDFUNC7.INC"
+	Include "arsfunc7.inc"
+
+menu definition
+
+	Include "stdmenu7.inc"
+	Include "arsmenu7.inc"
+}
+
+toolbar definition
+
+	Include "stdtoolbar7.inc"
+}
+
+screen at 1,1 to 20,80
+Properties
+	{
+	Layouttype = column
+	}
+{
+Panel
+Properties
+	{
+	Borderstyle 	= raised
+	ScrollBarPolicy = asneeded
+	}
+{
+%%
+                                                                  ____________
+*------------------------------------------------------------------------------*
+|                        Direct Bill Invoice Printing Options                  |
+*------------------------------------------------------------------------------*
+| [R                                                                           |
+|    _~~Direct~Bill~Invoices~~~Initial~Invoice~(~Annual~Bills~)~~~~~~~~~~~~~~~~|
+|    _~~Direct~Bill~Invoices~~~Installment~Invoices~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+|    _~~Reprint~Initial~Invoices~(Billed~Date)~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+|    _~~Reprint~Installment~Invoices~(Billed~Date)~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+|    _~~Print                                                                  |
+|                                                                              |
+|                                                                          R]  |
+*------------------------------------------------------------------------------*
+%%
+
+Components
+
+Fields
+0101     FUNCTION/noecho/showasguidetext ;
+0601     L_OPTION/values="a,b,c,d,e"
+         Begin
+         If L_OPTION <> "e"  Then
+         Begin
+
+            Access SFSDEFAULT, Set SFSDEFAULT:SFS_CODE  = L_SFS
+            Access ARSCONTROL, Set ARSCONTROL:COMPANY_ID = SFSDEFAULT:COMPANY_ID
+            L_COMPANY = SFSDEFAULT:COMPANY_ID
+
+            If L_OPTION One Of "b" Then
+            Begin
+                G_STARTING_DATE = TODAYSDATE + ARSCONTROL:BILL_INSTALLMENTS_DAYS_ADVANCE
+                G_ENDING_DATE   = (G_STARTING_DATE + ARSCONTROL:TOTAL_DAYS_INVOICE) - 1
+            End
+
+            Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = L_COMPANY
+            If ARSCONTROL2:AS_OF_INVOICES  One Of 1 Then
+            Begin
+               G_STARTING_DATE = 00.00.0000
+               Display Modal Screen "arspr955"
+               At Line 5, Column 15
+               With Initial Function "ADD|EXIT"
+            End
+            Else
+            Begin
+               Display Modal Screen "arspr950"
+               At Line 5, Column 15
+               With Initial Function "ADD|exit"
+            End
+
+        If G_ENDING_DATE <> 0 Then
+           Begin
+           If L_OPTION One Of "b" Then
+           Begin
+           -- update the arsinvdate file if running installment bills
+               Do UPDATE_ARSINVDATE
+           End
+           Switch (L_OPTION)
+               Case "a" : L_RUN_OPTION = 3 -- initial bills
+               Case "b" : L_RUN_OPTION = 0 -- installment bills
+               Case "c" : L_RUN_OPTION = 5 -- reprint initial
+               Case "d" : L_RUN_OPTION = 8 -- reprint Installment
+               Default  : L_RUN_OPTION = 5
+           End
+
+           End
+
+         End
+
+         If L_OPTION = "e" Then
+         Begin
+            Display Modal Screen "arspr965"
+            At Line 5, Column 15
+            With Initial Function "ADD|exit"
+            Error "Visual Printing is Not Available "
+            If G_REPORT_DEVICE = "visual"
+
+            If G_ENDING_DATE   <> 00.00.0000 And
+               G_REPORT_DEVICE <> "" Then
+            {
+             Message "Processing Policies to Print....... Please Wait!"
+             L_COMPANY = "XXXXXXXXXX"
+             Access ARSCONTROL, Set ARSCONTROL:COMPANY_ID = L_COMPANY
+             L_COMPANY = ARSCONTROL:DEFAULT_COMPANY
+
+             Access SFSCOMPANY, Set SFSCOMPANY:COMPANY_ID = L_COMPANY
+
+             If SFSCOMPANY:DEBUG_MODE = 0 Then
+             Begin
+                 Proc ("csbatch arsup930 %n%s%s000000000%s",L_RUN_OPTION,Str(G_STARTING_DATE,"MMDDYYYY"),Str(G_ENDING_DATE,"MMDDYYYY"),G_REPORT_DEVICE)/noconsole
+             End
+             Else
+             Begin
+                 Proc ("csbatch arsup930 %n%s%s000000000%s",L_RUN_OPTION,Str(G_STARTING_DATE,"MMDDYYYY"),Str(G_ENDING_DATE,"MMDDYYYY"),G_REPORT_DEVICE)
+             End
+
+             Message "                                                    "
+             Deletefile (L_ARSBILLS)
+             Refresh()
+
+            }
+
+   End
+
+End ;
+}
+}
+
+Screen Exit
+
+Procedure Definition
+
+Procedure  UPDATE_ARSINVDATE
+Begin
+
+Access ARSINVDATE, Set ARSINVDATE:COMPANY_ID = ARSCONTROL:COMPANY_ID
+
+If ARSINVDATE:COMPANY_ID = ARSCONTROL:COMPANY_ID Then
+Begin
+Change ARSINVDATE
+Begin
+    ARSINVDATE:STARTING_DATE = G_STARTING_DATE
+    ARSINVDATE:ENDING_DATE   = G_ENDING_DATE
+End
+End
+Else
+Add ARSINVDATE
+Begin
+   ARSINVDATE:COMPANY_ID   = ARSCONTROL:COMPANY_ID
+   ARSINVDATE:STARTING_DATE = G_STARTING_DATE
+   ARSINVDATE:ENDING_DATE   = G_ENDING_DATE
+End
+
+End -- end of procedure
+
+End -- end of program

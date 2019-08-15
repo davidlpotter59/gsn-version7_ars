@@ -1,0 +1,549 @@
+%%
+Screen
+        Name = "Arsmt900" ;
+        Domain="ARSMENU";
+        Type = "Detail" ;
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize = "dynamic";
+        Windowtitle="%s     %a Direct Bill Non Pay Processing Utilities (Ver 7.03)    %m";
+        iconline = 0;
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+        Global Wdate G_TRANS_DATE ;
+        Global Wdate G_TRANS_EFF ;
+        Global Wdate G_TRANS_EXP ;
+
+--        Global Wdate G_STARTING_DATE,
+--                     G_ENDING_DATE;
+
+        Global Unsigned Ascii Number G_TRANS_CODE[4] ;
+        Global Unsigned Ascii Number G_LINE_OF_BUSINESS[4] ;
+        Global Unsigned Ascii Number G_COMM_RATE[4]/decimals=2 ;
+        Global Unsigned Ascii Number G_SUB_CODE[4] ;
+        Global Unsigned Ascii Number G_BILLING_CTR[4] ;
+        Global Unsigned Ascii Number G_RETURN_CHECK_CTR[4] ;
+        Global String G_REPORT_DEVICE[10];
+        global signed ascii number g_grace_days[2];
+
+        include "arsmenu.var"
+
+        String L_OPTION[1]="";
+        String L_NON_PAY_NAME[50]="arsmt900.pcl";
+        Unsigned Ascii Number L_LINE_CTR[3]=0;
+        String L_ENTER[1];
+        String L_FIRST_TIME[1]="Y";
+        Unsigned Ascii Number L_SUB[2];
+        Unsigned Ascii Number L_V_POSITION[5]=0/decimals=0;
+        String L_ZIPCODE[10]="";
+        Unsigned Ascii Number L_LOOP_CTR[2]=0;
+        Unsigned Ascii Number L_LINES_PRINTED[2]=0;
+        Unsigned Ascii Number L_COPY_CTR[2]=0;
+
+        Unsigned Ascii Number L_PAGES_CTR[4]=0;
+        Unsigned Ascii Number L_HOLD_AGENT_NO[4]=0;
+        Signed Ascii Number L_COMMISSION[9]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_PREMIUM[9]=0/dec=2;
+        Signed Ascii Number L_TOTAL_COMMISSION[9]=0/decimals=2;
+        Unsigned Ascii Number L_COMM_RATE[4]=0/decimals=0;
+        String L_COMPANY[10]="FARMERS   ";
+        Unsigned Ascii Number L_PAID_YEAR[4]=0/decimals=0;
+        Unsigned Ascii Number L_PAID_MONTH[2]=0/decimals=0;
+        Signed Ascii Number L_YTD_PREMIUM[9]=0/decimals=2;
+        Signed Ascii Number L_YTD_COMMISSION[9]=0/decimals=2;
+        Unsigned Ascii Number L_SUB_CODE[4]=0/decimals=0;
+
+        String L_TRANSACTION[15]="";
+        String L_LOGFILE[15]="arsmt900.log";
+        String L_TOTALS_PAGE[1]="N";
+        Unsigned Ascii Number L_HOLD_POLICY_NO[9]=0/decimals=0;
+        Unsigned Ascii Number L_COPIES_REQUIRED[2]=0;
+        Unsigned Ascii Number L_POL_YEAR[4]=0;
+        Unsigned Ascii Number L_END_SEQUENCE[4]=0;
+        Unsigned Ascii Number L_POLICY_NO[9]=0;
+        String L_COPY_LIT[20]="";
+        Unsigned Ascii Number L_HOLD_COPY_CTR[4]=0;
+        Unsigned Ascii Number L_H_POSITION[4]=0;
+        String L_PAR_FILE[20]="arsdates.par";
+        string l_continue_1[50];
+
+/* buidling the array to hold sfpname keys */
+Array [200] Of Unsigned Ascii Number L_SFPNAME_POLICY_NO[9],
+                                     L_SFPNAME_POL_YEAR[4],
+                                     L_SFPNAME_END_SEQUENCE[4],
+                                     L_SFPNAME_PREM_NO[4],
+                                     L_SFPNAME_BUILD_NO[4],
+                                     L_SFPNAME_SUB_CODE[4];
+
+Unsigned Ascii Number L_SFPNAME_LOOP_CTR[4]=0;
+Unsigned Ascii Number L_TEMP_POLICY_NO[9]=0;
+Unsigned Ascii Number L_TEMP_POL_YEAR[4]=0;
+Unsigned Ascii Number L_TEMP_END_SEQUENCE[4]=0;
+Unsigned Ascii Number L_TEMP_PREM_NO[4]=0;
+Unsigned Ascii Number L_TEMP_BUILD_NO[4]=0;
+Unsigned Ascii Number L_TEMP_SUB_CODE[4]=0;
+String L_SFS[3]="SFS";
+
+        Include "scipserr.var"
+
+        Include "sfsrevname.var"
+
+        include "virtualdecs.var"
+
+        Access ARSMENU, Set ARSMENU:COMPANY_ID = G_COMPANY_ID
+
+--        Include "csfonts.inc"
+
+        Include "STDKEYS7.INC"
+
+style definition
+
+        Include "styles.inc"
+
+
+Functions
+
+        Include "STDFUNC7.INC"
+        Include "arsfunc7.inc"
+
+menu definition
+
+        Include "stdmenu7.inc"
+        Include "arsmenu7.inc"
+}
+
+toolbar definition
+
+        Include "stdtoolbar7.inc"
+}
+Screen Entry
+
+Access SFSDEFAULT, Set SFSDEFAULT:SFS_CODE  = L_SFS
+Access ARSCONTROL, Set ARSCONTROL:COMPANY_ID = SFSDEFAULT:COMPANY_ID
+Access SFSCOMPANY, Set SFSCOMPANY:COMPANY_ID = SFSDEFAULT:COMPANY_ID, Approximate
+g_grace_days = arscontrol:non_pay_grace_days * -1
+
+screen at 1,1 to 20,80
+Properties
+        {
+        Layouttype = column
+        }
+{
+Panel
+Properties
+        {
+        Borderstyle     = raised
+        ScrollBarPolicy = asneeded
+        }
+{
+%%
+                                                                  ____________
+*------------------------------------------------------------------------------*
+|                          Non-Pay Printing Options                            |
+*------------------------------------------------------------------------------*
+| [R                                                                           |
+|    _Select Non Pays / New                                                    |
+|    _Reprint Non Pays                                                         |
+|    _Select Non Pays / New By Policy Number                                   |
+|    _Reprint Non Pays / By Policy Number                                      |
+|    _Inquiry on Outstanding Non Pays                                          |
+|    _Override Outstanding Non Pays                                            |
+|    _Purge Cancellations Run                                                  |
+|                                                                          R]  |
+*------------------------------------------------------------------------------*
+%%
+
+Components
+
+Fields
+0101     FUNCTION/noecho/showasguidetext ;
+0601     L_OPTION/values="a,b,c,d,e,f,g"
+         Begin
+             If L_OPTION One Of "a" Then
+             Begin
+                Do GET_LAST_DATE_RUN
+
+                If ARSCONTROL2:AS_OF_NON_PAYS One Of 1 Then
+                Begin
+                   G_STARTING_DATE = 01.01.1990
+                End
+                Else
+                Begin
+                    G_STARTING_DATE = 01.01.2000
+                End
+
+                G_ENDING_DATE   = TODAYSDATE - (ARSCONTROL:NON_PAY_RUN_DAYS)
+                Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = L_COMPANY
+                If ARSCONTROL2:AS_OF_NON_PAYS One Of 1 Then
+                Begin
+                   Display Modal Screen "arspr955"
+                   At Line 5, Column 15
+                   With Initial Function "ADD|EXIT"
+                End
+                Else
+                Begin
+                    Display Modal Screen "arspr950"
+                    At Line 5, Column 15
+                    With Initial Function "ADD|exit"
+                End
+                If G_STARTING_DATE <> 0 And
+                   G_ENDING_DATE <> 0 Then
+                Begin
+
+                If ARSCONTROL2:AS_OF_NON_PAYS One Of 1 Then
+                Begin
+                    G_STARTING_DATE = 01.01.1900
+                End
+
+                /* select which printer to use */
+
+                Display Modal Screen "arspr965"
+                At Line 5, Column 15
+                With Initial Function "ADD|exit"
+                If G_REPORT_DEVICE <> "" Then
+                Begin
+                   Message "Processing Non-Pay Notices, Please wait ....."
+                   If SECURITY >= 65 Then
+                   Begin
+                   If SFSCOMPANY:DEBUG_MODE = 0 Then
+                   Begin
+                   -- NOTE: all runs from this screen will be considered a manual
+                   -- run.  The only time when this flag is set to "N" will be
+                   -- when cron is running the job.
+                   --  1- 8 = starting date
+                   --  9-16 = ending date
+                   -- 17-25 = policy number (Mask=999999999, must put in zeros)
+                   -- 26-35 = printer
+                       Do UPDATE_ARSCXDATE
+                       Proc ("arscxwork.mk")/noconsole
+                       Proc ("arscancelwrk2.mk")/noconsole
+                       Proc ("csbatch arsup900 %d%dYN%s%s",G_STARTING_DATE,G_ENDING_DATE,"000000000",G_REPORT_DEVICE)/noconsole
+                   End
+                   Else
+                   Begin
+                       Do UPDATE_ARSCXDATE
+                       Proc ("arscxwork.mk")/noconsole
+                       Proc ("arscancelwrk2.mk")/noconsole
+                       Proc ("csbatch arsup900 %d%dYN%s%s",G_STARTING_DATE,G_ENDING_DATE,"000000000",G_REPORT_DEVICE)
+                   End
+                   End
+                   Else Begin
+                      Error "Security Breach....  See Your Systems Manager -  65 Security Required"
+                   End
+                   Message "                                                   "
+               --    End -- security check end
+                End -- g_report_device check end
+             End -- date check end
+             if g_report_device = "visual" then
+             begin
+
+L_USERNAME = Trun(USERNAME)
+
+Access SFSPROFILE, Set SFSPROFILE:USER_ID = L_USERNAME, Exact
+
+If SFSPROFILE:USER_ID <> L_USERNAME Then
+Begin
+    L_USERNAME = "default"
+    Access SFSPROFILE, Set SFSPROFILE:USER_ID =     L_USERNAME,  Exact
+End
+
+        L_UNIX_PATH   = SFSPROFILE:UNIX_PATH/raw
+
+        L_UNIX_SERVER = SFSPROFILE:UNIX_SERVER/raw
+
+        L_CLIENT_PATH = SFSPROFILE:CLIENT_PATH/raw
+
+        l_dec_pdf     = "arsup900.pdf"
+Proc("%s %s%s",L_CLIENT_PATH,Trun(L_UNIX_SERVER),Trun(L_DEC_PDF))/client
+--        include "virtualdecs.pro"
+--        showdocument(trun(l_unix_server),trun(l_dec_pdf))
+
+             end
+             End -- l_option check
+             Else
+             If L_OPTION = "b" Then
+             Begin
+                Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = L_COMPANY
+                If ARSCONTROL2:AS_OF_NON_PAYS One Of 1 Then
+                Begin
+                    Display Modal Screen "arspr955"
+                    At Line 5, Column 15
+                    With Initial Function "ADD|EXIT"
+                End
+                Else
+                Begin
+                    Display Modal Screen "arspr950"
+                    At Line 5, Column 15
+                    With Initial Function "ADD|exit"
+                End
+
+                If ARSCONTROL2:AS_OF_NON_PAYS One Of 1 Then
+                Begin
+                    G_STARTING_DATE = 01.01.1900
+                End
+
+                If G_STARTING_DATE <> 0 And
+                   G_ENDING_DATE <> 0 Then
+                Begin
+                Display Modal Screen "arspr965"
+                At Line 5, Column 15
+                With Initial Function "ADD|exit"
+                If G_REPORT_DEVICE <> "" Then
+                Begin
+                   Message "Processing Rerun of Non Pay Notices, Please wait ....."
+                    If SFSCOMPANY:DEBUG_MODE = 0 Then
+                    Begin
+                       Proc ("csbatch arsup900 %d%dYY%s%s",G_STARTING_DATE,G_ENDING_DATE,"000000000",G_REPORT_DEVICE)/noconsole
+                    End
+                    Else
+                    Begin
+                       Proc ("csbatch arsup900 %d%dYY%s%s",G_STARTING_DATE,G_ENDING_DATE,"000000000",G_REPORT_DEVICE)
+                    End
+                   Message "                                                             "
+                End
+                End
+             End
+             Else
+             If L_OPTION One Of "c" Then
+             Begin
+                Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = L_COMPANY
+                If ARSCONTROL2:AS_OF_NON_PAYS One Of 1 Then
+                Begin
+                    Display Modal Screen "arspr955"
+                    At Line 5, Column 15
+                    With Initial Function "ADD|EXIT"
+                End
+                Else
+                Begin
+                    Display Modal Screen "arspr950"
+                    At Line 5, Column 15
+                    With Initial Function "ADD|exit"
+                End
+
+                If ARSCONTROL2:AS_OF_NON_PAYS One Of 1 Then
+                Begin
+                    G_STARTING_DATE = 01.01.1900
+                End
+
+                If G_STARTING_DATE <> 0 And
+                   G_ENDING_DATE <> 0 Then
+                Begin
+                Display Modal Screen "arspr965"
+                At Line 5, Column 15
+                With Initial Function "ADD|exit"
+                If G_REPORT_DEVICE <> "" Then
+                Begin
+                Display Modal Screen "arspr970"
+                At Line 5, Column 15
+                With Initial Function "ADD|exit"
+                If G_POLICY_NO <> 0 Then
+                Begin
+                   Message "Processing Non-Pay Notices, Please wait ....."
+                   If SECURITY >= 95 Then
+                   Begin
+                   If SFSCOMPANY:DEBUG_MODE = 0 Then
+                   Begin
+                       Proc ("csbatch arsup900 %d%dYN%s%s",G_STARTING_DATE,G_ENDING_DATE,Str(G_POLICY_NO,"999999999"),G_REPORT_DEVICE)/noconsole
+                   End
+                   Else
+                   Begin
+                       Proc ("csbatch arsup900 %d%dYN%s%s",G_STARTING_DATE,G_ENDING_DATE,Str(G_POLICY_NO,"999999999"),G_REPORT_DEVICE)
+                   End
+                   Message "                                                   "
+                   End -- security check end
+                End -- g_report_device check end
+             End -- date check end
+             End -- valid policy number check
+             End -- l_option check
+             Else
+             If L_OPTION One Of "d" Then
+             Begin
+                Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = L_COMPANY
+                If ARSCONTROL2:AS_OF_NON_PAYS One Of 1 Then
+                Begin
+                   Display Modal Screen "arspr955"
+                   At Line 5, Column 15
+                   With Initial Function "ADD|EXIT"
+                End
+                Else
+                Begin
+                    Display Modal Screen "arspr950"
+                    At Line 5, Column 15
+                    With Initial Function "ADD|exit"
+                End
+
+                If ARSCONTROL2:AS_OF_NON_PAYS One Of 1 Then
+                Begin
+                    G_STARTING_DATE = 01.01.1900
+                End
+
+                If G_STARTING_DATE <> 0 And
+                   G_ENDING_DATE <> 0 Then
+                Begin
+                Display Modal Screen "arspr965"
+                At Line 5, Column 15
+                With Initial Function "ADD|exit"
+                If G_REPORT_DEVICE <> "" Then
+                Begin
+                Display Modal Screen "arspr970"
+                At Line 5, Column 15
+                With Initial Function "ADD|exit"
+                If G_POLICY_NO <> 0 Then
+                Begin
+                   Message "Processing Non-Pay Notices, Please wait ....."
+                   If SECURITY >= 95 Then
+                   Begin
+                   If SFSCOMPANY:DEBUG_MODE = 0 Then
+                   Begin
+                       Proc ("csbatch arsup900 %d%dNY%s%s",G_STARTING_DATE,G_ENDING_DATE,Str(G_POLICY_NO,"999999999"),G_REPORT_DEVICE)/noconsole
+                   End
+                   Else
+                   Begin
+                       Proc ("csbatch arsup900 %d%dNY%s%s",G_STARTING_DATE,G_ENDING_DATE,Str(G_POLICY_NO,"999999999"),G_REPORT_DEVICE)
+                   End
+                   Message "                                                   "
+                   End -- security check end
+                End -- g_report_device check end
+             End -- date check end
+             End -- valid policy number check
+             End -- l_option check
+             If L_OPTION = "e" Then
+             Begin
+                Display Modal Screen "arsin041"
+                At Line 5, Column 15
+             End
+             Else
+             If L_OPTION = "f" Then
+             Begin
+                Display Modal Screen "arsmt051"
+                At Line 5, Column 15
+             End
+             Else
+             If L_OPTION One Of "g" And
+                SECURITY  > 90 Then
+             Begin
+                    Display Modal Screen "arspr952"
+                    At Line 5, Column 15
+                    With Initial Function "ADD|exit"
+
+                If G_STARTING_DATE <> 0 And
+                   G_ENDING_DATE <> 0 Then
+                   Begin
+                   Warning "You are about to remove all non-pay notices for the date selected.  To continue click continue otherwise please click ABORT to stop this process"
+                   If Abort <> "YES" Then
+                   Begin
+                        Message "Processing Non-Pay Notices CLEANUP, Please wait ....."
+                   If SECURITY >= 95 Then
+                   Begin
+                   If SFSCOMPANY:DEBUG_MODE = 0 Then
+                   Begin
+                       Proc ("csbatch arsup911 %d%d",G_STARTING_DATE,G_ENDING_DATE)/noconsole
+                   End
+                   Else
+                   Begin
+                       Proc ("csbatch arsup911 %d%d",G_STARTING_DATE,G_ENDING_DATE)
+                   End
+                   Message "                                                   "
+                   End -- security check end
+                End -- g_report_device check end
+             End -- date check end
+             End -- l_option check
+             If L_OPTION = "h" Then
+             Begin
+                G_STARTING_DATE = 00.00.0000
+                G_ENDING_DATE = 00.00.0000
+                Display Modal Screen "arspr950"
+                At Line 5, Column 15
+                With Initial Function "ADD|exit"
+                If G_STARTING_DATE <> 0 And
+                   G_ENDING_DATE <> 0 Then
+                Begin
+                    Deletefile (L_PAR_FILE)
+                    Writefile (L_PAR_FILE,"%d<NL>",G_STARTING_DATE)
+                    Writefile (L_PAR_FILE,"%d<NL>",G_ENDING_DATE)
+                    Closefile (L_PAR_FILE)
+                    If SFSCOMPANY:DEBUG_MODE = 1 Then
+                    Begin
+                        Proc ("cq -enhanced arspr905")
+                        Proc ("cqview -host arspr905")
+                    End
+                    Else
+                    Begin
+                        Proc ("cq -enhanced arspr905")/noconsole
+                        Proc ("cqview -host arspr905")/noconsole
+                    End
+--                    Deletefile (L_PAR_FILE)
+                End
+             End
+             End;
+
+}
+}
+
+Screen Exit
+
+Closefile( L_LOGFILE )
+
+Errors
+Warning CURRENTKEY
+Warning ERRORTEXT
+
+--Write ("%c%s%s",05050,"E R R O R",ERRORTEXT)
+If ERRORNUMBER <> ERR_EOF Then
+Begin
+    Writefile (L_LOGFILE,"arsmt900 had errors<NL>")
+    Writefile (L_LOGFILE,"Date of run: %d<NL> ",TODAYSDATE )
+    Writefile (L_LOGFILE,"Policy No  : %n<NL> ",ARSBILLING:POLICY_NO )
+    Writefile (L_LOGFILE,"Error        %s %n<NL><NL> ",ERRORTEXT,ERRORNUMBER)
+    Writefile (L_LOGFILE,"========================================<NL><NL>")
+End
+
+Procedure Definition
+
+Procedure GET_LAST_DATE_RUN
+Begin
+
+Access SFSDEFAULT, Set SFSDEFAULT:SFS_CODE = L_SFS
+
+L_COMPANY = SFSDEFAULT:COMPANY_ID
+
+Access ARSCXDATE, Set ARSCXDATE:COMPANY_ID = L_COMPANY
+
+End
+
+Procedure UPDATE_ARSCXDATE
+Begin
+
+Access SFSDEFAULT, Set SFSDEFAULT:SFS_CODE = L_SFS
+
+L_COMPANY = SFSDEFAULT:COMPANY_ID
+
+Access ARSCXDATE, Set ARSCXDATE:COMPANY_ID = L_COMPANY
+
+If ARSCXDATE:COMPANY_ID = L_COMPANY Then
+Begin
+Change ARSCXDATE
+Begin
+    ARSCXDATE:STARTING_DATE = G_STARTING_DATE
+    ARSCXDATE:ENDING_DATE   = G_ENDING_DATE
+    ARSCXDATE:RUN_DATE      = TODAYSDATE
+    ARSCXDATE:USER          = USERNAME
+End -- end of change
+End -- end of checking if company = company
+
+If ARSCXDATE:COMPANY_ID <> L_COMPANY Then
+Begin
+Add ARSCXDATE
+Begin
+    ARSCXDATE:COMPANY_ID    = L_COMPANY
+    ARSCXDATE:STARTING_DATE = G_STARTING_DATE
+    ARSCXDATE:ENDING_DATE   = G_ENDING_DATE
+    ARSCXDATE:RUN_DATE      = TODAYSDATE
+    ARSCXDATE:USER          = USERNAME
+End
+End
+
+End -- end of update_arscxdate
+
+End

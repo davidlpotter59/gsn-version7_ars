@@ -1,0 +1,127 @@
+%%
+Screen
+        Name = "Arsin041" ;
+        Type = "Multiline" ;
+        Padcharacter = Space ;
+        Highlite = Underscore ;
+        Screensize="Dynamic";
+        Repeat line_items_tg, 17 Times ;
+        Windowtitle="%s    %a  NonPay Cancellation Inquiry - Version 7.00    %m";
+        iconline = 0;
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+        Global Unsigned Ascii Number G_SUB_CODE[4] ;
+        Global Wdate G_EFF_DATE ;
+        Global Wdate G_EXP_DATE;
+
+        string l_continue_1[50]="";
+
+        Access ARSCANCEL,
+           Set ARSCANCEL:COMPANY_ID = G_COMPANY_ID ,
+               ARSCANCEL:POLICY_NO = G_POLICY_NO, Generic
+
+
+        Include "STDKEYS7.INC"
+
+Style Definition
+    include "styles.inc"
+
+Functions
+
+Include "stdfunc7.inc"
+
+Menu Definition
+    include "stdmenu7.inc"
+}
+
+ToolBar Definition
+    include "stdtoolbar7.inc"
+}
+
+/* Access Validation
+
+If G_POLICY_NO <> ARSCANCEL:POLICY_NO And
+   G_POLICY_NO <> 0 Then
+Begin
+    Error "NO more records for this policy"
+End
+*/
+
+Screen
+Properties
+    {
+    LayOutType      = Column
+    }
+{
+
+Panel Tagged Header_pl
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = AsNeeded
+    }
+{
+%%
+                                                                  ____________
+*------------------------------------------------------------------------------*
+|                                                                              |
+| Company Id: __________  __________________________________________________   |
+| Policy No:   _________  __________________________________________________   |
+|                                                                              |
+*------------------------------------------------------------------------------*
+|      Stauts      Due       Cancel EFF               Run           Past Due   |
+|       Date       Date         Date       Status     Date           Amount    |
+|    __________ __________   __________     _      __________     ___________  |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+*------------------------------------------------------------------------------*
+| Status P = Pending, C = Cancelled, R = Reinstated                            |
+*------------------------------------------------------------------------------*
+%%
+
+Components
+
+Fields
+0101  FUNCTION/noecho/showasguidetext ;
+0401  ARSCANCEL:COMPANY_ID/displayonly      Mandatory
+      Error 1223 If SFSCOMPANY:COMPANY_ID = ""
+      Activehelp SFSCOMPANY:COMPANY_ID,
+                 SFSCOMPANY:NAME[1];
+0402  SFSCOMPANY:NAME[1];
+0501  ARSCANCEL:POLICY_NO/displayonly ;
+0502  SFPNAME:NAME[1]/displayonly ;
+1001  ARSCANCEL:TRANS_DATE/displayonly tagged line_items_tg;
+1002  ARSCANCEL:DUE_DATE/displayonly tagged line_items_tg;
+1003  ARSCANCEL:CX_EFF_DATE/displayonly tagged line_items_tg;
+1004  ARSCANCEL:CX_STATUS/displayonly tagged line_items_tg;
+1005  ARSCANCEL:CX_DATE/displayonly tagged line_items_tg;
+1006  ARSCANCEL:AMOUNT_PAST_DUE/displayonly tagged line_items_tg;
+
+}
+}
+
+Screen Exit
+        If ARSCANCEL:COMPANY_ID > "" Then G_COMPANY_ID = ARSCANCEL:COMPANY_ID ;
+        If ARSCANCEL:POLICY_NO > 0 Then G_POLICY_NO = ARSCANCEL:POLICY_NO ;
+        If ARSCANCEL:SUB_CODE > 0 Then G_SUB_CODE = ARSCANCEL:SUB_CODE ;
+
+
+End

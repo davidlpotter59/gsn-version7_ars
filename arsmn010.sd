@@ -1,0 +1,121 @@
+%%
+Screen
+        Name         = "arsmn010" ;
+        Type         = "DETAIL" ;
+        padcharacter = space ;
+        highlight    = underscore ;
+        errortype    = lock ;
+        iconline     = 0 ;
+        domain       = "flat";
+
+        global string g_company_id[10],
+                      g_opt[10];
+
+        string l_menu_option[1],
+               l_continue[100],
+               l_continue_1[100],
+               l_sfs[3]="SFS",
+               l_system_id[15]="",
+               l_username[20]="";
+
+        unsigned ascii number l_abort_program[1]=0;
+
+     include "arskeys.inc"
+
+style definition
+
+     include "styles.inc"
+
+Functions
+
+     include "stdfunc7c.inc"
+
+menu definition
+
+     include "stdmenu7.inc"
+}
+
+toolbar definition
+
+     include "stdtoolbar7.inc"
+
+}
+screen entry
+
+include "arssecurity.inc"
+
+screen at 1,1 to 20,80
+properties
+     {
+     LayoutType = Column
+     }
+{
+Panel Tagged header_pl
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = AsNeeded
+    }
+{
+%%
+                                                       _______________
+*----------------------------------------------------------------------------*
+
+        Receipt Processing                    Reports
+
+            _ Enter Receipts Received            _ Outstanding Receipts
+            _ Process Receipts Received          _ Premium Master Register
+            _ Deposit Slips                      _ A/R Master Register
+                                                 _ A/R Billing Register
+                                                 _ D/B Installment Invoices
+        Other Processing                         _ Checks Processed by Check Reference
+                                                 _ Payments Received
+            _ Process NSF                        _ Daily Billed
+            _ Balance Checks Incorrectly Applied _ Returned Check Register (NSF)
+            _ Non-Pay Cancellation
+            _ Reinstatements/Rescinds
+            _ Balance Due Notices
+            _ D/B Commission Statements
+            _ A/C Commission Statements          _ Help with Daily Processing
+
+%%
+
+Components
+
+Fields
+        FUNCTION/noecho/showasguidetext ;
+        l_menu_option/values="a,b,c"
+        switch(l_menu_option)
+        case "a" : display modal screen "arsmt001"
+        case "b" : do process_receipts
+        end;
+}
+}
+
+procedure definition
+
+procedure process_receipts
+begin
+     l_continue_1 = dialog("SCIPS A/R Posting Message","warning.bmp","This will POST all Receipts that are currently Outstanding<NL>.  Press YES to Continue<NL><NL>","YES","NO")
+     switch (l_continue_1)
+     case "YES" : do posting_process
+     default    : l_continue_1 = dialog("SCIPS A/R Posting Message","warning.bmp","Posting Was not Processed","Continue")
+     end
+end
+
+procedure posting_process
+begin
+access sfsdefault, set sfsdefault:sfs_code = l_sfs
+
+access sfscompany, set sfscompany:company_id = sfsdefault:company_id
+
+switch(sfscompany:debug_mode)
+    case 1 :
+        proc ("cli csbatch arsup010")
+    case 2 :
+        proc ("cli csbatch arsup010")/noconsole
+    end
+
+end
+
+End

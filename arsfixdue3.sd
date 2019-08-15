@@ -1,0 +1,522 @@
+%%
+        Screen
+        Name = "Arsfixdue3" ;
+        Type = "Multiline" ;
+        Repeat repeat_items_tg, 23 Times Down;
+        Padcharacter = Space ;
+        Highlite = Underscore;
+        Windowtitle="%s     %a Fix Due Date Data (Installment Fees) - Version 7.22    %m";
+        iconline=0;
+
+        Global String G_COMPANY_ID[10] ;
+        Global String G_Company[10];
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+        Global String g_lib_1[10];
+        String L_ENTER[1];
+        String L_OUTFILE[15]="arschgbll.out" ;
+        String L_STATUS[1];
+        String l_continue_1[50];
+        Signed Ascii Number L_INSTALLMENT_AMOUNT[9]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_AMOUNT_PAID[9]=0/decimals=2;
+        Signed Ascii Number L_WRITE_OFF_AMOUNT[9]=0/decimals=2;
+        Signed Ascii Number L_DISBURSEMENT_AMOUNT[9]=0/decimals=2;
+        Unsigned Ascii Number L_TRANS_CODE[4]=0/decimals=0;
+        Wdate L_TRANS_DATE,
+              L_BILLED_DATE,
+              L_DUE_DATE,
+              L_TRANS_EFF;
+
+access arsbilling, set arsbilling:company_id = g_company,
+                       arsbilling:policy_no  = g_policy_no, generic ;
+
+!F4=Forwardtab/fields/icon="OK"/edit ;
+
+Style Definition
+
+        include "styles.inc"
+
+Functions
+
+"Exit"  return  tagged exit_fn ;
+
+/*
+"popup"  Continue Begin
+if g_lib_1 = "" then
+{
+l_continue_1 = Dialog("EXITING SCIPS","warning.bmp","You are About to Leave SCIPS","Yes","No")
+switch (l_continue_1)
+Case "Yes" : function =  "out"
+end
+}
+else
+{
+function = "return_lib"
+           }
+end ;
+"out" stop ;
+"return_lib" screenlib g_lib_1 ;
+*/
+--include "stdfunc7.inc"
+Add                                             Tagged Add_fn;
+Change                                  Tagged Change_fn;
+Delete                                  Tagged Delete_fn;
+Search                                  Tagged Search_fn;
+Find                                            Tagged Find_fn;
+Next                                            Tagged Next_fn;
+Previous                                Tagged Previous_fn;
+Page/noreturn                           Tagged Page_fn;
+"BACK"  Sequence "EXIT"         Tagged Back_fn;
+--"EXIT"  return                  Tagged Exit_fn;
+Return                                  Tagged Return_fn;
+Print                                   Tagged Print_fn;
+--"Check"   Sequence "FIND"     Tagged Check_fn;
+
+"merge"  sequence "merge_seq" tagged merge_tg;
+"merge_seq" continue
+{
+
+        l_continue_1 = dialog("Update Policy","warning.bmp","You are about to Update this policy<NL>Are you sure that you wish to do this?",
+                      "No","Yes")
+        switch (l_continue_1)
+        case "Yes" :
+        {
+            do update_arsbilling
+            g_company = arsbilling:company_id
+            g_policy_no = arsbilling:policy_no
+            function = "redisplay"
+        }
+        default    :
+        l_continue_1 = dialog("No Update","warning.bmp","You choose not to update this policy","Continue")
+        end
+};
+
+"redisplay" display/noreturn "arsfixdue";
+
+Menu Definition
+
+Toolbar Definition
+
+Access Validation
+
+skip if arsbilling:trans_code <> 18
+
+Screen -- at 1,1 to 20,0
+
+Properties
+    {
+    LayOutType      = Column
+    }
+{
+
+Panel tagged icon_line_tg
+
+Properties
+     {
+         LayoutType = Row
+         backgroundcolor = "white"
+     }
+{
+Components
+
+    Button at 1,1 to 1.0,18 tagged print_report_tg
+    Properties {
+        Text     = "Search"
+        Iconname = "search.bmp"
+        TextAlignment = Right
+               }
+    Events
+    {
+        Action = search_fn
+    }
+
+    Button at 1,1 to 1.0,18 tagged print_invoice_tg
+    Properties {
+        Text     = "Merge"
+        Iconname = "invoice.bmp"
+               }
+    Events
+    {
+        Action = merge_tg
+    }
+
+    Button at 1,1 to 1.0,18 tagged display_rollup_tg
+    Properties {
+        Text     = "Previous"
+        Iconname = "previous.bmp"
+        TextAlignment = Right
+               }
+    Events
+    {
+        Action = Previous_fn
+    }
+
+    Button at 1,1 to 1.0,18 tagged display_summary_tg
+    Properties {
+        Text     = "Next"
+        Iconname = "next.bmp"
+        TextAlignment = Left
+               }
+    Events
+    {
+        Action = next_fn
+    }
+
+    Button at 1,1 to 1.0,18 tagged display_detail_tg
+    Properties {
+        Text     = ""
+               }
+    Events
+    {
+    }
+
+    Button at 1,1 to 1.0,18 tagged display_detail_tg
+    Properties {
+        Text     = ""
+               }
+    Events
+    {
+    }
+
+    Button at 1,1 to 1.0,18 tagged exit_tg
+    Properties {
+        Text     = "EXIT Screen"
+        Iconname = "exit.bmp"
+               }
+    Events
+    {
+        Action = exit_fn
+    }
+}
+
+
+Panel
+Properties
+         {
+            BorderStyle = Raised
+            ScrollBarPolicy = asNeeded
+         }
+{
+%%
+                                                       ____________
+*------------------------------------------------------------------------------*
+|  Company Id: __________ __________________________________________________   |
+|  Policy No.:  _________ __________________________________________________   |
+*-------------------------------------------------------------------*----------*-------------------------------------------*
+|  Policy       Trans    Billed       Due        Trans    Trans  B  | S   Amount      Amount      Write     Amount         |
+|    NO         Date      Date       Date         Eff      Code  P  | T   Billed       Paid      Off Amt    Disbursed      |
+| _________  __________ __________ __________  __________  ____ __  | _ ___________ ___________ _________ ___________      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+|                                                                   |                                                      |
+*-------------------------------------------------------------------*------------------------------------------------------*
+%%
+
+Components
+
+Fields
+0101    FUNCTION/noecho/showasguidetext ;
+0301    Begin
+        If FUNCTION = "CHANGE" Then
+        Begin
+            L_STATUS              = ""
+            L_INSTALLMENT_AMOUNT  = 0.00
+            L_TOTAL_AMOUNT_PAID   = 0.00
+            L_WRITE_OFF_AMOUNT    = 0.00
+            L_DISBURSEMENT_AMOUNT = 0.00
+            L_TRANS_DATE          = 00.00.0000
+            L_BILLED_DATE         = 00.00.0000
+            L_DUE_DATE            = 00.00.0000
+            L_TRANS_EFF           = 00.00.0000
+            L_TRANS_CODE          = 00
+        End
+        End
+        ARSBILLING:COMPANY_ID/displayonly
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+                   }
+        Access SFSCOMPANY, Set SFSCOMPANY:COMPANY_ID = ARSBILLING:COMPANY_ID
+        Activehelp SFSCOMPANY:COMPANY_ID,
+                   SFSCOMPANY:NAME[1] ;
+
+
+0302    SFSCOMPANY:NAME[1]/displayonly
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           };
+
+0401    ARSBILLING:POLICY_NO/displayonly
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+        ;
+0402    SFPNAME:NAME[1]
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0801    ARSBILLING:Policy_no tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0802    ARSBILLING:TRANS_DATE tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0803    ARSBILLING:BILLED_DATE tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0804    ARSBILLING:DUE_DATE tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0805    ARSBILLING:TRANS_EFF tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0806    ARSBILLING:TRANS_CODE tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0807    arsbilling:bill_plan tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0808    ARSBILLING:STATUS/upper tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0809    ARSBILLING:INSTALLMENT_AMOUNT tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0810    ARSBILLING:TOTAL_AMOUNT_PAID tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0811    ARSBILLING:WRITE_OFF_AMOUNT tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0812    ARSBILLING:DISBURSEMENT_AMOUNT tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+
+}
+}
+
+Screen Exit
+        If ARSBILLING:COMPANY_ID > ""
+        Then G_COMPANY_ID = ARSBILLING:COMPANY_ID ;
+        If ARSBILLING:POLICY_NO > 0 Then G_POLICY_NO = ARSBILLING:POLICY_NO ;
+
+        Closefile (L_OUTFILE)
+
+Procedure Definition
+
+Procedure Update_arsbilling
+{
+
+proc ("arsduedatewrk.mk")/noconsole
+
+access arsbilling_alt, set arsbilling_alt:company_id = arsbilling:company_id,
+                           arsbilling_alt:policy_no  = arsbilling:policy_no, generic
+
+while arsbilling_alt:company_id = arsbilling:company_id and
+      arsbilling_alt:policy_no  = arsbilling:policy_no
+      {
+
+      -- first step is to gather the transaction codes that will be consolidated and
+      -- place these into the work file
+
+      if arsbilling_alt:trans_code <> 18 then
+      {
+         do build_workfile
+      }
+
+      next arsbilling_alt
+
+end
+
+      do cleanup_billing
+
+      do add_new_due_dates
+
+end -- end of procedure
+
+Procedure build_workfile
+{
+
+access arsduedatewrk, set arsduedatewrk:company_id = arsbilling_alt:company_id,
+                          arsduedatewrk:policy_no  = arsbilling_alt:policy_no,
+                          arsduedatewrk:due_date   = arsbilling_alt:due_date
+
+if arsduedatewrk:company_id <> arsbilling_alt:company_id or
+   arsduedatewrk:policy_no  <> arsbilling_alt:policy_no or
+   arsduedatewrk:due_date   <> arsbilling_alt:due_date then
+   { -- adding new records
+   add arsduedatewrk
+   {
+       arsduedatewrk:record             = arsbilling_alt:record/raw
+   }
+   }
+   else
+   {
+   change arsduedatewrk
+   {
+       arsduedatewrk:installment_amount = arsduedatewrk:installment_amount + arsbilling_alt:installment_amount
+       arsduedatewrk:total_amount_paid  = arsduedatewrk:total_amount_paid  + arsbilling_alt:total_amount_paid
+       arsduedatewrk:write_off_amount   = arsduedatewrk:write_off_amount   + arsbilling_alt:write_off_amount
+   }
+   }
+
+} -- end of procedure
+
+Procedure cleanup_billing
+{
+
+access arsbilling_alt2, set arsbilling_alt2:company_id = arsbilling:company_id,
+                            arsbilling_alt2:policy_no  = arsbilling:policy_no, generic
+
+while arsbilling_alt2:company_id = arsbilling:company_id and
+      arsbilling_alt2:policy_no  = arsbilling:policy_no
+      {
+
+      if arsbilling_alt2:trans_code <> 18 then
+      {
+      delete arsbilling_alt2
+      }
+
+      next arsbilling_alt2
+
+      }
+
+} -- end of procedure
+
+Procedure Add_new_due_dates
+{
+
+access arsduedatewrk, set arsduedatewrk:company_id = arsbilling:company_id,
+                          arsduedatewrk:policy_no  = arsbilling:policy_no, generic
+
+while arsduedatewrk:company_id = arsbilling:company_id and
+      arsduedatewrk:policy_no  = arsbilling:policy_no
+      {
+
+      Access ARSBILLING_alt, Set ARSBILLING_alt:COMPANY_ID       = arsduedatewrk:COMPANY_ID,
+                                 arsbilling_alt:POLICY_NO        = arsduedatewrk:POLICY_NO,
+                                 arsbilling_alt:TRANS_DATE       = arsduedatewrk:TRANS_DATE,
+                                 arsbilling_alt:TRANS_EFF        = arsduedatewrk:TRANS_EFF,
+                                 arsbilling_alt:TRANS_EXP        = arsduedatewrk:TRANS_EXP,
+                                 arsbilling_alt:TRANS_CODE       = arsduedatewrk:trans_code,
+                                 arsbilling_alt:LINE_OF_BUSINESS = arsduedatewrk:LINE_OF_BUSINESS,
+                                 arsbilling_alt:COMM_RATE        = arsduedatewrk:COMM_RATE,
+                                 arsbilling_alt:SUB_CODE         = arsduedatewrk:sub_code,
+                                 arsbilling_alt:billing_ctr      = arsduedatewrk:billing_ctr,
+                                 arsbilling_alt:return_check_ctr = arsduedatewrk:return_check_ctr
+
+        IF arsbilling_alt:COMPANY_ID       <> arsduedatewrk:COMPANY_ID or
+           arsbilling_alt:POLICY_NO        <> arsduedatewrk:POLICY_NO or
+           arsbilling_alt:TRANS_DATE       <> arsduedatewrk:TRANS_DATE or
+           arsbilling_alt:TRANS_EFF        <> arsduedatewrk:TRANS_EFF or
+           arsbilling_alt:TRANS_EXP        <> arsduedatewrk:TRANS_EXP or
+           arsbilling_alt:TRANS_CODE       <> arsduedatewrk:trans_code or
+           arsbilling_alt:LINE_OF_BUSINESS <> arsduedatewrk:LINE_OF_BUSINESS or
+           arsbilling_alt:COMM_RATE        <> arsduedatewrk:COMM_RATE or
+           arsbilling_alt:SUB_CODE         <> arsduedatewrk:SUB_CODE or
+           arsbilling_alt:billing_ctr      <> arsduedatewrk:billing_ctr or
+           arsbilling_alt:return_check_ctr <> arsduedatewrk:return_check_ctr THEN
+           {
+                ADD ARSBILLING_alt
+                {
+                    arsbilling_alt:COMPANY_ID          = arsduedatewrk:COMPANY_ID
+                    arsbilling_alt:POLICY_NO           = arsduedatewrk:POLICY_NO
+                    arsbilling_alt:TRANS_DATE          = arsduedatewrk:TRANS_DATE
+                    arsbilling_alt:TRANS_EFF           = arsduedatewrk:TRANS_EFF
+                    arsbilling_alt:TRANS_EXP           = arsduedatewrk:TRANS_EXP
+                    arsbilling_alt:TRANS_CODE          = arsduedatewrk:trans_code
+                    arsbilling_alt:LINE_OF_BUSINESS    = arsduedatewrk:LINE_OF_BUSINESS
+                    arsbilling_alt:COMM_RATE           = arsduedatewrk:COMM_RATE
+                    arsbilling_alt:SUB_CODE            = arsduedatewrk:SUB_CODE
+                    arsbilling_alt:BILLING_CTR         = arsduedatewrk:billing_ctr
+                    arsbilling_alt:RETURN_CHECK_CTR    = arsduedatewrk:return_check_ctr
+                    arsbilling_alt:LOB_SUBLINE         = arsduedatewrk:LOB_SUBLINE
+                    arsbilling_alt:DUE_DATE            = arsduedatewrk:DUE_DATE
+                    arsbilling_alt:BILL_PLAN           = arsduedatewrk:BILL_PLAN
+                    arsbilling_alt:PAYMENT_PLAN        = arsduedatewrk:PAYMENT_PLAN
+                    arsbilling_alt:STATUS              = arsduedatewrk:status
+                    arsbilling_alt:STATUS_DATE         = arsduedatewrk:status_date
+                    arsbilling_alt:BILLED_DATE         = arsduedatewrk:billed_date
+                    arsbilling_alt:INSTALLMENT_AMOUNT  = arsduedatewrk:installment_amount
+                    arsbilling_alt:TOTAL_AMOUNT_PAID   = arsduedatewrk:total_amount_paid
+                    arsbilling_alt:DISBURSEMENT_AMOUNT = arsduedatewrk:disbursement_amount
+                    arsbilling_alt:WRITE_OFF           = arsduedatewrk:WRITE_OFF
+                    arsbilling_alt:WRITE_OFF_AMOUNT    = arsduedatewrk:write_off_amount
+                    arsbilling_alt:WRITE_OFF_DATE      = arsduedatewrk:WRITE_OFF_DATE
+                    arsbilling_alt:PRIOR_STATUS        = arsduedatewrk:PRIOR_STATUS
+                    arsbilling_alt:PRIOR_STATUS_DATE   = arsduedatewrk:PRIOR_STATUS_DATE
+                    arsbilling_alt:PRIOR_TRANS_CODE    = arsduedatewrk:PRIOR_TRANS_CODE
+                    arsbilling_alt:REINSTATED          = arsduedatewrk:REINSTATED
+                    arsbilling_alt:USER                = "MERGED"
+                    arsbilling_alt:POL_YEAR            = arsduedatewrk:POL_YEAR
+                    arsbilling_alt:END_SEQUENCE        = arsduedatewrk:END_SEQUENCE
+                    arsbilling_alt:USER_CONSOLE        = arsduedatewrk:USER_CONSOLE
+                    arsbilling_alt:agent_no            = arsduedatewrk:agent_no
+                    } -- end of add
+        } -- end of record exists checking
+
+    next arsduedatewrk
+
+    } -- end of while
+
+} -- end of procedure
+
+end -- end of Program

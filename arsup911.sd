@@ -1,0 +1,159 @@
+%%
+Program
+        Name = "arsup911" ;
+        Type = "File" ;
+        Domain = "ARSCANCEL" ;
+        Padcharacter = Space ;
+
+        Number COUNTER = 0;
+        Number L_UPDATE_COUNTER = 0;
+        number l_arsbilling_counter = 0;
+        number l_arscancel_counter = 0;
+        number l_sfscancel_counter = 0;
+        Wdate L_CANCEL_DATE ;
+        Wdate L_DUE_DATE ;
+        String L_ENTER[1];
+
+Initialisation
+L_CANCEL_DATE = Date(COMMANDLINE[1,8])
+L_DUE_DATE    = Date(COMMANDLINE[9,16])
+
+--Read (23,1,"Press Enter to Process",L_ENTER,1)
+
+Update
+        COUNTER = COUNTER + 1
+
+If COUNTER = 1 Then
+Begin
+    Write ("<014>")
+    Write ("%c%s%d",05020,"<014>Removing CX Notices from : ",L_CANCEL_DATE)
+    Write ("%c%s",06020,"SCIPS will update the arscancel, sfpname, sfsmail, arsbilling, sfscancel files")
+    Write ("%c%s%d",07020,"Due date to be removed up to is ",L_DUE_DATE)
+End
+
+If COUNTER Mod 100 = 0 Then Begin
+        Write ("%c%s%n",02001,"Counter = ",COUNTER)
+End
+
+If ARSCANCEL:CX_DATE    = L_CANCEL_DATE And
+   ARSCANCEL:CX_STATUS  <> "R" And
+   ARSCANCEL:DUE_DATE   <= L_DUE_DATE Then
+Begin
+
+Access ARSCANCEL_ALIAS, Set ARSCANCEL_ALIAS:COMPANY_ID = ARSCANCEL:COMPANY_ID,
+                            ARSCANCEL_ALIAS:POLICY_NO  = ARSCANCEL:POLICY_NO,
+                            ARSCANCEL_ALIAS:SUB_CODE   = ARSCANCEL:SUB_CODE
+
+       If ARSCANCEL_ALIAS:COMPANY_ID = ARSCANCEL:COMPANY_ID And
+          ARSCANCEL_ALIAS:POLICY_NO  = ARSCANCEL:POLICY_NO And
+          ARSCANCEL_ALIAS:SUB_CODE   = ARSCANCEL:SUB_CODE Then
+       Begin
+            Delete ARSCANCEL_ALIAS
+            l_arscancel_counter = l_arscancel_counter + 1
+            L_UPDATE_COUNTER = L_UPDATE_COUNTER + 1
+            Access SFPCURRENT, Set SFPCURRENT:POLICY_NO = ARSCANCEL:POLICY_NO
+            If SFPCURRENT:POLICY_NO = ARSCANCEL:POLICY_NO Then
+            Begin
+                Access SFPNAME, Set SFPNAME:POLICY_NO = SFPCURRENT:POLICY_NO,
+                                    SFPNAME:POL_YEAR  = SFPCURRENT:POL_YEAR,
+                                    SFPNAME:END_SEQUENCE = SFPCURRENT:END_SEQUENCE
+
+                If SFPNAME:POLICY_NO = SFPCURRENT:POLICY_NO And
+                   SFPNAME:POL_YEAR  = SFPCURRENT:POL_YEAR And
+                   SFPNAME:END_SEQUENCE = SFPCURRENT:END_SEQUENCE Then
+                   Begin
+                   Change SFPNAME
+                   Begin
+                       SFPNAME:NUMBER_OF_LATE_PAY = SFPNAME:NUMBER_OF_LATE_PAY - 1
+                   End
+                   End
+           End
+
+           Access SFSMAIL, Set SFSMAIL:POLICY_NO = ARSCANCEL:POLICY_NO, Approximate
+           While SFSMAIL:POLICY_NO = ARSCANCEL:POLICY_NO
+           Begin
+           If SFSMAIL:POLICY_NO = ARSCANCEL:POLICY_NO And
+              SFSMAIL:TRANS_DATE = L_CANCEL_DATE Then
+              Begin
+              Delete SFSMAIL
+              End
+              Next SFSMAIL
+          End
+
+          access arsbilling, set arsbilling:company_id = arscancel:company_id,
+                                 arsbilling:policy_no  = arscancel:policy_no, approximate
+
+          while arsbilling:company_id = arscancel:company_id and
+                arsbilling:policy_no  = arscancel:policy_no
+                {
+                if arsbilling:trans_code = 70 and
+                   arsbilling:trans_date = l_cancel_date then
+                   {
+                   access arsbilling_alt, set arsbilling_alt:company_id       = arsbilling:company_id,
+                                              arsbilling_alt:policy_no        = arsbilling:policy_no,
+                                              arsbilling_alt:trans_date       = arsbilling:trans_date,
+                                              arsbilling_alt:trans_eff        = arsbilling:trans_eff,
+                                              arsbilling_alt:trans_exp        = arsbilling:trans_exp,
+                                              arsbilling_alt:trans_code       = arsbilling:trans_code,
+                                              arsbilling_alt:line_of_business = arsbilling:line_of_business,
+                                              arsbilling_alt:comm_rate        = arsbilling:comm_rate,
+                                              arsbilling_alt:sub_code         = arsbilling:sub_code,
+                                              arsbilling_alt:billing_ctr      = arsbilling:billing_ctr,
+                                              arsbilling_alt:return_check_ctr = arsbilling:return_check_ctr
+
+                   if arsbilling_alt:company_id       = arsbilling:company_id and
+                      arsbilling_alt:policy_no        = arsbilling:policy_no and
+                      arsbilling_alt:trans_date       = arsbilling:trans_date and
+                      arsbilling_alt:trans_eff        = arsbilling:trans_eff and
+                      arsbilling_alt:trans_exp        = arsbilling:trans_exp and
+                      arsbilling_alt:trans_code       = arsbilling:trans_code and
+                      arsbilling_alt:line_of_business = arsbilling:line_of_business and
+                      arsbilling_alt:comm_rate        = arsbilling:comm_rate and
+                      arsbilling_alt:sub_code         = arsbilling:sub_code and
+                      arsbilling_alt:billing_ctr      = arsbilling:billing_ctr and
+                      arsbilling_alt:return_check_ctr = arsbilling:return_check_ctr then
+                      {
+                          l_arsbilling_counter = l_arsbilling_counter + 1
+                          delete arsbilling_alt
+                      }
+                   } -- t/c 70 and trans date checking end
+
+                   next arsbilling
+
+                   } -- end of while
+
+                   access sfscancel, set sfscancel:company_id = arscancel:company_id,
+                                         sfscancel:policy_no  = arscancel:policy_no, approximate
+
+                   while sfscancel:company_id = arscancel:company_id and
+                         sfscancel:policy_no  = arscancel:policy_no
+                         {
+                         if sfscancel:trans_date = l_cancel_date and
+                            sfscancel:cancellation_code = 100 then
+                         {
+                         access sfscancel_alt, set sfscancel_alt:company_id = sfscancel:company_id,
+                                                   sfscancel_alt:policy_no  = sfscancel:policy_no,
+                                                   sfscancel_alt:sub_code   = sfscancel:sub_code
+
+                         if sfscancel_alt:company_id = sfscancel:company_id and
+                            sfscancel_alt:policy_no  = sfscancel:policy_no and
+                            sfscancel_alt:sub_code   = sfscancel:sub_code then
+                            {
+                            delete sfscancel_alt
+                            l_sfscancel_counter = l_sfscancel_counter + 1
+                            }
+                         }
+                         next sfscancel
+                         }
+       End
+
+End
+
+Screen Exit
+--Write ("%c%s%n",10050,"Number of Policies Corrected ",L_UPDATE_COUNTER)
+Write ("%c%s%n",11050,"Number of arsbilling records Corrected ",l_arsbilling_COUNTER)
+Write ("%c%s%n",12050,"Number of arscancel records Corrected ",l_arscancel_COUNTER)
+Write ("%c%s%n",13050,"Number of sfscancel records Corrected ",l_sfscancel_COUNTER)
+Write ("%c%s%n",15001,"Update is Compete......",COUNTER)
+
+End

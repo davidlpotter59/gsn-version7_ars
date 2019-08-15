@@ -1,0 +1,117 @@
+%%
+Screen
+        Name = "Arsin202" ;
+        Type = "Multiline" ;
+        repeat line_items_tg, 15 times;
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize = "dynamic";
+        Windowtitle="%s    %a   Agents Commission Inquiry By Policy Number - Version 7.00 -    %m";
+        iconline = 0;
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+        Global Wdate G_TRANS_DATE ;
+        Global Wdate G_TRANS_EFF ;
+        Global Wdate G_TRANS_EXP ;
+        Global Unsigned Ascii Number G_TRANS_CODE[4] ;
+        Global Unsigned Ascii Number G_LINE_OF_BUSINESS[4] ;
+        Global Unsigned Ascii Number G_COMM_RATE[4]/decimals=2 ;
+
+        string l_continue_1[50]="";
+
+        Access ARSMASTER,
+           Set ARSMASTER:COMPANY_ID = G_COMPANY_ID ,
+               ARSMASTER:POLICY_NO = G_POLICY_NO, Generic
+
+        Include "STDKEYS7.INC"
+
+Style Definition
+    include "styles.inc"
+
+Functions
+
+        Include "STDFUNC7.INC"
+Menu Definition
+    include "stdmenu7.inc"
+}
+
+ToolBar Definition
+    include "stdtoolbar7.inc"
+}
+Screen
+Properties
+    {
+    LayOutType      = Column
+    }
+{
+
+Panel Tagged Header_pl
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = AsNeeded
+    }
+{
+%%
+                                                                  ____________
+*-------------------------------------------------------------------------------------*
+| Company ID: __________ ________________________________________                     |
+|                                                                                     |
+|  Policy          Insured's        Trans    Trans     Commission Premium       Comm  |
+|  Number            Name           Date      Eff       Paid Date               Rate  |
+| _________ ____________________ __________ __________ __________ _____________ _____ |
+|                                                                                     |
+|                                                                                     |
+|                                                                                     |
+|                                                                                     |
+|                                                                                     |
+|                                                                                     |
+|                                                                                     |
+|                                                                                     |
+|                                                                                     |
+|                                                                                     |
+|                                                                                     |
+|                                                                                     |
+|                                                                                     |
+|                                                                                     |
+*-------------------------------------------------------------------------------------*
+%%
+
+Components
+
+Fields
+101     FUNCTION/noecho/showasguidetext ;
+0301    ARSMASTER:COMPANY_ID/displayonly
+        Include "companyhlp.inc"
+0302    SFSCOMPANY:NAME[1]/mask="X(30)";
+0701    ARSMASTER:POLICY_NO/displayonly tagged line_items_tg;
+0702    SFPNAME:NAME[1]/mask="X(20)" tagged line_items_tg;
+0703    ARSMASTER:TRANS_DATE/displayonly tagged line_items_tg;
+0704    ARSMASTER:TRANS_EFF/displayonly tagged line_items_tg;
+0705    ARSMASTER:COMMISSIONS_APPLIED tagged line_items_tg;
+0706    ARSMASTER:PREMIUM/displayonly tagged line_items_tg;
+0707    Begin
+        If FUNCTION One Of "CHANGE" And
+           SECURITY < 95 Then
+           Begin
+               Error "Security Violation - Can Not Change "
+           End
+        End
+        ARSMASTER:COMM_RATE tagged line_items_tg;
+}
+}
+
+Screen Exit
+        If ARSMASTER:COMPANY_ID > "" Then G_COMPANY_ID = ARSMASTER:COMPANY_ID ;
+        If ARSMASTER:POLICY_NO > 0 Then G_POLICY_NO = ARSMASTER:POLICY_NO ;
+        If ARSMASTER:TRANS_DATE > 0 Then G_TRANS_DATE = ARSMASTER:TRANS_DATE ;
+        If ARSMASTER:TRANS_EFF > 0 Then G_TRANS_EFF = ARSMASTER:TRANS_EFF ;
+        If ARSMASTER:TRANS_EXP > 0 Then G_TRANS_EXP = ARSMASTER:TRANS_EXP ;
+        If ARSMASTER:TRANS_CODE > 0 Then G_TRANS_CODE = ARSMASTER:TRANS_CODE ;
+        If ARSMASTER:LINE_OF_BUSINESS > 0
+        Then G_LINE_OF_BUSINESS = ARSMASTER:LINE_OF_BUSINESS ;
+        If ARSMASTER:COMM_RATE > 0 Then G_COMM_RATE = ARSMASTER:COMM_RATE ;
+
+
+End

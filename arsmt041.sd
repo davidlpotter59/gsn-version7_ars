@@ -1,0 +1,91 @@
+                                                       ____________
+*-----------------------------------------------------------------------*
+|   Company:           __________                                       |
+|   Invoice Message:                                   *--------------* |
+|   __________________________________________________ |   Positions  | |
+|   __________________________________________________ | H Pos  ____  | |
+|   __________________________________________________ | V Pos  ____  | |
+|   __________________________________________________ *--------------* |
+|   __________________________________________________                  |
+|   __________________________________________________                  |
+|   Invoice Type:      ________________________________________         |
+|   Invoice Seperator: __________________________________________       |
+|                                                                       |
+|   Invoice Payto:     ________________________________________         |
+|   Invoice Company:   ________________________________________         |
+|   Invoice Slogan:    ________________________________________         |
+|   Invoice Payment Options: __________________________________         |
+|                                                                       |
+|   Invoice Closing:         __________________________________         |
+|                                                                       |
+|   Invoice Pay Amount:      ______________________________             |
+|   Automatically Hold Checks After Cancellation Date: __               |
+|   Endorsemets on Installments Effective: __________                   |
+|~~~Print~Mortgagee~on:~~~~Invoice~Head~_~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+|~~~~~~~~~~~~~~~~~~~~~~~~~~Invoice~Body~_~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+|~~~Print~All~Past~Due:~~~~~~~~~~~~~_~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+|~~~Print~Cx~Notice~On~Open~Status:~_~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+|~~~Print~Non~Pay~With~Other~Cx:~~~~_~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+*-----------------------------------------------------------------------*
+%%
+Screen
+        Name = "Arsmt041" ;
+        Type = "Detail" ;
+        Padcharacter=Space;
+        Highlite=Underscore;
+        Screensize="dynamic";
+
+        Global String G_COMPANY_ID[10] ;
+
+        Access ARSCONTROL,
+           Set ARSCONTROL:COMPANY_ID = G_COMPANY_ID ;
+
+        Include "STDKEYS.INC"
+        !F7="T"/function/icon="Ctrl";
+
+Functions
+
+        Include "STDFUNC.INC"
+        "T" Display "arsmt042";
+        -- include "SCIPSPRINT.FUN"
+
+Fields
+101     FUNCTION ;
+301     ARSCONTROL:COMPANY_ID                   Mandatory;
+501     ARSCONTROL:INVOICE_MESSAGE_ARRAY[1];
+601     ARSCONTROL:INVOICE_MESSAGE_ARRAY[2];
+602     ARSCONTROL:INVOICE_BOTTOM_H_POSITION;
+701     ARSCONTROL:INVOICE_MESSAGE_ARRAY[3];
+702     ARSCONTROL:INVOICE_BOTTOM_V_POSITION;
+801     ARSCONTROL:INVOICE_MESSAGE_ARRAY[4];
+901     ARSCONTROL:INVOICE_MESSAGE_ARRAY[5];
+1001    ARSCONTROL:INVOICE_MESSAGE_ARRAY[6];
+1101    ARSCONTROL:INVOICE_TYPE ;
+1201    ARSCONTROL:INVOICE_SEPERATOR/freetextlines=2 ;
+1501    ARSCONTROL:INVOICE_COMPANY ;
+1401    ARSCONTROL:INVOICE_PAYTO ;
+1601    ARSCONTROL:INVOICE_SLOGAN ;
+1701    ARSCONTROL:INVOICE_PAYMENT_OPTIONS/freetextlines=2 ;
+1901    ARSCONTROL:INVOICE_CLOSING/freetextlines=2 ;
+2101    ARSCONTROL:INVOICE_PAY_AMOUNT;
+2201    ARSCONTROL:HOLD_CX_CHECKS /checkbox/values="0,1";
+2301    ARSCONTROL:INVOICE_APPLY_END_EFF;
+2401    ARSCONTROL:PRINT_MORTGAGEE_ON_INVOICE_HEAD/checkbox/values="0,1"/anchor;
+2501    ARSCONTROL:PRINT_MORTGAGEE_ON_INVOICE_BODY/checkbox/values="0,1"/anchor;
+2601    ARSCONTROL:PRINT_ALL_PAST_DUE/checkbox/values="0,1";
+2701    ARSCONTROL:PRINT_CX_NOTICE_ON_OPEN_STATUS /checkbox/values="0,1";
+2801    ARSCONTROL:PRINT_NON_PAY_WITH_OTHER_CX/checkbox/values="0,1";
+
+/* Postupdate
+        Begin
+           Display Modal Screen "arsmt042"
+           At Line 1, Column 1
+           With Initial Function "Change"
+        End;
+*/
+Screen Exit
+        If ARSCONTROL:COMPANY_ID > ""
+        Then G_COMPANY_ID = ARSCONTROL:COMPANY_ID ;
+
+
+End

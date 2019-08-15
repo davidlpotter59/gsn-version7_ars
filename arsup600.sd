@@ -1,0 +1,288 @@
+%%
+/*
+Date Written: May 3, 2010
+
+Name: arsup600.sd
+
+Copyright (c) 2000, SCIPS.com Inc.
+
+Modify
+Date               By          Comment
+-------------------------------------------------------
+may 3, 2010       CAC          this program will read from
+a text file called MOBacct and put it into
+a database called mobmaster
+this is for an original first load of mobmaster.
+==============================================================
+*/
+
+Program
+        Name = "arsup600" ;
+        Type = "File" ;
+        Domain = "dummy" ;
+        Padcharacter = Space ;
+
+
+        unsigned ascii number l_policy[9];
+        string L_POLICY_NO[9];
+
+        local unsigned number l_mob_reg[1];
+        local unsigned number l_mob_auto[8];
+        local unsigned number l_mob_paper[1];
+
+        string l_reg_date[20];
+        string l_pap_date[20];
+        string l_auto_date[20];
+        string l_reg_date3[8] ;
+
+        string l_pay_type[20];
+        string l_company_id[10];
+        string l_directory[40];
+        string l_mob_filename[100];
+        string l_mob_filename1[100];
+        string l_mob_date[8] ;
+        string l_record[200];
+        string l_enter[1];
+        string l_path[100];
+        string l_reg_date1[8] ;
+        string l_junk[1] ;
+--        unsigned number l_reg_date2[8] ;
+        wdate l_reg_date4 ;
+        rwdate l_reg_date5 ;
+        string l_pap_date1[8] ;
+  --      unsigned number l_pap_date2[8] ;
+        wdate l_pap_date4 ;
+        string l_auto_date1[8] ;
+    --    unsigned number l_auto_date2[8] ;
+        wdate l_auto_date4 ;
+
+
+Initialisation
+
+--  l_company_id = ""
+
+  access sfsdefault, set sfsdefault:sfs_code = "SFS", exact
+  l_company_id = sfsdefault:company_id
+
+  access arscontrol2, set arscontrol2:company_id = l_company_id, exact
+
+--********************************
+-- for testing
+--  if arscontrol2:company_id <> "" then
+--    {
+--      l_directory = arscontrol2:mob_input_location
+--      l_mob_date =  str(todaysdate,"YYYYMMDD")
+--      l_mob_filename = trun(lowercase(trun(arscontrol2:mob_input_name)) + trun(l_mob_date)  + ".txt")
+--     l_mob_filename1 = trun(l_directory) + trun(l_mob_filename)
+--    }
+
+--  l_directory = "/data/fos_debug/"
+  l_mob_filename1 = "/data/fos_debug/NewDump_Client10868_WithTab.csv"
+  l_mob_filename = trun(l_mob_filename1)
+
+/*
+  write ("<014>")
+  WRITE("%c%s%s",02001,"l_mob_filename  = ",trun(l_mob_filename))
+  WRITE("%c%s%s",03001,"l_mob_filename1  = ",trun(l_mob_filename1))
+  write("%c%s%s",4001,"l_mob_date =        ",l_mob_date)
+  write ("%c%s%s",05001,"l company id    = ",l_company_id)
+  Read (23,1,"at getting l_mob_file name 1 Press Enter to Continue ",L_ENTER,1)
+*/
+  do read_from_text_file
+
+
+update
+
+procedure definition
+
+procedure read_from_text_file
+
+BEGIN
+  l_pay_type = ""
+  while errornumber <> 6001
+    {
+--    warning currentdir
+      readfile (l_mob_filename,l_policy_no,20,"<tab>")
+      readfile (l_mob_filename,l_mob_reg,20,"<tab>")
+      readfile (l_mob_filename,L_reg_date,20,"<tab>")
+      readfile (l_mob_filename,L_mob_paper,20,"<tab>")
+      readfile (l_mob_filename,L_pap_date,20,"<tab>")
+      readfile (l_mob_filename,L_mob_auto,20,"<tab>")
+      readfile (l_mob_filename,L_auto_date,20,"<tab>")
+      readfile (l_mob_filename,L_pay_type,20,"<tab>")
+      readfile (l_mob_filename,l_junk,20,"<NL>")
+
+/*
+      write ("<014>")
+      WRITE("%c%s%s",01001,"L_policy_no = ",l_policy_no)
+      WRITE("%c%s%n",02001,"l_mob_reg   = ",l_mob_reg)
+      WRITE("%c%s%s",03001,"L_reg_date  = ",l_reg_date)
+      WRITE("%c%s%n",04001,"L_mob_paper = ",l_mob_paper)
+      write("%c%s%s",05001,"l_pap_date  = ",l_pap_date)
+      WRITE("%c%s%s",06001,"L_pay_type  = ",l_pay_type)
+--      WRITE("%c%s%s",07001,L_junk)
+      write("%c%s%n",08001,"errornumber = ",errornumber)
+      write ("%c%s%s",09001,"l company id    = ",l_company_id)
+      read(20,1,"press enter to continue",l_enter,1)
+*/
+      do add_to_mobmaster
+
+
+    }
+END
+
+procedure add_to_mobmaster
+
+BEGIN
+  l_policy = val(l_policy_no)
+  if l_company_id = "" then
+   {
+    access sfsdefault, set sfsdefault:sfs_code = "SFS", exact
+    l_company_id = sfsdefault:company_id
+--    write ("<014>")
+  --  write ("%c%s%s",05001,"l company id    = ",l_company_id)
+    --Read (23,1,"i if statement -----Press Enter to Continue ",L_ENTER,1)
+   }
+
+
+  access mobmaster,
+     set mobmaster:company_id        = l_company_id,
+         mobmaster:policy_no         = l_policy, generic
+
+
+  if l_policy <> 0 then
+   {
+   if mobmaster:company_id     <> l_company_id or
+     mobmaster:policy_no      <> l_policy then
+     {
+      add mobmaster
+        {
+          mobmaster:company_id                  = l_company_id
+          mobmaster:policy_no                   = l_policy
+          if l_pay_type = "" then
+             mobmaster:autopay_type = "          "
+          else
+             mobmaster:autopay_type = l_pay_type
+
+--  mob sent a different date layout
+--             l_reg_date1 = l_reg_date[5,6] + l_reg_date[7,8] + l_reg_date[1,4]
+             l_reg_date1 = l_reg_date[1,2] + l_reg_date[4,5] + l_reg_date[7,10]
+             l_reg_date4 = date(l_reg_date1)
+
+--             l_pap_date1 =  l_pap_date[5,6] + l_pap_date[7,8] + l_pap_date[1,4]
+             l_pap_date1 =  l_pap_date[1,2] + l_pap_date[4,5] + l_pap_date[7,10]
+             l_pap_date4 = date(l_pap_date1)
+
+             l_auto_date1 = l_auto_date[5,6] + l_auto_date[7,8] + l_auto_date[1,4]
+             l_auto_date1 = l_auto_date[1,2] + l_auto_date[4,5] + l_auto_date[7,10]
+             l_auto_date4 = date(l_auto_date1)
+
+/*
+             write ("<014>")
+             write ("%c%s%s",2001,"l_reg_date1 =",l_reg_date1)
+             write ("%c%s%s",3001,"l_reg_date  =",l_reg_date)
+             write ("%c%s%d",4001,"l_reg_date4 =",l_reg_date4)
+             write ("%c%s%d",6001,"l_reg_date5 =",l_reg_date5)
+             Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+*/
+
+          if l_mob_reg = 1 then
+           {
+             mobmaster:registered_online  = 1
+             mobmaster:registered_date = l_reg_date4
+           }
+          else
+           {
+             mobmaster:registered_online = 0
+             mobmaster:registered_date = l_reg_date4
+           }
+
+          if l_mob_paper = 1 then
+           {
+             mobmaster:paperless_invoicing  = 1
+             mobmaster:paperless_date = l_pap_date4
+           }
+          else
+           {
+             mobmaster:paperless_invoicing = 0
+             mobmaster:paperless_date = l_pap_date4
+           }
+
+          if l_mob_auto = 1 then
+           {
+             mobmaster:auto_pay  = 1
+             mobmaster:auto_date = l_auto_date4
+           }
+          else
+           if l_mob_auto = 0 then
+            {
+             mobmaster:auto_pay = 0
+             mobmaster:auto_date = l_auto_date4
+            }
+--          else
+  --         if l_mob_auto = "pending" then
+    --        {
+      --       mobmaster:auto_pay = "pending"
+        --     mobmaster:auto_date = l_auto_date4
+          --  }
+        }
+    }
+    -- change
+    else
+      change mobmaster
+        {
+          l_reg_date1 = l_reg_date[5,6] + l_reg_date[7,8] + l_reg_date[1,4]
+          l_reg_date4 = date(l_reg_date1)
+
+          l_pap_date1 =  l_pap_date[5,6] + l_pap_date[7,8] + l_pap_date[1,4]
+          l_pap_date4 = date(l_pap_date1)
+
+          l_auto_date1 = l_auto_date[5,6] + l_auto_date[7,8] + l_auto_date[1,4]
+          l_auto_date4 = date(l_auto_date1)
+
+          if l_mob_reg = 0 then
+           {
+             mobmaster:registered_online  = 1
+             mobmaster:registered_date = l_reg_date4
+           }
+          else
+           {
+             mobmaster:registered_online = 0
+             mobmaster:registered_date = l_reg_date4
+           }
+
+          if l_mob_paper = 0 then
+           {
+             mobmaster:paperless_invoicing  = 1
+             mobmaster:paperless_date = l_pap_date4
+           }
+          else
+           {
+             mobmaster:paperless_invoicing = 0
+             mobmaster:paperless_date = l_pap_date4
+           }
+
+          if l_mob_auto = 1 then
+           {
+             mobmaster:auto_pay  = 1
+             mobmaster:auto_date = l_auto_date4
+           }
+          else
+          if l_mob_auto = 0 then
+           {
+             mobmaster:auto_pay = 0
+             mobmaster:auto_date = l_auto_date4
+           }
+          else
+--          if l_mob_auto = "pending" then
+  --         {
+    --         mobmaster:auto_pay = "pending"
+      --       mobmaster:auto_date = l_auto_date4
+        --   }
+         mobmaster:autopay_type = l_pay_type
+        }
+   }
+END
+
+
+End

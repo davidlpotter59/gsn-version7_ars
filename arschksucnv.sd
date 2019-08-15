@@ -1,0 +1,46 @@
+%%
+Program
+        Name = "arschksucnv" ;
+        Type = "File" ;
+        Domain = "ARSCHKSU" ;
+
+        Number COUNTER = 0;
+        String L_LOGFILE[20]="arschksucnv.log";
+
+Initialisation
+
+Update
+        COUNTER = COUNTER + 1
+
+If COUNTER = 1 Then
+Begin
+    Write ("<014>")
+End
+
+If COUNTER Mod 100 = 0 Then Begin
+        Write ("%c%s%n",02001,"Counter = ",COUNTER)
+End
+
+      access qcstest, set qcstest:policy_no = arschksu:policy_no
+      Add qcstest
+      Begin
+         qcstest:policy_no   = arschksu:policy_no
+         qcstest:trans_date  = arschksu:trans_date
+         qcstest:check_no    = arschksu:check_no
+         qcstest:total_due   = 9999.99
+         qcstest:due_date    = 12.31.2005
+         qcstest:image_name  = "dummy.jpg"
+         qcstest:bank_no     = "0012112"
+      End -- end of end
+
+Screen Exit
+
+Write ("%c%s%n",15001,"Update is Complete......",COUNTER)
+
+Writefile (L_LOGFILE, "<NL>Update is Complete --- >  %n",COUNTER)
+Writefile (L_LOGFILE, "<NL>Update Run on --- >  %d",TODAYSDATE )
+Writefile (L_LOGFILE, "<NL><NL>")
+
+Closefile (L_LOGFILE)
+
+End

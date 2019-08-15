@@ -1,0 +1,373 @@
+%%
+Screen
+        Name = "Arsmt03d" ;
+        Type = "Multiline" ;
+        Highlite = Underscore;
+        Screensize = "dynamic";
+        Padcharacter = Space;
+        Windowtitle="%a      %s Agent -OFFSET Information - Version 7.00      %m";
+        Repeat line_item_tg, 10 times down;
+        domain = "Arsbillingac_work" ;
+        iconline = 0 ;
+
+        Global String G_COMPANY[10],
+                      G_COMPANY_ID[10];
+
+        Global Unsigned Ascii Number G_CHECK_REFERENCE[7],
+                                     g_key_check_reference[7],
+                                     G_POLICY_NO[9],
+                                     G_QUOTE_NO[8] ,
+                                     G_AGENT_NO[4] ,
+                                     g_offset[1] ;
+
+        Global String G_SUPP_NAME[50],
+                      G_CARE_OF[50],
+                      g_bank_no[15] ,
+                      G_STREET[30],
+                      G_CITY_STATE[30],
+                      G_CHECK_NUMBER[20];
+
+        Global Signed Ascii Number G_TOTAL_DUE[9]/decimals=2,
+                                   G_CHECK_AMOUNT[9]/decimals=2,
+                                   g_balance[9]/dec=2,
+                                   g_grace_days[2],
+                                   g_apply_amount[9]/decimals=2 ;
+
+        Global Unsigned Ascii Number G_ZIP_CODE[9] ,
+                                     g_master_reference[7] ;
+
+        global wdate g_starting_date,
+                     g_ending_date,
+                     g_post_date ;
+
+        Signed Ascii Number L_AMOUNT[10]=0/decimals=2;
+        Signed Ascii Number L_BALANCE[10]=0/decimals=2,
+                            l_amt_paid[11]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_CHECKS[10]=0/decimals=2,
+                            l_total_amount_due[10]=0/decimals=2 ;
+        String L_ENTER[1],
+               l_first[1],
+               l_mouse[1]="N" ;
+        String L_SFS[3]="SFS",
+               l_already_added[1]="N",
+               l_pol_zero[1]="N"  ;
+        Wdate L_HOLD_CX_EFF_DATE;
+        String L_POLICY_CX[1],
+               l_post[1] ;
+        String L_CANCELLATION_EXISTS[1];
+        unsigned ascii number l_master_reference[7],
+                              l_apply_to[1],
+                              l_policy_no[9],
+                              l_paid[11],
+                              l_comm[6]/dec=2;
+
+        signed ascii number l_total_due_agent[9]=0/decimals=2,
+                            l_ac_net_amount_due[9]=0/dec=2 ;
+        signed ascii number l_total_due_policy[9]=0/decimals=2;
+        string l_continue_1[10]="",
+               l_continue_2[10]="",
+               l_continue_3[10]="",
+               l_continue_4[10]="",
+               l_continue_5[10]="",
+               l_entry[1],
+               l_got_it[1]="N" ;
+
+        unsigned ascii number l_found[1]=0 ;
+        signed ascii number l_total_applied[9]=0.00/decimals=2;
+        Global unsigned ascii number g_starting_check_reference[9]=0/decimals=0,
+                                     g_ending_check_reference[9]=0/decimals=0;
+
+        Include "csexec.var"
+
+        access arsbillingac_work, set arsbillingac_work:company_id = G_company_id, approximate
+
+        Include "STDKEYS7.INC"
+
+style definition
+
+        include "styles.inc"
+
+
+functions
+
+        include "stdfunc7.inc"
+
+        reaccess ;
+        "redisplay" display/noreturn "arsmt03d" ;
+
+        "CHANGE" sequence "chg"   tagged change_fn      ;
+        "chg" change/hidden ;
+
+        "post_arsbill" sequence "arsbill"  tagged update_fn ;
+        "arsbill" continue
+                            {
+                            if l_first = "Y" then
+                              begin
+                                g_balance = g_check_amount
+                                l_first = "N"
+                              end
+
+                            l_continue_1 = dialog("Agent A/C APPLY Payment","warning.bmp","Are you sure you want to apply this offsest? ","No","Yes")
+                            if l_continue_1 = "Yes" then
+                               begin
+                                  --ask how much to apply
+                                  g_apply_amount = 0
+                                  display modal screen "arsmt03c"
+                                  if g_apply_amount = 0 then
+                                     begin
+                                        g_apply_amount = arsbillingac_work:installment_amount
+                                     end
+                                  do update_arsbilling
+                                  if l_already_added = "Y" then
+                                     begin
+                                      l_continue_3 = dialog("Agent A/C APPLY Payment","warning.bmp","You already applied this check for payment of this line item? ","Continue")
+                                      abort()
+                                     end
+                               end
+                             l_amt_paid = g_balance - arsbillingac_work:installment_amount
+
+                            } ;
+
+
+screen entry
+--disable(change_fn)
+--write("%c%s",14050,"                                              ")
+--if g_agent_no <> 0 then
+-- begin
+--  write("%c%s%n",14050,"Balance of Check Remaining = $",g_balance)
+-- end
+
+access validation
+skip if arsbillingac_work:agent_no          <> g_agent_no
+skip if arsbillingac_work:due_date           > g_ending_date
+skip if arsbillingac_work:installment_amount = 0.00
+skip if arsbillingac_work:bill_plan          not one of "AC"
+skip if arsbillingac_work:total_amount_paid  <> 0
+
+
+
+
+
+Screen at 1,2 to 20,100
+properties
+        {
+        Layouttype = column
+        }
+{
+Panel
+Properties
+        {
+        borderstyle = raised
+        scrollbarpolicy = asneeded
+        }
+{
+%%
+                                                                          _________
+ Policy No              Insured               Billed       Paid     Write Off  Amount Due
+ _________ ______________________________ ___________ ___________ ___________ ___________
+
+
+
+
+
+
+
+
+
+
+%%
+
+Components
+
+Fields
+
+/* beginning of the multiline screen */
+101    function/noecho/showasguidetext ;
+301    begin
+        if function one of "ADD", "NEW" then
+           begin
+             if g_agent_no = 0 then
+                 begin
+                   arsbillingac_work:policy_no = 0
+                 end
+           end
+       end
+        arsbillingac_work:POLICY_NO/displayonly tagged line_item_tg
+        properties {
+                   cursorshape     = hand
+                   backgroundcolor = "white"
+                   foregroundcolor = "blue"
+                   }
+       events     {
+                  MouseClicked {
+                  Currentrecord = EVENT.LINE
+                  function = "post_arsbill"
+                  Abort()
+                  }
+                  };
+302    sfpname:NAME[1]/displayonly tagged line_item_tg
+        properties {
+                   foregroundcolor = "black"
+                   backgroundcolor = "white"
+                   } ;
+
+303    arsbillingac_work:installment_amount/displayonly tagged line_item_tg
+        properties {
+                   foregroundcolor = "black"
+                   backgroundcolor = "white"
+                   } ;
+304    arsbillingac_work:total_amount_paid/displayonly tagged line_item_tg
+       properties {
+                   foregroundcolor = "black"
+                   backgroundcolor = "white"
+                   } ;
+305   arsbillingac_work:write_off_amount/displayonly tagged line_item_tg
+        properties {
+                   foregroundcolor = "black"
+                   backgroundcolor = "white"
+                   } ;
+
+306    begin
+        if arsbillingac_work:agent_no           = g_agent_no and
+            arsbillingac_work:due_date           <= g_ending_date  and
+            arsbillingac_work:due_date           <> 00.00.0000 and
+            arsbillingac_work:installment_amount <> 0.00 and
+            arsbillingac_work:bill_plan          one of "AC" then
+              begin
+              l_ac_net_amount_due = arsbillingac_work:installment_amount
+              l_total_amount_due = l_total_amount_due + arsbillingac_work:premium
+
+              end
+        else
+              l_ac_net_amount_due = 0
+        end
+        arsbillingac_work:installment_amount/displayonly tagged line_item_tg
+        properties {
+                   foregroundcolor = "black"
+                   backgroundcolor = "white"
+                   } ;
+
+}
+
+}
+
+
+Screen Exit
+do update_arschksu
+g_agent_no = 0
+
+Procedure Definition
+
+procedure update_arschksu
+begin
+
+  Access arschksu, Set arschksu:company_id = g_company_id,
+                       arschksu:check_reference = g_check_reference, exact
+
+  If arschksu:check_reference = g_check_reference Then
+      Begin
+      delete arschksu
+      End
+end
+
+
+Procedure UPDATE_ARSBILLING
+BEGIN
+
+  Access ARSBILLING, Set ARSBILLING:COMPANY_ID        = arsbillingac_work:COMPANY_ID,
+                         ARSBILLING:POLICY_NO         = arsbillingac_work:POLICY_NO,
+                         ARSBILLING:TRANS_DATE        = arsbillingac_work:TRANS_DATE,
+                         ARSBILLING:TRANS_EFF         = arsbillingac_work:TRANS_EFF,
+                         ARSBILLING:TRANS_EXP         = arsbillingac_work:TRANS_EXP,
+                         ARSBILLING:TRANS_CODE        = arsbillingac_work:TRANS_CODE,
+                         ARSBILLING:LINE_OF_BUSINESS  = arsbillingac_work:LINE_OF_BUSINESS,
+                         ARSBILLING:COMM_RATE         = arsbillingac_work:COMM_RATE,
+                         ARSBILLING:SUB_CODE          = arsbillingac_work:SUB_CODE,
+                         ARSBILLING:BILLING_CTR       = arsbillingac_work:BILLING_CTR,
+                         arsbilling:return_check_ctr  = arsbillingac_work:return_check_ctr, Exact
+
+
+  If ARSBILLING:COMPANY_ID        <> arsbillingac_work:COMPANY_ID Or
+     ARSBILLING:POLICY_NO         <> arsbillingac_work:POLICY_NO Or
+     ARSBILLING:TRANS_DATE        <> arsbillingac_work:TRANS_DATE Or
+     ARSBILLING:TRANS_EFF         <> arsbillingac_work:TRANS_EFF Or
+     ARSBILLING:TRANS_EXP         <> arsbillingac_work:TRANS_EXP Or
+     ARSBILLING:TRANS_CODE        <> arsbillingac_work:TRANS_CODE Or
+     ARSBILLING:LINE_OF_BUSINESS  <> arsbillingac_work:LINE_OF_BUSINESS  Or
+     ARSBILLING:COMM_RATE         <> arsbillingac_work:COMM_RATE  Or
+     ARSBILLING:SUB_CODE          <> arsbillingac_work:SUB_CODE Or
+     ARSBILLING:BILLING_CTR       <> arsbillingac_work:BILLING_CTR then
+      Begin
+       Add ARSBILLING
+        Begin
+         ARSBILLING:COMPANY_ID        = arsbillingac_work:COMPANY_ID
+         ARSBILLING:POLICY_NO         = arsbillingac_work:POLICY_NO
+         ARSBILLING:TRANS_DATE        = arsbillingac_work:TRANS_DATE
+         ARSBILLING:TRANS_EFF         = arsbillingac_work:TRANS_EFF
+         ARSBILLING:TRANS_EXP         = arsbillingac_work:TRANS_EXP
+         ARSBILLING:TRANS_CODE        = arsbillingac_work:TRANS_CODE
+         ARSBILLING:LINE_OF_BUSINESS  = arsbillingac_work:LINE_OF_BUSINESS
+         ARSBILLING:COMM_RATE         = arsbillingac_work:COMM_RATE
+         ARSBILLING:SUB_CODE          = arsbillingac_work:SUB_CODE
+         ARSBILLING:BILLING_CTR       = arsbillingac_work:BILLING_CTR
+         ARSBILLING:AGENT_NO          = arsbillingac_work:AGENT_NO
+         ARSBILLING:LINE_OF_BUSINESS  = arsbillingac_work:LINE_OF_BUSINESS
+         ARSBILLING:LOB_SUBLINE       = "99"
+         ARSBILLING:TRANS_DATE        = TODAYSDATE
+         ARSBILLING:TRANS_EFF         = sfpname:eff_date
+         ARSBILLING:PAYMENT_PLAN      = 1
+         ARSBILLING:BILL_PLAN         = arsbillingac_work:bill_plan
+         ARSBILLING:USER_CONSOLE      = TERMINAL
+         ARSBILLING:USER              = USERNAME
+         ARSBILLING:PRINTED           = 0
+         ARSBILLING:WRITE_OFF         = 0
+         ARSBILLING:WRITE_OFF_AMOUNT  = 0
+         ARSBILLING:WRITE_OFF_DATE    = 00.00.0000
+         ARSBILLING:CHECK_NO          = "offset999"
+         ARSBILLING:CHECK_VOIDED      = 0
+         ARSBILLING:PRIOR_STATUS      = " "
+         ARSBILLING:PRIOR_STATUS_DATE = 00.00.0000
+         ARSBILLING:REINSTATED        = "N"
+         ARSBILLING:PRIOR_TRANS_CODE  = 00
+         ARSBILLING:INSTALLMENT_CHARGE= 0.00
+         ARSBILLING:INSTALLMENT_AMOUNT= arsbillingac_work:installment_amount
+         ARSBILLING:WRITE_OFF_AMOUNT  = 0.00
+         ARSBILLING:WRITE_OFF         = 0
+         ARSBILLING:WRITE_OFF_DATE    = 00.00.0000
+         ARSBILLING:TOTAL_AMOUNT_PAID = arsbilling:total_amount_paid + g_apply_AMOUNT
+         ARSBILLING:payment_offset    = arsbilling:payment_offset + g_apply_AMOUNT
+         If ARSBILLING:installment_amount - (arsbilling:total_amount_paid +
+                                             arsbilling:write_off_amount) = 0.00 and
+            arsbilling:status <> "C" then
+           Begin
+             ARSBILLING:STATUS      = "P"
+             ARSBILLING:STATUS_DATE       = TODAYSDATE
+           end
+         ARSBILLING:DISBURSEMENT_AMOUNT = 0
+         ARSBILLING:BILLED_DATE       = TODAYSDATE
+         ARSBILLING:DUE_DATE          = ARSBILLINGac_work:due_date
+         ARSBILLING:POL_YEAR          = year(sfpname:eff_date)
+        End  -- add
+      end
+     else
+      begin
+       change arsbilling
+        begin
+         ARSBILLING:TOTAL_AMOUNT_PAID = arsbilling:total_amount_paid + g_apply_AMOUNT
+         ARSBILLING:payment_offset    = arsbilling:payment_offset + g_apply_AMOUNT
+         If ARSBILLING:installment_amount - (arsbilling:total_amount_paid +
+                                             arsbilling:write_off_amount) = 0.00 and
+            arsbilling:status <> "C" then
+           Begin
+             ARSBILLING:STATUS      = "P"
+             ARSBILLING:STATUS_DATE = TODAYSDATE
+           end
+         ARSBILLING:CHECK_NO          = "offset999"
+
+        end -- end of change
+      End  -- record exist checking
+
+END
+
+
+End

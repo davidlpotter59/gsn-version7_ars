@@ -1,0 +1,890 @@
+%%
+Screen
+        Name            = "Arsmt03a" ;
+        Type            = "Detail"  ;
+        Highlite        = Underscore;
+        Screensize      = "dynamic";
+        Padcharacter    = Space;
+        Domain          = "arschksu" ;
+        Windowtitle="%a      %s Agent - Payee Information - Version 7.00      %m";
+        iconline        = 0 ;
+
+        Global String G_COMPANY[10],
+                      G_COMPANY_ID[10];
+
+        Global Unsigned Ascii Number G_CHECK_REFERENCE[7],
+                                     g_key_check_reference[7],
+                                     G_POLICY_NO[9],
+                                     G_QUOTE_NO[8] ,
+                                     G_AGENT_NO[4],
+                                     g_offset[1] ;
+
+        Global String G_SUPP_NAME[50],
+                      G_CARE_OF[50],
+                      G_STREET[30],
+                      g_bank_no[15],
+                      G_CITY_STATE[30],
+                      G_CHECK_NUMBER[20],
+                      g_first[1] ;
+
+        Global Signed Ascii Number G_TOTAL_DUE[9]/decimals=2,
+                                   G_CHECK_AMOUNT[9]/decimals=2,
+                                   g_balance[9]/dec=2,
+                                   g_grace_days[2] ,
+                                   G_total_due_agent[9]=0/decimals=2;
+
+        Global Unsigned Ascii Number G_ZIP_CODE[9],
+                                     g_master_reference[7] ;
+
+        global wdate g_starting_date,
+                     g_ending_date,
+                     g_post_date ;
+
+        Signed Ascii Number L_AMOUNT[10]=0/decimals=2;
+        Signed Ascii Number L_BALANCE[10]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_CHECKS[10]=0/decimals=2;
+        String L_ENTER[1];
+        String L_SFS[3]="SFS";
+        Wdate L_HOLD_CX_EFF_DATE;
+        String L_POLICY_CX[1];
+        String L_CANCELLATION_EXISTS[1] ;
+        unsigned ascii number l_master_reference[7],
+                              l_count[1]=0 ,
+                              l_policy_no[9] ;
+        signed ascii number l_total_due_agent[9]=0/decimals=2,
+                            l_installment_amount[9]=0/decimals=2 ;
+        signed ascii number l_total_due_policy[9]=0/decimals=2;
+        string l_continue_1[10]="";
+        string l_continue_2[10]="";
+        string l_continue_4[10]="";
+        string l_continue_3[3]="" ;
+        string l_reset_key_check_reference[1]="Y";
+        unsigned ascii number l_found[1]=0 ;
+        signed ascii number l_total_applied[9]=0.00/decimals=2;
+        Global unsigned ascii number g_starting_check_reference[9]=0/decimals=0,
+                                     g_ending_check_reference[9]=0/decimals=0;
+
+        Include "csexec.var"
+
+        Access ARSCHKSU, Set ARSCHKSU:COMPANY_ID      = G_COMPANY_ID,
+                             ARSCHKSU:CHECK_REFERENCE = G_CHECK_REFERENCE ;
+
+        Include "STDKEYS7.INC"
+
+Style Definition
+
+        include "styles.inc"
+
+Functions
+
+     --   include "stdfunc7m.inc"
+        reaccess ;
+        "redisplay" display/noreturn "arsmt03a";
+
+        "add" sequence "new|final|redisplay" tagged add_fn ;
+--        "add" sequence "new|final|reaccess"  tagged add_fn ;
+        "new" add/hidden ;
+
+        "change" sequence "chg|final|redisplay" tagged change_fn ;
+        "chg" change/hidden ;
+
+        "final" continue begin
+--                           g_agent_no = g_agent_no
+                           do update_final_rating
+                         end ;
+
+         include "stdfunc7b.inc"
+
+event definition
+      default eventhandler {
+                           "reload"  {
+                                      function = "reaccess"
+                                      abort ()
+                                     }
+                           }
+
+
+Menu Definition
+
+--        include "stdmenu7b.inc"
+        include "stdmenu7.inc"
+
+}
+
+Toolbar Definition
+
+--        include "stdtoolbar7m.inc"
+       include "stdtoolbar7.inc"
+
+}
+
+
+
+screen entry
+if g_first = "Y" then
+begin
+g_check_reference = 0
+g_key_check_reference = 0
+g_first = "N"
+end
+if g_key_check_reference > 0 then
+   g_check_reference = g_key_check_reference
+
+
+access validation
+if g_key_check_reference > 0 then
+  begin
+  g_check_reference = g_key_check_reference
+  end
+
+
+Screen at 1,2 to 20,100
+Properties
+    {
+    LayoutType = Column
+    }
+{
+Panel Tagged header_pl
+Properties
+    {
+    Borderstyle = Raised
+    ScrollBarPolicy = asneeded
+    }
+{
+%%
+                                                        ____________
+*-------------------*----------------------------------------------------------*
+| Agent Information |                                                          |
+*-------------------*                                                          |
+| Agent No:      ____ ________________________________________   *-------------*
+|                ______________________________                  |    A/C Due  |
+| Address:       ______________________________                  | ___________ |
+| City State:    ______________________________ _________        |             |
+*----------------------------------------------------------------*-------------*
+| Offset: _ Check No: ____________________ Date: __________ Amount:  _________ |
+| Bank No:  _______________      Deposit Date:   __________ Balance: _________ |
+| Refer:    _________                                                          |
+*------------------------------------------------------------------------------*
+
+%%
+
+Components
+
+Fields
+101     FUNCTION/noecho/showasguidetext ;
+501     Begin
+        If FUNCTION one of "NEW", "APPEND" Then
+            Begin
+            ARSCHKSU:COMPANY_ID = G_COMPANY
+            l_total_due_agent   = 0.00
+            g_offset = 0
+            if g_company = "" then
+                begin
+                l_sfs = "SFS"
+                access sfsdefault, set sfsdefault:sfs_code = l_sfs, generic
+
+                g_company = sfsdefault:company_id
+                g_agent_no = 0
+                g_check_amount = 0
+                arschksu:company_id = g_company
+                end
+            End
+        End
+        ARSCHKSU:AGENT_NO/default
+        if arschksu:agent_no <> sfsagent:agent_no or
+           arschksu:agent_no = 0 then
+            error "Invalid Agent"
+
+        Activehelp SFSAGENT_ALIAS:AGENT_NO,
+                   SFSAGENT_ALIAS:NAME[1] ;
+0501    begin
+        if function one of "NEW", "APPEND" then
+            begin
+--            g_agent_no = arschksu:agent_no
+            l_continue_1 = dialog("Payment Type Checking","warning.bmp","Is this an A/C Payment ?", "No","Yes")
+            switch (l_continue_1)
+              case "Yes" : begin
+                           g_starting_date = 00.00.0000
+                           g_ending_date   = 00.00.0000
+                           g_grace_days    = 0
+                           display modal screen "arspr955"
+                           g_starting_date = 01.01.1990
+                           do check_agent_balance
+                           l_continue_2 = dialog("A/C Balance","warning.bmp","Total Outstanding Billed A/C for this Agent is "+str(l_total_due_agent,"$Z,ZZZ,ZZZ.99-")+" ","Continue ")
+                           end
+              end
+            end
+        end
+        arschksu:agent_no/displayonly ;
+0702    begin
+            l_total_due_agent = g_total_due_agent
+        end
+        l_total_due_agent/mask="ZZZ,ZZZ.99-"/displayonly ;
+502     Begin
+        If FUNCTION one of "ADD", "NEW", "APPEND" Then
+            Begin
+            ARSCHKSU:PAYOR_NAME      = SFSAGENT:NAME[1]
+            ARSCHKSU:PAYOR_CARE_OF   = SFSAGENT:NAME[2]
+            ARSCHKSU:PAYOR_ADDRESS   = SFSAGENT:ADDRESS[1]
+            ARSCHKSU:PAYOR_CITY      = SFSAGENT:CITY
+            ARSCHKSU:PAYOR_STR_STATE = SFSAGENT:STR_STATE
+            ARSCHKSU:PAYOR_ZIPCODE   = SFSAGENT:ZIPCODE
+            End
+        End
+        ARSCHKSU:PAYOR_NAME/displayonly/default;
+601     ARSCHKSU:PAYOR_CARE_OF/displayonly;
+701     ARSCHKSU:PAYOR_ADDRESS/displayonly;
+801     ARSCHKSU:PAYOR_CITY/displayonly;
+802     ARSCHKSU:PAYOR_ZIPCODE/displayonly;
+
+/* Check Information */
+1001    g_offset/checkbox/values="0,1" ;
+1002    ARSCHKSU:CHECK_NO
+--        hide if g_offset = 1
+        begin
+          g_check_number = arschksu:check_no
+        end ;
+1003    Begin
+        If FUNCTION one of "ADD", "NEW", "APPEND" Then
+            Begin
+            ARSCHKSU:CHECK_DATE = TODAYSDATE
+            ARSCHKSU:TRANS_DATE = TODAYSDATE
+            End
+        End
+        ARSCHKSU:TRANS_DATE/displayonly/default;
+1004    begin
+        if l_amount = 0 then
+           begin
+             l_amount = g_check_amount
+           end
+
+        end
+        L_AMOUNT/default
+        hide if g_offset = 1
+        begin
+          if l_amount > 0 then
+            g_balance = l_amount
+          If FUNCTION one of "CHANGE", "CHG" Then
+            Begin
+            arschksu:check_amount = l_amount
+--            ARSCHKSU:BALANCE         = ARSCHKSU:CHECK_AMOUNT
+            end
+        end ;
+1101    begin
+          g_check_amount = l_amount
+        end
+        ARSCHKSU:BANK_NO
+        hide if g_offset = 1
+        begin
+          g_bank_no = arschksu:bank_no
+        end ;
+1003    begin
+        If FUNCTION one of "ADD", "NEW", "APPEND" Then
+        begin
+        if l_amount           =  l_total_due_agent and
+           l_total_due_agent  <> 0.00 and
+           l_amount           <> 0.00 then
+            Begin
+            l_continue_3      = dialog("A/C Paid in Full","warning.bmp","Current check pays entire amount due",
+                                "YES","NO ")
+            if l_continue_3 = "YES" then
+              begin
+                do pay_total_due_ac
+                l_reset_key_check_reference = "N"
+                g_company_id      = arschksu_alias:company_id
+                g_check_reference = g_starting_check_reference
+                l_continue_4      = dialog("Check Reference Used","warning.bmp",
+                                    "Check Reference Range" + str(g_starting_check_reference,"ZZZZZZZ")
+                                    + " - " + str(g_ending_check_reference,"ZZZZZZZ"),"Continue")
+                g_balance = 0
+              end
+            end
+        else
+          l_reset_key_check_reference = "Y"
+        end
+        end
+        l_amount/displayonly ;
+1102    ARSCHKSU:DEPOSIT_DATE/displayonly;
+1103    Begin
+        If FUNCTION one of "ADD", "NEW", "APPEND" Then
+            Begin
+            L_BALANCE = L_AMOUNT
+            End
+        End
+        L_BALANCE/default/displayonly  ;
+1201    Begin
+        If FUNCTION one of "ADD", "APPEND", "NEW" Then
+            Begin
+            G_COMPANY = arschksu:company_id
+            Access ARSCONTROL, Set ARSCONTROL:COMPANY_ID = G_COMPANY_ID
+            If Len(ARSCONTROL:COMPANY_ID) < 2 Then
+                Begin
+                G_COMPANY = ""
+                G_COMPANY_ID = ""
+                End
+            If G_COMPANY_ID = "" Then
+                begin
+                L_SFS = "SFS"
+                Access SFSDEFAULT, Set SFSDEFAULT:SFS_CODE = L_SFS, generic
+
+                G_COMPANY_ID = SFSDEFAULT:COMPANY_ID
+                G_COMPANY    = G_COMPANY_ID
+                end  -- need that default file bad
+            ARSCHKSU:COMPANY_ID      = G_COMPANY_ID
+            ARSCHKSU:USER_CONSOLE    = CONSOLE
+            ARSCHKSU:ENTER_TIME      = SYSTEMTIME
+            ARSCHKSU:ENTER_DATE      = g_ending_date
+            ARSCHKSU:COMMENTS        = "Paid with Agent Check"
+            ARSCHKSU:PAYOR_TYPE      = "A" -- Agent
+            ARSCHKSU:DISPOSITION     = "OPEN"
+            ARSCHKSU:DEPOSIT_DATE    = 00.00.0000
+            ARSCHKSU:USER            = USERNAME
+            ARSCHKSU:TRANS_EFF       = SFPNAME:EFF_DATE
+            arschksu:pol_year        = arsbilling:pol_year
+
+
+            arschksu:check_amount    = l_amount
+
+            if l_master_reference = 0 then
+                begin
+                do update_csexec_master
+                l_master_reference = i_csexec_number + 1
+                g_master_reference = l_master_reference
+                do add_check_master
+                end
+            Do UPDATE_CSEXEC
+            ARSCHKSU:CHECK_REFERENCE = I_CSEXEC_NUMBER
+            if l_reset_key_check_reference = "Y" then
+              begin
+               g_key_check_reference = arschksu:check_reference
+              end
+            L_BALANCE                = l_balance - ARSCHKSU:CHECK_AMOUNT
+            ARSCHKSU:BALANCE         = ARSCHKSU:CHECK_AMOUNT
+            L_TOTAL_CHECKS           = L_TOTAL_CHECKS + ARSCHKSU:CHECK_AMOUNT
+            End
+
+        End
+        ARSCHKSU:CHECK_REFERENCE/default/displayonly
+          g_check_reference = arschksu:check_reference;
+
+} -- end of screen
+
+carddialog GUI at 1,1
+Properties
+        {
+        layoutconstraints = stretch
+        }
+
+{
+
+Panel tagged polices
+Properties
+        {
+         scrollbarpolicy        = asneeded
+         text                   = "Policy"
+         }
+{
+%%
+
+%%
+
+components
+
+        subscreen at 1,1 to 20,102
+               Properties
+               {
+                screen = "arsmt03b"
+               }
+}
+}
+
+}
+
+update
+if abort = "YES" then
+    function = "redisplay"
+if updateok = "YES" and
+   abort = "NO" and
+   l_reset_key_check_reference = "N" then
+    begin
+
+    access arschksu_alias, set arschksu_alias:company_id     = g_company_id,
+                              arschksu_alias:check_reference = g_check_reference, exact
+    if arschksu_alias:company_id      = g_company and
+       arschksu_alias:check_reference = g_check_reference then
+          delete arschksu_alias
+    end
+
+Screen Exit
+If ARSCHKSU:COMPANY_ID <> "" Then G_COMPANY_ID = ARSCHKSU:COMPANY_ID ;
+if arschksu:agent_no <> 0 then g_agent_no = arschksu:agent_no ;
+If ARSCHKSU:CHECK_REFERENCE > 0 Then G_CHECK_REFERENCE = ARSCHKSU:CHECK_REFERENCE ;
+
+
+Procedure Definition
+
+Procedure UPDATE_CSEXEC_master
+Begin
+    I_CSEXEC_APPLICATION="CHECK_MASTER"/spacefill
+    Include "sfscsexec.pro"
+End
+
+Procedure UPDATE_CSEXEC
+Begin
+    I_CSEXEC_APPLICATION="CHECK_REFERENCE"/spacefill
+    include "sfscsexec.pro"
+End
+
+Procedure CHECK_FOR_CANCELLATION
+Begin
+L_CANCELLATION_EXISTS = "N"
+L_HOLD_CX_EFF_DATE = 00.00.0000
+
+Access ARSCANCEL, Set ARSCANCEL:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                      ARSCANCEL:POLICY_NO  = ARSCHKSU:POLICY_NO, Approximate
+
+While ARSCANCEL:COMPANY_ID = ARSCHKSU:COMPANY_ID And
+      ARSCANCEL:POLICY_NO  = ARSCHKSU:POLICY_NO
+        Begin
+        If ARSCANCEL:CX_EFF_DATE <= TODAYSDATE - ARSCONTROL:NON_PAY_GRACE_DAYS And
+           ARSCANCEL:CX_STATUS <> "R" And
+           L_CANCELLATION_EXISTS <> "Y" Then
+            Begin
+            L_CANCELLATION_EXISTS = "Y"
+            L_HOLD_CX_EFF_DATE = ARSCANCEL:CX_EFF_DATE
+            -- do not add notes here, this is done later so that check info can be added too
+            --      Do CREATE_NOTES
+            End
+
+        Next ARSCANCEL
+        End
+
+-- checking for cancellations from sfpname
+L_POLICY_CX = "N"
+
+Access SFPNAME, Set SFPNAME:POLICY_NO = ARSCHKSU:POLICY_NO, Approximate
+
+While SFPNAME:POLICY_NO = ARSCHKSU:POLICY_NO
+    Begin
+    If L_POLICY_CX = "N" And
+       SFPNAME:STATUS = "CANCELLED" Then
+        Begin
+        L_POLICY_CX = "Y"
+        End
+    Else
+    If L_POLICY_CX = "Y" And
+       SFPNAME:STATUS = "CURRENT" Then
+        Begin
+        L_POLICY_CX = "N"
+        End
+
+    Next SFPNAME
+    End
+
+End
+
+procedure update_final_rating
+begin
+if arschksu:agent_no <> 0 then
+  begin
+   if g_offset = 0 then
+    begin
+     do check_policy_balance
+    end
+   if g_offset = 1 then
+    begin
+      do check_offset_balance
+    end
+  end
+postevent("arsmt03b","reload")
+
+
+end
+
+
+
+procedure check_agent_balance
+begin
+
+l_total_due_agent = 0.00
+
+access arsbilling, set arsbilling:company_id = arschksu:company_id, approximate
+
+while arsbilling:errornumber = 0
+    begin
+--    l_installment_amount = 0
+--    l_installment_amount = arsbilling:installment_amount - (arsbilling:total_amount_paid +
+--                                         arsbilling:write_off_amount)
+    if (arsbilling:agent_no             = arschksu:agent_no and
+       arsbilling:due_date              = g_ending_date and
+       arsbilling:due_date             <> 00.00.0000 and
+       arsbilling:installment_amount - (arsbilling:total_amount_paid +
+       arsbilling:write_off_amount)    <> 0 and
+       arsbilling:bill_plan one of "AC") then
+        begin
+        l_total_due_agent = l_total_due_agent + (arsbilling:installment_amount -
+                            (arsbilling:write_off_amount + arsbilling:total_amount_paid))
+        g_total_due_agent = l_total_due_agent
+
+        end
+
+/*
+      if (arsbilling:agent_no           = arschksu:agent_no and
+       arsbilling:status             one of "P" and
+       arsbilling:trans_code         one of 13 and
+       arsbilling:due_date           <= g_ending_date  and
+       arsbilling:due_date             <> 00.00.0000 and
+       arsbilling:installment_amount - (arsbilling:total_amount_paid
+       + arsbilling:write_off_amount) <> 0.00 and
+       arsbilling:bill_plan          not one of "DB") then
+        begin
+        l_total_due_agent = l_total_due_agent + arsbilling:installment_amount
+        end
+*/
+    next arsbilling
+    end
+
+end
+
+procedure check_policy_balance
+begin
+l_total_due_policy = 0.00
+l_policy_no = 0
+proc("arsbillingac_work.mk")/noconsole  -- reset work file
+
+access arsbilling, set arsbilling:company_id = arschksu:company_id, approximate
+
+--while errornumber <> 4026
+while arsbilling:errornumber <> 4026
+    begin
+    if arsbilling:agent_no           = arschksu:agent_no and
+       arsbilling:due_date           <= g_ending_date  and
+       arsbilling:due_date           <> 00.00.0000 and
+       arsbilling:installment_amount <> 0.00 and
+       arsbilling:total_amount_paid  = 0 and
+       arsbilling:bill_plan          one of "AC" then
+        begin
+
+        -- add arsbillingac_work file
+        access arsbillingac_work, set arsbillingac_work:company_id = arsbilling:company_id,
+                                      arsbillingac_work:policy_no = arsbilling:policy_no, generic
+
+        if arsbillingac_work:Company_id <> arsbilling:company_id and
+           arsbillingac_work:policy_no  <> arsbilling:policy_no then
+            begin
+
+             add arsbillingac_work
+               begin
+               arsbillingac_work:company_id         = arsbilling:company_id
+               arsbillingac_work:policy_no          = arsbilling:policy_no
+               arsbillingac_work:trans_date         = arsbilling:trans_date
+               arsbillingac_work:trans_eff          = arsbilling:trans_eff
+--               arsbillingac_work:trans_eff_mm       = arsbilling:trans_eff_dd
+  --             arsbillingac_work:trans_eff_dd       = arsbilling:trans_eff_dd
+    --           arsbillingac_work:trans_eff_yyyy     = arsbilling:trans_eff_yyyy
+               arsbillingac_work:trans_exp          = arsbilling:trans_exp
+               arsbillingac_work:trans_code         = arsbilling:trans_code
+               arsbillingac_work:line_of_business   = arsbilling:line_of_business
+               arsbillingac_work:lob_subline        = arsbilling:lob_subline
+               arsbillingac_work:comm_rate          = arsbilling:comm_rate
+               arsbillingac_work:sub_code           = arsbilling:sub_code
+               arsbillingac_work:billing_ctr        = arsbilling:billing_ctr
+               arsbillingac_work:return_check_ctr   = arsbilling:return_check_ctr
+               arsbillingac_work:agent_no           = arsbilling:agent_no
+               arsbillingac_work:billed_date        = arsbilling:billed_date
+               arsbillingac_work:due_date           = arsbilling:due_date
+               arsbillingac_work:installment_amount = (arsbilling:installment_amount -
+                            (arsbilling:write_off_amount + arsbilling:total_amount_paid))
+               arsbillingac_work:premium            = arsbilling:premium
+               arsbillingac_work:status             = arsbilling:status
+               arsbillingac_work:status_date        = arsbilling:status_date
+               arsbillingac_work:total_amount_paid  = arsbilling:total_amount_paid
+               arsbillingac_work:bill_plan          = arsbilling:bill_plan
+               arsbillingac_work:payment_plan       = arsbilling:payment_plan
+               arsbillingac_work:installment_charge = arsbilling:installment_charge
+               arsbillingac_work:user_console       = arsbilling:user_console
+               arsbillingac_work:user               = arsbilling:user
+               arsbillingac_work:printed            = arsbilling:printed
+               arsbillingac_work:write_off          = arsbilling:write_off
+               arsbillingac_work:write_off_amount   = arsbilling:write_off_amount
+               arsbillingac_work:check_no           = arsbilling:check_no
+               arsbillingac_work:pol_year           = arsbilling:pol_year
+               arsbillingac_work:end_sequence       = arsbilling:end_sequence
+               arsbillingac_work:ac_net_amount_due  = arsbilling:ac_net_amount_due
+               end
+            end
+        else
+            change arsbillingac_work
+              begin
+
+              arsbillingac_work:installment_amount = (arsbillingac_work:installment_amount
+                                                     + (arsbilling:installment_amount -
+                            (arsbilling:write_off_amount + arsbilling:total_amount_paid)))
+
+
+              end
+
+        end
+
+    next arsbilling
+    end
+
+end
+
+
+procedure check_offset_balance
+begin
+l_total_due_policy = 0.00
+l_policy_no = 0
+proc("arsbillingac_work.mk")/noconsole  -- reset work file
+
+access arsbilling, set arsbilling:company_id = arschksu:company_id, approximate
+
+while errornumber <> 4026
+    begin
+    if arsbilling:agent_no           = arschksu:agent_no and
+       arsbilling:due_date           <= g_ending_date  and
+       arsbilling:due_date           <> 00.00.0000 and
+       arsbilling:installment_amount <> 0.00 and
+       arsbilling:total_amount_paid  = 0 and
+       arsbilling:bill_plan          one of "AC" then
+        begin
+
+        -- add arsbillingac_work file
+        access arsbillingac_work, set arsbillingac_work:company_id = arsbilling:company_id,
+                                      arsbillingac_work:policy_no = arsbilling:policy_no,
+                                      arsbillingac_work:trans_date = arsbilling:trans_date,
+                                      arsbillingac_work:trans_eff = arsbilling:trans_eff,
+                                      arsbillingac_work:trans_exp = arsbilling:trans_exp,
+                                      arsbillingac_work:trans_code = arsbilling:trans_code,
+                                      arsbillingac_work:line_of_business = arsbilling:line_of_business,
+                                      arsbillingac_work:comm_rate = arsbilling:comm_rate,
+                                      arsbillingac_work:sub_code = arsbilling:sub_code, generic
+
+
+        if arsbillingac_work:Company_id <> arsbilling:company_id or
+           arsbillingac_work:policy_no  <> arsbilling:policy_no or
+           arsbillingac_work:trans_date <> arsbilling:trans_date or
+           arsbillingac_work:trans_eff <> arsbilling:trans_eff or
+           arsbillingac_work:trans_exp <> arsbilling:trans_exp or
+           arsbillingac_work:trans_code <> arsbilling:trans_code or
+           arsbillingac_work:line_of_business <> arsbilling:line_of_business or
+           arsbillingac_work:comm_rate <> arsbilling:comm_rate or
+           arsbillingac_work:sub_code <> arsbilling:sub_code then
+
+            begin
+
+             add arsbillingac_work
+               begin
+               arsbillingac_work:company_id         = arsbilling:company_id
+               arsbillingac_work:policy_no          = arsbilling:policy_no
+               arsbillingac_work:trans_date         = arsbilling:trans_date
+               arsbillingac_work:trans_eff          = arsbilling:trans_eff
+               arsbillingac_work:trans_exp          = arsbilling:trans_exp
+               arsbillingac_work:trans_code         = arsbilling:trans_code
+               arsbillingac_work:line_of_business   = arsbilling:line_of_business
+               arsbillingac_work:lob_subline        = arsbilling:lob_subline
+               arsbillingac_work:comm_rate          = arsbilling:comm_rate
+               arsbillingac_work:sub_code           = arsbilling:sub_code
+               arsbillingac_work:billing_ctr        = arsbilling:billing_ctr
+               arsbillingac_work:return_check_ctr   = arsbilling:return_check_ctr
+               arsbillingac_work:agent_no           = arsbilling:agent_no
+               arsbillingac_work:billed_date        = arsbilling:billed_date
+               arsbillingac_work:due_date           = arsbilling:due_date
+               arsbillingac_work:installment_amount = (arsbilling:installment_amount -
+                            (arsbilling:write_off_amount + arsbilling:total_amount_paid))
+               arsbillingac_work:premium            = arsbilling:premium
+               arsbillingac_work:status             = arsbilling:status
+               arsbillingac_work:status_date        = arsbilling:status_date
+               arsbillingac_work:total_amount_paid  = arsbilling:total_amount_paid
+               arsbillingac_work:bill_plan          = arsbilling:bill_plan
+               arsbillingac_work:payment_plan       = arsbilling:payment_plan
+               arsbillingac_work:installment_charge = arsbilling:installment_charge
+               arsbillingac_work:user_console       = arsbilling:user_console
+               arsbillingac_work:user               = arsbilling:user
+               arsbillingac_work:printed            = arsbilling:printed
+               arsbillingac_work:write_off          = arsbilling:write_off
+               arsbillingac_work:write_off_amount   = arsbilling:write_off_amount
+               arsbillingac_work:check_no           = arsbilling:check_no
+               arsbillingac_work:pol_year           = arsbilling:pol_year
+               arsbillingac_work:end_sequence       = arsbilling:end_sequence
+               arsbillingac_work:ac_net_amount_due  = arsbilling:ac_net_amount_due
+               end
+            end
+
+--        else
+--            change arsbillingac_work
+--              begin
+--
+--              arsbillingac_work:installment_amount = (arsbillingac_work:installment_amount
+ --                                                    + (arsbilling:installment_amount -
+   --                         (arsbilling:write_off_amount + arsbilling:total_amount_paid)))
+     --
+
+       --       end
+
+        end
+
+    next arsbilling
+    end
+
+end
+
+procedure pay_total_due_ac
+begin
+l_total_applied            = 0.00
+g_starting_check_reference = 0
+g_ending_check_reference   = 0
+
+access arsbilling, set arsbilling:company_id = arschksu:company_id, approximate
+l_count = 1
+
+while arsbilling:company_id = arschksu:company_id
+    begin
+    if arsbilling:agent_no           = arschksu:agent_no and
+       arsbilling:due_date           = g_ending_date and
+       arsbilling:installment_amount - (arsbilling:total_amount_paid
+                                       + arsbilling:write_off_amount)  <> 0.00 and
+       arsbilling:installment_amount <> 0.00 and
+       arsbilling:bill_plan          one of "AC" then
+--       l_total_applied               <= l_total_due_agent then
+         begin
+           -- step 1 - get arschksu check_reference
+           access arschksu_alias, set arschksu_alias:policy_no = arsbilling:policy_no, using fourth index, generic
+
+           l_found = 0
+           while arschksu_alias:policy_no = arsbilling:policy_no and
+                 arschksu_alias:disposition <> "CLEAR"
+              begin
+               if arschksu_alias:agent_no   = arsbilling:agent_no and
+                  arschksu_alias:trans_date = arschksu:trans_date then
+                  begin
+                   l_found = 1
+                   i_csexec_number = arschksu_alias:check_reference
+                  end
+
+              next arschksu_alias
+              end
+
+           if l_found = 0 then
+               do update_csexec
+
+           if g_starting_check_reference = 0 then
+               begin
+                g_starting_check_reference = i_csexec_number
+               end
+
+           g_ending_check_reference = i_csexec_number
+           access arschksu_alias, set arschksu_alias:company_id      = arschksu:company_id,
+                                      arschksu_alias:check_reference = i_csexec_number, exact
+
+           if arschksu_alias:company_id      <> arschksu:company_id or
+              arschksu_alias:check_reference <> i_csexec_number then
+               add arschksu_alias
+                 begin
+                  -- do the record to record to capture what already exists
+                  arschksu_alias:record          = arschksu:record/raw
+                  ARSCHKSU_alias:COMPANY_ID      = arschksu:company_id
+                  arschksu_alias:check_reference = i_csexec_number
+                  g_key_check_reference          = i_csexec_number
+                  arschksu_alias:policy_no       = arsbilling:policy_no
+                  arschksu_alias:agent_no        = arsbilling:agent_no
+                  arschksu_alias:check_no        = arschksu:check_no
+                  arschksu_alias:bank_no         = arschksu:bank_no
+                  arschksu_alias:trans_date      = todaysdate
+                  arschksu_alias:posted_date     = 00.00.0000
+                  arschksu_alias:post_dated      = ""
+                  arschksu_alias:comments        = "Automatic AC Payment"
+                  ARSCHKSU_alias:USER_CONSOLE    = CONSOLE
+                  ARSCHKSU_alias:ENTER_TIME      = SYSTEMTIME
+                  ARSCHKSU_alias:ENTER_DATE      = g_ending_date
+                  ARSCHKSU_alias:PAYOR_TYPE      = "A" -- Agent
+                  ARSCHKSU_alias:DISPOSITION     = "OPEN"
+                  ARSCHKSU_alias:DEPOSIT_DATE    = 00.00.0000
+                  ARSCHKSU_alias:USER            = USERNAME
+                  ARSCHKSU_alias:TRANS_EFF       = arsbilling:trans_eff
+                  arschksu_alias:pol_year        = arsbilling:pol_year
+                  arschksu_alias:ac_payment      = 1
+                  if l_count = 1 then
+                    begin
+                     do update_csexec_master
+                     l_master_reference             = i_csexec_number + 1
+                     do add_check_master
+                    end
+                  --setting arschsu to master check for mulitple records
+                  arschksu_alias:master_reference      = l_master_reference
+
+                  arschksu_alias:check_amount    = (arsbilling:installment_amount
+                                                   - (arsbilling:total_amount_paid
+                                                   + arsbilling:write_off_amount))
+                  l_total_applied                = l_total_applied +
+                                                   arschksu_alias:check_amount
+                  arschksu_alias:balance         = arschksu_alias:check_amount
+                  g_balance                      = 0
+                 end
+           else
+              change arschksu_alias
+                  begin
+                    arschksu_alias:check_amount    = (arschksu_alias:check_amount +
+                                                     (arsbilling:installment_amount
+                                                     - (arsbilling:total_amount_paid
+                                                     + arsbilling:write_off_amount)))
+                    l_total_applied                = l_total_applied +
+                                                     arschksu_alias:check_amount
+                    arschksu_alias:balance         = arschksu_alias:check_amount
+                    g_balance                      = 0
+                  end
+
+           end
+    l_count = l_count +1
+    next arsbilling
+    end
+
+end
+
+procedure update_arsbilling
+begin
+    if arsbilling:agent_no           = arschksu:agent_no and
+       arsbilling:due_date           = g_ending_date and
+       arsbilling:installment_amount - (arsbilling:total_amount_paid
+                                       + arsbilling:write_off_amount)  < 0.00 and
+       arsbilling:trans_code         one of 11 and
+       arsbilling:installment_amount < 0.00 and
+       arsbilling:bill_plan          one of "AC" then
+         begin
+
+            change arsbilling
+              begin
+                arsbilling:status             = "C"
+                arsbilling:check_no           = arschksu:check_no
+                arsbilling:ac_net_amount_due  = 0
+                arsbilling:status_date        = todaysdate
+                arsbilling:total_amount_paid  = arsbilling:installment_amount
+
+                arsbilling:installment_amount = (arsbilling:installment_amount
+                                                      + (arsbilling:installment_amount -
+                             (arsbilling:write_off_amount + arsbilling:total_amount_paid)))
+
+
+              end
+         end
+
+end
+
+procedure add_check_master
+begin
+access arschkmstr, set  arschkmstr:company_id       = arschksu:company_id,
+                        arschkmstr:master_reference = l_master_reference
+
+if arschkmstr:company_id       <> arschksu:company_id or
+   arschkmstr:master_reference <> l_master_reference then
+    add arschkmstr
+        begin
+        arschkmstr:record           = arschksu:record/raw
+        arschkmstr:master_reference = l_master_reference
+        arschkmstr:check_amount     = l_amount
+        end
+
+end
+
+End

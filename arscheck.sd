@@ -1,0 +1,98 @@
+Cyberscreen System                                     Function [____________]
+Screen 1. ARSCHECK Update Screen
+ 1. Company Id:       __________
+ 2. Policy Number:    _________            18. Check Draft:  _
+ 3. Sub Code:              ____            19. eff date:     ____________
+ 4. Payee Key:        ____________________ 20. check date:   ____________
+ 5. Check Number:     ____________________ 21. release:      __
+                                           22. release date: ____________
+ 7. check amount:     _______________      23. status after check: __
+ 8. Account:          _______________      24. chk cleared date: __________
+ 9. Transaction Code: __________
+10. Ten99:                    _
+11. Loss Payee:               _
+12. Payee Name:       __________________________________________________
+13. voided date:      __________
+
+14. Mailto Name:      __________________________________________________
+15. Address:          __________________________________________________
+16. City:             ______________________________
+17. State:            __
+18. Str Zipcode:      _________
+%%
+Screen
+        Name = "Arscheck" ;
+        Type = "Detail" ;
+        padcharacter = space ;
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+        Global Unsigned Ascii Number G_SUB_CODE[4] ;
+
+        Access ARSCHECK,
+           Set ARSCHECK:COMPANY_ID = G_COMPANY_ID ,
+               ARSCHECK:POLICY_NO = G_POLICY_NO ,
+               ARSCHECK:SUB_CODE = G_SUB_CODE ;
+
+
+        Include "STDKEYS.INC"
+
+Functions
+        Add;            /* Add a record */
+        Change;         /* Change an existing record */
+        Delete;         /* Delete an existing record */
+
+        Find ;          /* Select a record using an exact key */
+        Search;         /* Select a record using an approximate key */
+        Next;           /* Display the next record(s) in key sequence */
+        Previous;       /* Display the previous record(s) in key sequence */
+        View;           /* View the contents of freetext fields */
+
+        Page/noreturn;  /* Display a different page - no going back */
+
+"Back"  Return;         /* Back to previous screen */
+"Exit"  Return;
+        Return;
+
+"Bye"   Stop;           /* Terminate this session */
+        Stop;
+
+        Print;          /* Print the screen on the default printer */
+"Cq"    Proc "CQ";      /* Enter Cyberquery */
+"Cli"   Proc ":CLI";    /* Push to the CLI */
+
+Fields
+        FUNCTION ;
+301     ARSCHECK:COMPANY_ID                     Mandatory;
+401     ARSCHECK:POLICY_NO                      Mandatory;
+501     ARSCHECK:SUB_CODE                       Mandatory;
+601     ARSCHECK:PAYEE_KEY                      Mandatory;
+701     ARSCHECK:CHECK_no                      ;
+
+901     arscheck:check_amount ;
+1001    ARSCHECK:ACCOUNT;
+1101    ARSCHECK:APS_TRANS_CODE;
+1201    ARSCHECK:TEN99;
+1301    ARSCHECK:LOSS_PAYEE;
+1401    ARSCHECK:PAYEE_NAME[1];
+1501    ARSCHECK:voided_date;
+1701    ARSCHECK:MAILTO_NAME[1];
+1801    ARSCHECK:ADDRESS[1];
+1901    ARSCHECK:CITY;
+2001    ARSCHECK:STR_STATE;
+2101    ARSCHECK:STR_ZIPCODE;
+402     ARSCHECK:CHECK_DRAFT;
+502     arscheck:eff_date ;
+602     arscheck:check_date ;
+702     arscheck:release ;
+801     arscheck:release_date ;
+902     arscheck:status_after_check ;
+1002    arscheck:check_cleared_date ;
+
+Screen Exit
+        If ARSCHECK:COMPANY_ID > "" Then G_COMPANY_ID = ARSCHECK:COMPANY_ID ;
+        If ARSCHECK:POLICY_NO > 0 Then G_POLICY_NO = ARSCHECK:POLICY_NO ;
+        If ARSCHECK:SUB_CODE > 0 Then G_SUB_CODE = ARSCHECK:SUB_CODE ;
+
+
+End

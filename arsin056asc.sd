@@ -1,0 +1,107 @@
+%%
+Screen
+        Name = "arsin056asc" ;
+        Type = "Detail" ;
+        Padcharacter = Space;
+        Highlite = Underscore ;
+        Screensize = "dynamic";
+        domain = "arscheck" ;
+        resizeable = yes ;
+        iconline = 0 ;
+
+        Global String G_COMPANY_ID[10];
+
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+
+        Global wdate g_eff_date;
+
+        Local Signed Ascii Number L_TOTAL_CHECKS[9]=0/DECIMALS=2;
+
+        Local String l_enter[1];
+
+        access arscheck, set arscheck:company_id = g_company_id,
+                             arscheck:policy_no  = g_policy_no, generic
+
+Style Definition
+
+--        Include "styles.inc"
+
+Functions
+     include "stdfunc7.inc"
+     reaccess ;
+
+Event Definition
+    Default eventhandler {
+        "reload" { Function = "reaccess" abort () }
+                         }
+
+Menu Definition
+
+Toolbar Definition
+
+screen entry
+
+Access Validation
+
+if arscheck:company_id <> g_company_id or
+   arscheck:policy_no <> g_policy_no then
+{
+    abort ()
+}
+
+screen  at 1,1 to 40,100
+
+Properties
+        {
+           LayoutType = Column
+        }
+{
+Panel
+Properties
+        {
+--        BorderStyle     = Raised
+        ScrollBarPolicy = asNeeded
+        }
+{
+%%
+                                                          Total Checks   ______________
+%%
+
+Components
+
+Fields
+{ do get_totals }
+L_TOTAL_CHECKS/displayonly
+Properties {
+              BackgroundColor = "white"
+              ForegroundColor = "black"
+           }
+;
+
+}
+
+}
+
+Screen Exit
+
+Procedure Definition
+
+Procedure GET_TOTALS
+Begin
+
+L_TOTAL_CHECKS = 0
+
+Access ARScheck_ALIAS, Set  arscheck_alias:company_id = g_company_id,
+                            ARScheck_alias:POLICY_NO  = G_POLICY_NO, approximate
+
+while ARScheck_alias:POLICY_NO = g_policy_no
+      {
+          if year(arscheck_alias:eff_date) = year(g_eff_date) then
+          {
+              l_total_checks = l_total_checks + arscheck_alias:check_amount
+          }
+          Next arscheck_alias
+      }
+End
+
+End

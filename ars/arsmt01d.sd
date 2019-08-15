@@ -1,0 +1,125 @@
+%%
+Screen
+        Name = "Arsmt01D" ;
+        Type = "Detail" ;
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize = "dynamic";
+        Windowtitle ="%a      %s Apply Installment Charge Credits - Ver. 7.00    %m";
+        resizeable = yes ;
+        iconline = 0 ;
+
+        Global String G_COMPANY[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9];
+        Global String G_CHECK_NUMBER[20];
+        Global String G_BANK_NO[15];
+        Global Unsigned Ascii Number G_CHECK_REFERENCE[7] ;
+        Global Unsigned Ascii Number G_AGENT_NO[4] ;
+
+        Global Signed Ascii Number G_INSTALLMENT_AMT[9]/decimals=2,
+                                   G_TOTAL_PREMIUM[9]/decimals=2,
+                                   G_TOTAL_SURCHARGE[9]/decimals=2,
+                                   G_TOTAL_DUE_NET[9]/decimals=2,
+                                   G_CHECK_AMOUNT[9]/decimals=2;
+        Global Unsigned Ascii Number G_APPLY_INSTALLMENT_CREDIT[1];
+        String L_REMOVE_QUESTION[30];
+
+        Access ARSCHKSU,
+           Set ARSCHKSU:COMPANY_ID = G_COMPANY ,
+               ARSCHKSU:CHECK_REFERENCE = G_CHECK_REFERENCE ;
+
+        Include "stdkeys7.inc"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        Include "stdfunc7.inc"
+
+Menu Definition
+
+        Include "stdmenu7.inc"
+
+}
+
+Toolbar Definition
+
+        Include "stdtoolbar7.inc"
+}
+
+screen at 2,1 to 16, 81
+{
+%%
+                                                        _______________
+*------------------------------------------------------------------------------*
+| Company Id:       __________ _______________________________________________ |
+| Policy Number:    _________  ________________________________________        |
+| Check Number:     ____________________                                       |
+| Check Amount:     _____________                                              |
+| Agent Number:     ____ __________________________________________________    |
+| Bank Number:      _______________                                            |
+*----------------------------------------*-------------------------------------*
+| Installment Amount Due:  _________     | ______________________________  _   |
+| Total Policy Balance:    _________     *-------------------------------------*
+| Surcharge Amount:        _________                                           |
+| Net Due:                 _________                                           |
+*------------------------------------------------------------------------------*
+
+
+%%
+
+Components
+
+Fields
+        FUNCTION/noecho/showasguidetext ;
+301     G_COMPANY/displayonly;
+302     Begin
+        Access SFSCOMPANY, Set SFSCOMPANY:COMPANY_ID = G_COMPANY
+        End
+        SFSCOMPANY:NAME[1];
+401     G_POLICY_NO/displayonly;
+402     Begin
+        Access SFPCURRENT, Set SFPCURRENT:POLICY_NO = G_POLICY_NO
+        Access SFPNAME, Set SFPNAME:POLICY_NO     = SFPCURRENT:POLICY_NO,
+                            SFPNAME:POL_YEAR      = SFPCURRENT:POL_YEAR,
+                            SFPNAME:END_SEQUENCE  = SFPCURRENT:END_SEQUENCE
+        End
+        SFPNAME:NAME[1];
+501     G_CHECK_NUMBER/displayonly;
+601     G_CHECK_AMOUNT/displayonly ;
+701     G_AGENT_NO/displayonly ;
+702     Begin
+        Access SFSAGENT, Set SFSAGENT:COMPANY_ID = G_COMPANY,
+                             SFSAGENT:AGENT_NO   = G_AGENT_NO,Exact
+        End
+        SFSAGENT:NAME[1]/displayonly;
+801     G_BANK_NO/displayonly ;
+1001    G_INSTALLMENT_AMT/displayonly;
+1002    Begin
+            Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = G_COMPANY
+            If ARSCONTROL2:REMOVE_INSTALLMENT_QUESTION = "" Then
+            Begin
+                 L_REMOVE_QUESTION = "          Apply Credits:"
+            End
+            Else
+            Begin
+                 L_REMOVE_QUESTION = ARSCONTROL2:REMOVE_INSTALLMENT_QUESTION
+            End
+        End
+        L_REMOVE_QUESTION/showasguidetext/displayonly;
+1003    G_APPLY_INSTALLMENT_CREDIT /checkbox;
+1101    G_TOTAL_PREMIUM/displayonly;
+1201    G_TOTAL_SURCHARGE/displayonly;
+1301    G_TOTAL_DUE_NET/displayonly;
+
+}
+
+Screen Exit
+        If ARSCHKSU:COMPANY_ID > "" Then G_COMPANY = ARSCHKSU:COMPANY_ID ;
+        If ARSCHKSU:CHECK_REFERENCE > 0
+        Then G_CHECK_REFERENCE = ARSCHKSU:CHECK_REFERENCE ;
+
+
+End

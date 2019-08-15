@@ -1,0 +1,417 @@
+%%
+Screen
+        Name = "Arsmt009" ;
+        Type = "Multiline" ;
+        Padcharacter = Space ;
+        Highlite = Underscore ;
+        Domain = "ARSCHKSU" ;
+        Screensize = "dynamic";
+        Repeat line_item_tg, 10 times down;
+        Windowtitle = "%a     %s Processed Returned Checks - Version 7.01    %m";
+        iconline = 0;
+
+
+        Global String G_COMPANY_ID[10] ;
+        Global String G_COMPANY[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+        Global Unsigned Ascii Number G_CHECK_REFERENCE[7];
+        Global Wdate G_TRANS_DATE ;
+        Global Wdate G_TRANS_EFF ;
+        Global Wdate G_TRANS_EXP ;
+        Global Unsigned Ascii Number G_TRANS_CODE[4] ;
+        Global Unsigned Ascii Number G_LINE_OF_BUSINESS[4] ;
+        Global Unsigned Ascii Number G_COMM_RATE[4]/decimals=2 ;
+        Global Unsigned Ascii Number G_SUB_CODE[4] ;
+        Global Unsigned Ascii Number G_BILLING_CTR[4] ;
+        Global Unsigned Ascii Number G_RETURN_CHECK_CTR[4] ;
+        Global Unsigned Ascii Number G_PAYMENT_CTR[4] ;
+
+        include "arsmenu.var"
+
+        string l_continue_1[100];
+        Signed Ascii Number L_RETURN[1]=0;
+        Signed Ascii Number L_CHECK_BALANCE[9]=0/decimals=2;
+        Unsigned Ascii Number L_RETURN_CTR[4]=0/decimals=0;
+        String L_ENTER[1];
+        String L_FIRST_TIME[1]="Y";
+
+--        Access ARSCHKSU,
+--           Set ARSCHKSU:POLICY_NO = G_POLICY_NO, Using Fourth Index, Exact
+
+        Include "STDKEYS7.INC"
+        !F8="Check"/function ;
+
+Style definition
+
+        include "styles.inc"
+
+Functions
+
+        Include "STDFUNC7.INC"
+        include "arsfunc7.inc"
+
+        "Check" Display "arsmt001" ;
+
+        -- include "SCIPSPRINT.FUN"
+
+Menu Definition
+        include "stdmenu7.inc"
+        include "arsmenu7.inc"
+}
+
+Toolbar Definition
+        include "stdtoolbar7.inc"
+}
+
+screen entry
+
+Access Validation
+Skip If ARSCHKSU:DISPOSITION One Of "RETRN", "NSF"
+
+screen
+properties
+        {
+        LayOuttype = column
+        }
+{
+
+Panel Tagged header_pl
+properties
+        {
+        borderstyle = raised
+        scrollbarpolicy = asneeded
+        }
+{
+%%
+                                                                  ____________
+*------------------------------------------------------------------------------*
+|  Policy       Payor         Check       Check            Check       Process |
+|  Number        Name       Reference     Number           Amount       Return |
+*------------------------------------------------------------------------------*
+| _________  ______________  _______  ____________________ ___________      _  |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+*------------------------------------------------------------------------------*
+%%
+
+components
+
+Fields
+0101 FUNCTION/noecho/showasguidetext ;
+     ARSCHKSU:POLICY_NO/displayonly tagged line_item_tg;
+--     Error "No Payments Found for this Policy Number"
+--     If ARSCHKSU:POLICY_NO = 0 ;
+602  ARSCHKSU:PAYOR_NAME/mask="X(10)"/displayonly tagged line_item_tg;
+     ARSCHKSU:CHECK_REFERENCE/displayonly tagged line_item_tg;
+     ARSCHKSU:CHECK_NO/default/displayonly tagged line_item_tg;
+     ARSCHKSU:CHECK_AMOUNT/displayonly tagged line_item_tg;
+     L_RETURN/checkbox tagged line_item_tg
+     Begin
+     If L_RETURN <> 0 Then
+     Begin
+        Warning "You are about to 'RETURN' this check, Click NO or Cancel to Stop"
+        If Abort <> "YES" Then
+            Begin
+                Do CREATE_RETURN_PROCEDURE
+                Do CREATE_BILLING_RECORDS
+                Do UPDATE_ARSCHKSU
+                G_COMPANY_ID      = ARSCHKSU:COMPANY_ID
+                G_CHECK_REFERENCE = ARSCHKSU:CHECK_REFERENCE
+                G_POLICY_NO       = ARSCHKSU:POLICY_NO
+                Display Modal Screen "arsmt010"
+                With Initial Function "CHANGE"
+            End
+      End
+      End
+        ;
+
+}
+}
+Screen Exit
+
+Procedure Definition
+
+Procedure CREATE_RETURN_PROCEDURE
+Begin
+
+L_FIRST_TIME = "Y"
+
+Access ARSPAYMENT, Set ARSPAYMENT:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                       ARSPAYMENT:POLICY_NO  = ARSCHKSU:POLICY_NO, Approximate
+
+While ARSPAYMENT:COMPANY_ID = ARSCHKSU:COMPANY_ID And
+      ARSPAYMENT:POLICY_NO  = ARSCHKSU:POLICY_NO And
+      L_FIRST_TIME          = "Y"
+      Begin
+          If ARSPAYMENT:CHECK_REFERENCE = ARSCHKSU:CHECK_REFERENCE Then
+          Begin
+              L_FIRST_TIME = "N"
+              Do GET_NEXT_RETURN_CTR
+              Do GET_BILLING_RECORD
+              Do CREATE_RETURNED_CHECK_CHARGE
+              Do CREATE_VOIDED_PAYMENT_LINE
+          End
+
+       Next ARSPAYMENT
+
+       End  -- end of record loop
+
+End -- end of procedure
+
+Procedure GET_BILLING_RECORD
+Begin
+
+Access ARSBILLING, Set
+       ARSBILLING:COMPANY_ID        = ARSPAYMENT:COMPANY_ID,
+       ARSBILLING:POLICY_NO         = ARSPAYMENT:POLICY_NO,
+       ARSBILLING:TRANS_DATE        = ARSPAYMENT:TRANS_DATE,
+       ARSBILLING:TRANS_EFF         = ARSPAYMENT:TRANS_EFF,
+       ARSBILLING:TRANS_EXP         = ARSPAYMENT:TRANS_EXP,
+       ARSBILLING:TRANS_CODE        = ARSPAYMENT:TRANS_CODE,
+       ARSBILLING:LINE_OF_BUSINESS  = ARSPAYMENT:LINE_OF_BUSINESS,
+       ARSBILLING:COMM_RATE         = ARSPAYMENT:COMM_RATE,
+       ARSBILLING:SUB_CODE          = ARSPAYMENT:SUB_CODE,
+       ARSBILLING:BILLING_CTR       = ARSPAYMENT:BILLING_CTR, Generic
+--       ARSBILLING:RETURN_CHECK_CTR  = ARSPAYMENT:RETURN_CHECK_CTR
+--Write ("%c%s%n",19001,"error  ",ARSBILLING:POLICY_NO)
+--Write ("%c%s%s",19050,"Text   ",ARSBILLING:COMPANY_ID)
+--Warning (" ")
+
+End
+
+Procedure CREATE_BILLING_RECORDS
+Begin
+
+L_FIRST_TIME = "Y"
+L_CHECK_BALANCE = ARSCHKSU:CHECK_AMOUNT
+
+Access ARSPAYMENT, Set ARSPAYMENT:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                       ARSPAYMENT:POLICY_NO  = ARSCHKSU:POLICY_NO, Approximate
+
+While ARSPAYMENT:COMPANY_ID = ARSCHKSU:COMPANY_ID And
+      ARSPAYMENT:POLICY_NO  = ARSCHKSU:POLICY_NO And
+      L_CHECK_BALANCE      <> 0.00
+      Begin
+      If ARSPAYMENT:CHECK_REFERENCE = ARSCHKSU:CHECK_REFERENCE And
+         ARSPAYMENT:AMOUNT          > 0.00 Then
+      Begin
+/*  house cleaning */
+        L_RETURN_CTR = 0
+        Access ARSBILLING, Set
+        ARSBILLING:COMPANY_ID        = ARSPAYMENT:COMPANY_ID,
+        ARSBILLING:POLICY_NO         = ARSPAYMENT:POLICY_NO,
+        ARSBILLING:TRANS_DATE        = ARSPAYMENT:TRANS_DATE,
+        ARSBILLING:TRANS_EFF         = ARSPAYMENT:TRANS_EFF,
+        ARSBILLING:TRANS_EXP         = ARSPAYMENT:TRANS_EXP,
+        ARSBILLING:TRANS_CODE        = ARSPAYMENT:TRANS_CODE,
+        ARSBILLING:LINE_OF_BUSINESS  = ARSPAYMENT:LINE_OF_BUSINESS,
+        ARSBILLING:COMM_RATE         = ARSPAYMENT:COMM_RATE,
+        ARSBILLING:SUB_CODE          = ARSPAYMENT:SUB_CODE,
+        ARSBILLING:BILLING_CTR       = ARSPAYMENT:BILLING_CTR,
+        ARSBILLING:RETURN_CHECK_CTR  = ARSPAYMENT:RETURN_CHECK_CTR
+        If
+           ARSBILLING:COMPANY_ID     = ARSPAYMENT:COMPANY_ID And
+           ARSBILLING:POLICY_NO      = ARSPAYMENT:POLICY_NO  And
+           ARSBILLING:TRANS_DATE     = ARSPAYMENT:TRANS_DATE And
+           ARSBILLING:TRANS_EFF      = ARSPAYMENT:TRANS_EFF And
+           ARSBILLING:TRANS_EXP      = ARSPAYMENT:TRANS_EXP And
+           ARSBILLING:TRANS_CODE     = ARSPAYMENT:TRANS_CODE And
+           ARSBILLING:LINE_OF_BUSINESS = ARSPAYMENT:LINE_OF_BUSINESS And
+           ARSBILLING:COMM_RATE      = ARSPAYMENT:COMM_RATE And
+           ARSBILLING:SUB_CODE       = ARSPAYMENT:SUB_CODE And
+           ARSBILLING:BILLING_CTR    = ARSPAYMENT:BILLING_CTR And
+           ARSBILLING:RETURN_CHECK_CTR = ARSPAYMENT:RETURN_CHECK_CTR Then
+           Begin
+           Add ARSBILLING_ALT
+           Begin
+           ARSBILLING_ALT:COMPANY_ID       = ARSPAYMENT:COMPANY_ID
+           ARSBILLING_ALT:POLICY_NO        = ARSPAYMENT:POLICY_NO
+           ARSBILLING_ALT:TRANS_DATE       = TODAYSDATE
+           ARSBILLING_ALT:TRANS_EFF        = ARSPAYMENT:TRANS_EFF
+           ARSBILLING_ALT:TRANS_EXP        = ARSPAYMENT:TRANS_EXP
+--           ARSBILLING_ALT:TRANS_CODE       = ARSCONTROL:RETURNED_CHECK_REBILL_TRANS
+           If ARSBILLING_ALT:TRANS_CODE < 60 Then
+           Begin
+               ARSBILLING_ALT:TRANS_CODE       = ARSBILLING:TRANS_CODE + 50
+           End
+           Else
+           Begin
+               ARSBILLING_ALT:TRANS_CODE       = ARSBILLING:TRANS_CODE
+           End
+           ARSBILLING_ALT:LINE_OF_BUSINESS = ARSPAYMENT:LINE_OF_BUSINESS
+           ARSBILLING_ALT:COMM_RATE        = ARSPAYMENT:COMM_RATE
+           ARSBILLING_ALT:SUB_CODE         = ARSPAYMENT:SUB_CODE
+           ARSBILLING_ALT:BILLING_CTR      = ARSPAYMENT:BILLING_CTR
+           -- this is only temp, need logic to loop for next available
+           Do GET_NEXT_RETURN_CTR
+--           Write ("junk junk junk junk")
+           ARSBILLING_ALT:RETURN_CHECK_CTR = L_RETURN_CTR -- was +1
+           -- the actual record gets addded here
+           ARSBILLING_ALT:AGENT_NO         = ARSPAYMENT:AGENT_NO
+If ARSBILLING:PRIOR_STATUS = "O" Then
+Begin
+           ARSBILLING_ALT:BILLED_DATE      = 00.00.0000
+End
+Else
+Begin
+           ARSBILLING_ALT:BILLED_DATE      = ARSBILLING:PRIOR_STATUS_DATE
+End
+           ARSBILLING_ALT:DUE_DATE         = ARSBILLING:DUE_DATE
+           ARSBILLING_ALT:INSTALLMENT_AMOUNT = ARSBILLING:TOTAL_AMOUNT_PAID
+           ARSBILLING_ALT:STATUS           =  ARSBILLING:PRIOR_STATUS --"B" -- assume billed maybe ok? NOT!
+           ARSBILLING_ALT:STATUS_DATE      = TODAYSDATE
+           ARSBILLING_ALT:TOTAL_AMOUNT_PAID = 0.00 -- no money now
+           ARSBILLING_ALT:WRITE_OFF_AMOUNT = 0.00
+           ARSBILLING_ALT:BILL_PLAN        = ARSBILLING:BILL_PLAN
+           ARSBILLING_ALT:PAYMENT_PLAN     = ARSBILLING:PAYMENT_PLAN
+           ARSBILLING_ALT:INSTALLMENT_CHARGE = 0.00
+           ARSBILLING_ALT:USER_CONSOLE     = CONSOLE
+           ARSBILLING_ALT:USER             = USERNAME
+           ARSBILLING_ALT:CHECK_NO         = Trun(ARSCHKSU:CHECK_NO)
+           ARSBILLING_ALT:POL_YEAR         = ARSBILLING:POL_YEAR
+           ARSBILLING_ALT:END_SEQUENCE     = ARSBILLING:END_SEQUENCE
+           ARSBILLING_ALT:EXPANSION        = " "/raw
+           End  -- end for the adding of records
+           Next ARSBILLING
+        End   -- end for the checking for exact read
+
+        End
+
+        Next ARSPAYMENT
+
+        End
+
+End  -- end of procedure
+
+Procedure GET_NEXT_RETURN_CTR
+Begin
+
+        Access ARSBILLING_ALT2, Set
+        ARSBILLING_ALT2:COMPANY_ID        = ARSPAYMENT:COMPANY_ID,
+        ARSBILLING_ALT2:POLICY_NO         = ARSPAYMENT:POLICY_NO,
+        ARSBILLING_ALT2:TRANS_DATE        = ARSPAYMENT:TRANS_DATE,
+        ARSBILLING_ALT2:TRANS_EFF         = ARSPAYMENT:TRANS_EFF,
+        ARSBILLING_ALT2:TRANS_EXP         = ARSPAYMENT:TRANS_EXP,
+        ARSBILLING_ALT2:TRANS_CODE        = ARSPAYMENT:TRANS_CODE,
+        ARSBILLING_ALT2:LINE_OF_BUSINESS  = ARSPAYMENT:LINE_OF_BUSINESS,
+        ARSBILLING_ALT2:COMM_RATE         = ARSPAYMENT:COMM_RATE,
+        ARSBILLING_ALT2:SUB_CODE          = ARSPAYMENT:SUB_CODE,
+        ARSBILLING_ALT2:BILLING_CTR       = ARSPAYMENT:BILLING_CTR, Approximate
+
+        While ARSBILLING_ALT2:COMPANY_ID     = ARSPAYMENT:COMPANY_ID And
+           ARSBILLING_ALT2:POLICY_NO      = ARSPAYMENT:POLICY_NO And
+           ARSBILLING_ALT2:TRANS_DATE     = ARSPAYMENT:TRANS_DATE And
+           ARSBILLING_ALT2:TRANS_EFF      = ARSPAYMENT:TRANS_EFF And
+           ARSBILLING_ALT2:TRANS_EXP      = ARSPAYMENT:TRANS_EXP And
+           ARSBILLING_ALT2:TRANS_CODE     = ARSPAYMENT:TRANS_CODE And
+           ARSBILLING_ALT2:LINE_OF_BUSINESS = ARSPAYMENT:LINE_OF_BUSINESS And
+           ARSBILLING_ALT2:COMM_RATE      = ARSPAYMENT:COMM_RATE And
+           ARSBILLING_ALT2:SUB_CODE       = ARSPAYMENT:SUB_CODE And
+           ARSBILLING_ALT2:BILLING_CTR    = ARSPAYMENT:BILLING_CTR
+           Begin
+               L_RETURN_CTR = ARSBILLING_ALT2:RETURN_CHECK_CTR + 1
+               Next ARSBILLING_ALT2
+           End
+
+End  -- end of the procedure (get_next_return_ctr)
+
+Procedure UPDATE_ARSCHKSU
+Begin
+
+Access ARSCHKSU_ALT, Set ARSCHKSU_ALT:COMPANY_ID    = ARSCHKSU:COMPANY_ID,
+                         ARSCHKSU_ALT:CHECK_REFERENCE = ARSCHKSU:CHECK_REFERENCE, Approximate
+
+If ARSCHKSU_ALT:COMPANY_ID =       ARSCHKSU:COMPANY_ID And
+   ARSCHKSU_ALT:CHECK_REFERENCE  = ARSCHKSU:CHECK_REFERENCE Then
+   Begin
+   Change ARSCHKSU_ALT
+   Begin
+       ARSCHKSU_ALT:DISPOSITION = "NSF"  -- yes I know this is hard coded
+   End  -- end of change loop
+   End  -- end of conditional
+
+End -- end of procedure
+
+Procedure CREATE_RETURNED_CHECK_CHARGE
+Begin
+
+           Add ARSBILLING_ALIAS
+           Begin
+           ARSBILLING_ALIAS:COMPANY_ID       = ARSBILLING:COMPANY_ID
+           ARSBILLING_ALIAS:POLICY_NO        = ARSBILLING:POLICY_NO
+           ARSBILLING_ALIAS:TRANS_DATE       = TODAYSDATE
+           ARSBILLING_ALIAS:TRANS_EFF        = ARSBILLING:TRANS_EFF
+           ARSBILLING_ALIAS:TRANS_EXP        = ARSBILLING:TRANS_EXP
+           ARSBILLING_ALIAS:TRANS_CODE       = ARSCONTROL:RETURNED_CHECK_TRANS_CODE
+           ARSBILLING_ALIAS:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS
+           ARSBILLING_ALIAS:COMM_RATE        = ARSBILLING:COMM_RATE
+           ARSBILLING_ALIAS:SUB_CODE         = ARSBILLING:SUB_CODE
+           ARSBILLING_ALIAS:BILLING_CTR      = ARSBILLING:BILLING_CTR
+           -- this is only temp, need logic to loop for next available
+--           Do GET_NEXT_RETURN_CTR
+           ARSBILLING_ALIAS:RETURN_CHECK_CTR = L_RETURN_CTR -- was +1
+           -- the actual record gets addded here
+           ARSBILLING_ALIAS:AGENT_NO         = ARSBILLING:AGENT_NO
+           ARSBILLING_ALIAS:BILLED_DATE      = TODAYSDATE
+           ARSBILLING_ALIAS:DUE_DATE         = ARSBILLING:DUE_DATE
+           ARSBILLING_ALIAS:INSTALLMENT_AMOUNT = ARSCONTROL:RETURNED_CHECK_CHARGE
+           ARSBILLING_ALIAS:STATUS           = "B" -- assume billed maybe ok?
+           ARSBILLING_ALIAS:STATUS_DATE      = TODAYSDATE
+           ARSBILLING_ALIAS:TOTAL_AMOUNT_PAID = 0.00 -- no money now
+           ARSBILLING_ALIAS:BILL_PLAN        = ARSBILLING:BILL_PLAN
+           ARSBILLING_ALIAS:PAYMENT_PLAN     = ARSBILLING:PAYMENT_PLAN
+           ARSBILLING_ALIAS:INSTALLMENT_CHARGE = 0
+           ARSBILLING_ALIAS:USER_CONSOLE     = CONSOLE
+           ARSBILLING_ALIAS:USER             = USERNAME
+           ARSBILLING_ALIAS:POL_YEAR         = ARSBILLING:POL_YEAR
+           ARSBILLING_ALIAS:END_SEQUENCE     = ARSBILLING:END_SEQUENCE
+           ARSBILLING_ALIAS:EXPANSION        = " "/raw
+           End
+
+End -- end of create_returned_check_charge
+
+Procedure CREATE_VOIDED_PAYMENT_LINE
+Begin
+           Add ARSBILLING_ALIAS
+           Begin
+           ARSBILLING_ALIAS:COMPANY_ID       = ARSBILLING:COMPANY_ID
+           ARSBILLING_ALIAS:POLICY_NO        = ARSBILLING:POLICY_NO
+           ARSBILLING_ALIAS:TRANS_DATE       = TODAYSDATE
+           ARSBILLING_ALIAS:TRANS_EFF        = ARSBILLING:TRANS_EFF
+           ARSBILLING_ALIAS:TRANS_EXP        = ARSBILLING:TRANS_EXP
+           ARSBILLING_ALIAS:TRANS_CODE       = ARSCONTROL:NSF_VOIDED_PAYMENT_TRANS_CODE
+           ARSBILLING_ALIAS:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS
+           ARSBILLING_ALIAS:COMM_RATE        = ARSBILLING:COMM_RATE
+           ARSBILLING_ALIAS:SUB_CODE         = ARSBILLING:SUB_CODE
+           ARSBILLING_ALIAS:BILLING_CTR      = ARSBILLING:BILLING_CTR
+           -- this is only temp, need logic to loop for next available
+--           Do GET_NEXT_RETURN_CTR
+           ARSBILLING_ALIAS:RETURN_CHECK_CTR = L_RETURN_CTR -- was +1
+           -- the actual record gets addded here
+           ARSBILLING_ALIAS:AGENT_NO         = ARSBILLING:AGENT_NO
+           ARSBILLING_ALIAS:BILLED_DATE      = 00.00.0000
+           ARSBILLING_ALIAS:DUE_DATE         = 00.00.0000
+           ARSBILLING_ALIAS:INSTALLMENT_AMOUNT = 0.00
+           ARSBILLING_ALIAS:STATUS           = "R" -- assume billed maybe ok?
+           ARSBILLING_ALIAS:STATUS_DATE      = TODAYSDATE
+           ARSBILLING_ALIAS:TOTAL_AMOUNT_PAID = ARSCHKSU:CHECK_AMOUNT * -1
+           ARSBILLING_ALIAS:BILL_PLAN        = ARSBILLING:BILL_PLAN
+           ARSBILLING_ALIAS:PAYMENT_PLAN     = ARSBILLING:PAYMENT_PLAN
+           ARSBILLING_ALIAS:INSTALLMENT_CHARGE = 0
+           ARSBILLING_ALIAS:USER_CONSOLE     = CONSOLE
+           ARSBILLING_ALIAS:USER             = USERNAME
+           ARSBILLING_ALIAS:EXPANSION        = " "/raw
+           End
+
+End -- end of create_returned_check_charge
+
+End  -- final end for program

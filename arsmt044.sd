@@ -1,0 +1,422 @@
+%%
+Screen
+        Name = "Arsmt044" ;
+        Type = "Detail" ;
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize = "dynamic";
+        domain = "arscontrol2" ;
+        Windowtitle="%a    %s  Additional Control Maintenance - Ver 7.08     %m";
+--      resizeable = yes ;
+        iconline = 0 ;
+
+        Include "stdkeys7.inc"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        add/reuse  tagged add_fn;
+
+        Include "stdfunc7.inc"
+
+Menu Definition
+
+        Include "stdmenu7.inc"
+
+}
+
+Toolbar Definition
+
+        Include "stdtoolbar7.inc"
+}
+
+
+screen at 1,1 to 20,80
+Properties
+        {
+        LayoutType = column
+        }
+{
+Panel
+Properties
+        {
+        Borderstyle     = Raised
+        ScrollBarPolicy = asneeded
+        }
+{
+%%
+                                                        _______________
+*-------------------------------------------------------------------------------------------------------*
+| Company Id: __________ __________________________________________________                             |
+*-------------------------------------------------------------------------------------------------------*
+%%
+
+components
+
+Fields
+        FUNCTION/noecho/showasguidetext ;
+301     ARSCONTROL2:COMPANY_ID                  Mandatory
+        include "companyhlp.inc"
+302     SFSCOMPANY:NAME[1];
+
+} -- end of header
+
+CardDialog GUI at 1,80
+{
+Panel
+Properties
+        {
+        ScrollBarPolicy         = asneeded
+        Text                    = "Controls Menu 1"
+        }
+{
+%%
+*-------------------------------------------------------------------------------------------------------*
+| Invoice Failure Literal:                        Print Failure Notice on Annual Pay: _                 |
+| ____________________________________________________________________________________________________  |
+| Back of Invoice Balance Due Wording: _________________________                                        |
+| Back of Invoice Notice: _                       Use sfsprinter for tray selection: _                  |
+|    __________________________________________________________________________________________         |
+| Total Due Literal on Invoice Face: ________________________________________                           |
+| Hide All Internal Checks:  _                                             *----------------------------*
+| Copy Order: __________ __________ __________ __________                  | Remove AR CX:           _  |
+| Indicator: __________ ____ ____                                          | Reinstate A/R Side:     _  |
+| Remove Installment Question: ______________________________              | Reinstate Premium Side: _  |
+| Accounts Payable Return Premium Default Release Code: __                 *----------------------------*
+| Print Ctr On Cx Notices: _                                               |   Commissions Run Options  |
+| Whole Dollar Installments: _                                             | Commissions On Cash: _     |
+| Reinstatement Warning in Customer Service: _                             *----------------------------*
+| Print Invoice Message: _ Invoice Message V Position: ____       Invoice Message H Position: ____      |
+| Include installment fee in total due:  _                                                              |
+| Lapse notice indicator:       __________                        Equity Cancellation Processing: _     |
+*-------------------------------------------------------------------------------------------------------*
+| Print total balance due on Cancelation notice:  _ Wording: ________________________________________   |
+*-------------------------------------------------------------------------------------------------------*
+| Do not print copies of the Invoice:   _ Producer/Agent                                                |
+|                                       _ Home                                                          |
+|                                       _ Insured/Original                                              |
+|                                       _ Mortgagee                                                     |
+*-------------------------------------------------------------------------------------------------------*
+%%
+
+components
+
+Fields
+201     arscontrol2:print_failure_on_annual/checkbox/values="0,1";
+301     ARSCONTROL2:INVOICE_FAILURE_LITERAL;
+401     ARSCONTROL2:TOTAL_BALANCE_LIT;
+501     ARSCONTROL2:BACK_OF_INVOICE_NOTICE/checkbox/values="0,1";
+502     arscontrol2:USE_SFSPRINTER_FOR_TRAY_SELECT/checkbox/values="0,1";
+601     ARSCONTROL2:BACK_OF_INVOICE_REFERENCE;
+701     ARSCONTROL2:TOTAL_DUE_LITERAL_FACE;
+801    ARSCONTROL2:HIDE_ALL_INTERNAL_CHECKS /checkbox/values="0,1";
+901    ARSCONTROL2:COPIES[1]/uppercase
+        Error "Copy Literal Has Already Been Selected"
+            If ARSCONTROL2:COPIES[1] <> "" And
+              (ARSCONTROL2:COPIES[1] = ARSCONTROL2:COPIES[2] Or
+               ARSCONTROL2:COPIES[1] = ARSCONTROL2:COPIES[3] Or
+               ARSCONTROL2:COPIES[1] = ARSCONTROL2:COPIES[4])
+
+        Activehelp/optionlist
+                "COPY             ",
+                "AGENT            ",
+                "PAYOR            ",
+                "OTHER            ";
+902    ARSCONTROL2:COPIES[2]/uppercase
+        Error "Copy Literal Has Already Been Selected"
+            If ARSCONTROL2:COPIES[2] <> "" And
+              (ARSCONTROL2:COPIES[2] = ARSCONTROL2:COPIES[1] Or
+               ARSCONTROL2:COPIES[2] = ARSCONTROL2:COPIES[3] Or
+               ARSCONTROL2:COPIES[2] = ARSCONTROL2:COPIES[4])
+
+        Activehelp/optionlist
+                "COPY             ",
+                "AGENT            ",
+                "PAYOR            ",
+                "OTHER            ";
+903    ARSCONTROL2:COPIES[3]/uppercase
+        Error "Copy Literal Has Already Been Selected"
+            If ARSCONTROL2:COPIES[3] <> "" And
+              (ARSCONTROL2:COPIES[3] = ARSCONTROL2:COPIES[1] Or
+               ARSCONTROL2:COPIES[3] = ARSCONTROL2:COPIES[2] Or
+               ARSCONTROL2:COPIES[3] = ARSCONTROL2:COPIES[4])
+
+        Activehelp/optionlist
+                "COPY             ",
+                "AGENT            ",
+                "PAYOR            ",
+                "OTHER            ";
+904    ARSCONTROL2:COPIES[4]/uppercase
+        Error "Copy Literal Has Already Been Selected"
+            If ARSCONTROL2:COPIES[4] <> "" And
+              (ARSCONTROL2:COPIES[4] = ARSCONTROL2:COPIES[1] Or
+               ARSCONTROL2:COPIES[4] = ARSCONTROL2:COPIES[2] Or
+               ARSCONTROL2:COPIES[4] = ARSCONTROL2:COPIES[3])
+
+        Activehelp/optionlist
+                "COPY             ",
+                "AGENT            ",
+                "PAYOR            ",
+                "OTHER            ";
+905     arscontrol2:remove_ar_cx_on_reinstate/checkbox/values="0,1";
+1001    arscontrol2:invoice_indicator ;
+1002    arscontrol2:indicator_v_position ;
+1003    arscontrol2:indicator_h_position ;
+1004    ARSCONTROL2:REINSTATE_AR/checkbox/values = "0,1"        Hide If REINSTATE_PREMIUMS One Of 1;
+1101    ARSCONTROL2:REMOVE_INSTALLMENT_QUESTION;
+1102    ARSCONTROL2:REINSTATE_PREMIUMS/checkbox/values="0,1"        Hide If REINSTATE_AR One Of 1;
+1201    ARSCONTROL2:DEFAULT_CHECK_RELEASE /mask="XX"/uppercase
+        Error If ARSCONTROL2:DEFAULT_CHECK_RELEASE Not One Of "S","V"," ","";
+1301    ARSCONTROL2:PRINT_CTR_ON_CX_NOTICES /checkbox/values="0,1";
+1401    ARSCONTROL2:WHOLE_DOLLAR_INSTALLMENTS /checkbox/values="0,1";
+1402    ARSCONTROL2:COMMISSIONS_ON_CASH /checkbox/values="0,1";
+1501    ARSCONTROL2:REINSTATEMENT_WARNING/checkbox/values="0,1";
+1601    ARSCONTROL2:PRINT_INVOICE_MESSAGE/checkbox/values="0,1";
+1602    ARSCONTROL2:INVOICE_MESSAGE_V_POSITION/mask="9999";
+1603    ARSCONTROL2:INVOICE_MESSAGE_H_POSITION/mask="9999";
+1701    arscontrol2:include_install_fee_in_total_due/checkbox/values="0,1" ;
+1801    arscontrol2:lapse_notice_indicator ;
+1802    arscontrol2:equity_cx/checkbox/values="0,1";
+2001    arscontrol2:print_full_amount_on_cancel/checkbox/values="0,1" ;
+2002    arscontrol2:print_full_amount_on_cancel_lit ;
+2201    arscontrol2:no_print_producer_agent/checkbox/values="0,1" ;
+2301    arscontrol2:no_print_home/checkbox/values="0,1" ;
+2401    arscontrol2:no_print_insured_original/checkbox/values="0,1" ;
+2501    arscontrol2:no_print_mortgagee/checkbox/values="0,1" ;
+
+}  -- end of stuff1
+
+Panel
+Properties
+        {
+        ScrollBarPolicy         = asneeded
+        Text                    = "Controls Menu 2"
+        }
+{
+%%
+*---------------------------------------*---------------------------------------*-----------------------*
+| Special Date Selection Options        | Print Loan Number Part 1: _           |   Round AC Net:   _   |
+| Select Non Pay Notices As of        _ | Print Loan Number Part 2: _           |   AC Days Due:  ___   |
+| Select Installment Invoices As of   _ |                                       | AC Due Date Zero: _   |
+| Select Reinstatements As of         _ |                                       |                       |
+*---------------------------------------*---------------------------------------*-----------------------*
+| Agent/Producer: __________            |                                                               |
+| (leave blank for Agent on forms)      |  Printing Run Date on Notice Stub                             |
+*---------------------------------------*                   Invoice:     _                              |
+|        Forms Sorting Options          |                   CX Notice:   _  Position                    |
+|                 Agent    Mortgagee    |                   Rescinds:    _  V Position: ____            |
+| Invoices          _          _        |                   Balance Due: _  H Position: ____            |
+| CX Notices        _          _        *---------------------------------------------------------------*
+| Reinstatements    _          _        | Consent Order Flag: __ Do Not Print Consent Cancel: _         |
+| Balance Due       _          _        | Print Total Due on all Installments: _                        |
+| Alpha Options (checked=Do Not Print)  | Fully Earned Sur-Charges   : _  Include fee in total due: _   |
+| AC Statements: _ DB Statements: _     | Print Agent No on Invoices : _  CX on Prem Only:          _   |
+| Invoices: _ CX Notices: _ Rescinds: _ | Long Form Non Pay Notices  : _                                |
+*---------------------------------------*---------------------------------------------------------------*
+| Check Scan Input: _    V Position:     ____  H Position:     ____    Server URL and Path              |
+| Check Scan Items       Policy Number:     _  Amount Due:     _  _________________________________     |
+| Due Date:         _        Total Amount Due:   _                                                      |
+| Check Digit Divisor:  __   Check Digit Weight: __                                                     |
+| Checks Directory Path:                                                                                |
+| __________________________________________________________________________________________________    |
+| Checks input Location: __________________________________________________                             |
+| Checks input Name:     __________________________________________________                             |
+*-------------------------------------------------------------------------------------------------------*
+| Print Rescind on Audits:  _  click this if you DON't want the rescind notice to print on an audit     |
+| Print Cancel Notice on Audits: _ click this if you want the cancel notice for Audits                  |
+*-------------------------------------------------------------------------------------------------------*
+%%
+
+components
+
+Fields
+201    ARSCONTROL2:PRINT_LOAN_NO_TOP/checkbox/values="0,1";
+202    arscontrol2:ac_round/checkbox/values="0,1";
+301    ARSCONTROL2:AS_OF_NON_PAYS/checkbox/values="0,1";
+302    ARSCONTROL2:PRINT_LOAN_NO_BOTTOM/checkbox/values="0,1";
+303    arscontrol2:ac_days_due/mask="ZZZ";
+401    ARSCONTROL2:AS_OF_INVOICES/checkbox/values="0,1";
+402    arscontrol2:ac_due_date_zero/checkbox/values="0,1" ;
+501    ARSCONTROL2:AS_OF_REINSTATEMENTS/checkbox/values="0,1";
+0701   ARSCONTROL2:AGENT_PRODUCER/UPPER ;
+
+0901   ARSCONTROL2:PRINT_RUN_DATE_ON_INVOICE /checkbox/values="0,1";
+1001   ARSCONTROL2:PRINT_RUN_DATE_ON_cx_notice /checkbox/values="0,1";
+1101   ARSCONTROL2:PRINT_RUN_DATE_ON_rescind /checkbox/values="0,1";
+1201   ARSCONTROL2:PRINT_RUN_DATE_ON_cx_bal_due /checkbox/values="0,1";
+1102   ARSCONTROL2:DATE_ON_INVOICE_V_POSITION
+       Hide If ARSCONTROL2:PRINT_RUN_DATE_ON_INVOICE One Of 0;
+
+1202    ARSCONTROL2:PRINT_INVOICES_BY_AGENT/checkbox/values="0,1";
+1203    ARSCONTROL2:PRINT_INVOICES_BY_MORT/checkbox/values="0,1";
+1204    ARSCONTROL2:DATE_ON_INVOICE_H_POSITION
+        Hide If ARSCONTROL2:PRINT_RUN_DATE_ON_INVOICE One Of 0;
+1301    ARSCONTROL2:PRINT_CX_NOTICES_BY_AGENT/checkbox/values="0,1";
+1302    ARSCONTROL2:PRINT_CX_NOTICES_BY_MORT/checkbox/values="0,1";
+1401    ARSCONTROL2:PRINT_REINSTATEMENTS_BY_AGENT/checkbox/values="0,1";
+1402    ARSCONTROL2:PRINT_REINSTATEMENTS_BY_MORT/checkbox/values="0,1";
+1403    ARSCONTROL2:CONSENT_ORDER_FLAG;
+1404    ARSCONTROL2:DO_NOT_PRINT_CONSENT_CANCEL /checkbox/values="0,1";
+1501    ARSCONTROL2:PRINT_CX_BALANCE_BY_AGENT/checkbox/values="0,1";
+1502    ARSCONTROL2:PRINT_CX_BALANCE_BY_MORT/checkbox/values="0,1";
+1503    ARSCONTROL2:PRINT_TOTAL_DUE_ALL_INSTALLMENTS /checkbox/values="0,1";
+1601    ARSCONTROL2:SELECTIVE_REINSTATEMENTS /checkbox/values="0,1";
+1602    ARSCONTROL2:total_due_includes_installment /checkbox/values="0,1";
+1701    arscontrol2:no_alpha_ac_statements/checkbox/values="0,1";
+1702    arscontrol2:no_alpha_db_statements/checkbox/values="0,1";
+1703    arscontrol2:print_agent_no_on_invoice/checkbox/values="0,1";
+1704    arscontrol2:cancel_on_premium_only/checkbox/values="0,1";
+1801    arscontrol2:no_alpha_invoices/checkbox/values="0,1";
+1802    arscontrol2:no_alpha_cx_notices/checkbox/values="0,1";
+1803    arscontrol2:no_alpha_reinstatements/checkbox/values="0,1";
+1804    arscontrol2:long_form_non_pay_notice/checkbox/values="0,1";
+2001    arscontrol2:check_scan/checkbox/values="0,1";
+--        error "User not allowed to change this field" if
+--        username not one of "davep", "richl", "debbiep", "dougr", "cindyc","tcornish" ;
+2002    arscontrol2:check_scan_v_position;
+2003    arscontrol2:check_scan_h_position;
+2101    arscontrol2:check_scan_policy_no/checkbox/values="0,1";
+2102    arscontrol2:check_scan_due_date/checkbox/values="0,1";
+2103    arscontrol2:check_scan_url;
+2201    arscontrol2:check_scan_current_due/checkbox/values="0,1";
+2202    arscontrol2:check_scan_total_due/checkbox/values="0,1";
+2301    arscontrol2:check_digit_divisor;
+2302    arscontrol2:check_digit_weight;
+2501    arscontrol2:checks_directory_path ;
+2601    arscontrol2:checks_input_location ;
+2701    arscontrol2:checks_input_name ;
+2901    arscontrol2:print_rescind_on_audit/checkbox/values= "0,1";
+3001    arscontrol2:print_cancel_on_audit/checkbox/values="0,1" ;
+
+} -- end of stuff2
+
+Panel
+Properties
+        {
+        ScrollBarPolicy         = asneeded
+        Text                    = "Controls Menu 3"
+        }
+{
+%%
+*---------------------------------------*---------------------------------------------------------------*
+| Return Check Options                  | Return with Disbursement Refund Amount                        |
+*---------------------------------------*---------------------------------------------------------------*
+| Days to Pay (Not NonPay):      ___    | Calculate Installment fees in disbursements:  _               |
+| Days to Pay   Non Pay:         ___    | Calculate Late fees in disbursements:         _               |
+| Include NFS Charge (Not NonPay): _    | Don't calculate write offs in disbursements:  _               |
+| Include NFS Charge - Non Pay:    _    | Align Credit Endorsements with "B" Status:    _               |
+*---------------------------------------*---------------------------------------------------------------*
+| Turn on MOB:           _                                                                              |
+| MOB input Location:    __________________________________________________                             |
+| MOB input Name:        __________________________________________________                             |
+*-------------------------------------------------------------------------------------------------------*
+| Turn on Pay by Credit Card message _    Effective Date of pay credit card message  __________         |
+| Pay by Credit Card Horizontal Postion _____  Pay by credit card Vertical Position: _____              |
+| Pay by Credit Card Wording                                                                            |
+| ____________________________________________________________________________________________________  |
+|                                                                                                       |
+| Pay by Credit Card Header:  ________________________________________                                  |
+| Pay by Credit Card Header Horizontal Postion _____ Pay by Credit Card Header Vertical Position: _____ |
+| Turn on Pay by Credit Card Wording for Cancel Non Pay. _                                              |
+| Turn on Pay by Credit Card Wording for Cancellation Balance Due. _                                    |
+*-------------------------------------------------------------------------------------------------------*
+| Auto Pay Wording :                                                                                    |
+| ____________________________________________________________________________________________________  |
+|                                                                                                       |
+*-------------------------------------------------------------------------------------------------------*
+| No Cash Indicator: _          Payor is payee (Name on arschksu is name on AP check): _                |
+*-------------------------------------------------------------------------------------------------------*
+| Written premium commission to Cash paid commissions start date: __________                            |
+*-------------------------------------------------------------------------------------------------------*
+| Alternate AP check names: _                                                                           |
+*-------------------------------------------------------------------------------------------------------*
+| No access to Correct Billing Records: _                                                               |
+*-------------------------------------------------------------------------------------------------------*
+%%
+components
+
+Fields
+401    ARSCONTROL2:NSF_DAYS_TO_PAY_NORMAL/mask="ZZZ";
+501    ARSCONTROL2:NSF_DAYS_TO_PAY_NONPAY/mask="ZZZ";
+601    ARSCONTROL2:NSF_INCLUDE_CHARGE_NORMAL/checkbox/values="0,1";
+701    ARSCONTROL2:NSF_INCLUDE_CHARGE_NONPAY/checkbox/values="0,1";
+402    arscontrol2:return_paid_installment_fee/checkbox/values="0,1" ;
+502    arscontrol2:return_paid_late_fee/checkbox/values="0,1" ;
+602    arscontrol2:return_write_offs/checkbox/values="0,1" ;
+702    arscontrol2:align_credit_endorsement/checkbox/values="0,1";
+901    arscontrol2:mob/checkbox/values="0,1" ;
+1001    arscontrol2:mob_input_location;
+1101   arscontrol2:mob_input_name ;
+1301   arscontrol2:turn_on_pay_by_credit_card_msg/checkbox/values="0,1";
+1302   arscontrol2:eff_date_pay_by_credit_card_msg;
+1401   arscontrol2:credit_card_horizontal_position[1];
+1402   arscontrol2:credit_card_vertical_position[1];
+1601   arscontrol2:pay_by_credit_card_wording/freetextlines=2;
+2101   arscontrol2:pay_by_credit_card_header;
+1901   arscontrol2:credit_card_horizontal_position[2];
+1902   arscontrol2:credit_card_vertical_position[2];
+2001   arscontrol2:DISPLAY_CREDIT_CW_CX_NON_PAY/checkbox/values="0,1";
+2101   arscontrol2:DISPLAY_CREDIT_CW_CX_BAL_DUE/checkbox/values="0,1";
+2401   arscontrol2:auto_pay_wording ;
+2701   arscontrol2:no_cash_id/checkbox/values="0,1" ;
+2702   arscontrol2:payor_is_payee/checkbox/values="0,1" ;
+2901   arscontrol2:cash_paid_comm_start_date ;
+3101   arscontrol2:ap_payor_type/checkbox/values="0,1" ;
+3301   arscontrol2:no_access_correct_billing_rec/checkbox/values="0,1" ;
+
+}  -- end of stuff3
+
+-- new payment plan change options
+
+Panel
+Properties
+        {
+        ScrollBarPolicy         = asneeded
+        Text                    = "Pay Plan Change Options"
+        }
+{
+%%
+*----------------------------------------------------------------------*
+| Allow Payment Plan to be changed on:                                 |
+|                                                                      |
+|  _ New policy transactions                                           |
+|  _ Renewal policy transactions                                       |
+|  _ Where the Policy has an endorsement                               |
+|  _ When there has been money received for the current term           |
+|  _ When there has been a disbursement processed on the current term  |
+|  _ When there has been a write-off processed on the current term     |
+*----------------------------------------------------------------------*
+
+%%
+components
+
+Fields
+/*    arscontrol2:fee_on_pay_plan_change/checkbox/values="0,1";
+    arscontrol2:status_on_pay_plan_change/uppercase
+--    error "Only O and B allowed" if arscontrol2:status_on_pay_plan_change not one of "O","B"
+    error "If you are setting the status to 'B' you need to create<NL>the installment fee!l"
+    if arscontrol2:fee_on_pay_plan_change one of 0 and
+       arscontrol2:status_on_pay_plan_change one of "B" ;
+    arscontrol2:rescind_on_pay_plan_change/checkbox/values="0,1";
+    arscontrol2:new_due_date_on_pay_plan_change/checkbox/values="0,1";
+*/
+
+--
+-- Changing payment plan options
+--
+arscontrol2:change_pp_new/checkbox/values="0,1";
+arscontrol2:change_pp_renewal/checkbox/values="0,1";
+arscontrol2:change_pp_endorsement/checkbox/values="0,1";
+arscontrol2:change_pp_money/checkbox/values="0,1";
+arscontrol2:change_pp_disbursement/checkbox/values="0,1" {nochange};
+arscontrol2:change_pp_write_off/checkbox/values="0,1" {nochange};
+
+}  -- end of Pay plan change options
+
+
+}
+}
+End -- end of total stuff it

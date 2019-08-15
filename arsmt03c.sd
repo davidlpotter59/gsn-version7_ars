@@ -1,0 +1,100 @@
+%%
+Screen
+        Name            = "Arsmt03c" ;
+        Type            = "Detail" ;
+        Highlite        = Underscore;
+        Screensize      = "dynamic";
+        Padcharacter    = Space;
+        Windowtitle="%a      %s Agent - Apply Amount - Version 7.00      %m";
+        iconline        = 0 ;
+
+        Global String G_COMPANY[10],
+                      G_COMPANY_ID[10];
+
+        Global Unsigned Ascii Number G_CHECK_REFERENCE[7],
+                                     G_POLICY_NO[9],
+                                     G_QUOTE_NO[8] ,
+                                     G_AGENT_NO[4] ;
+
+        Global String G_SUPP_NAME[50],
+                      G_CARE_OF[50],
+                      G_STREET[30],
+                      G_CITY_STATE[30],
+                      G_CHECK_NUMBER[20];
+
+        Global Signed Ascii Number G_TOTAL_DUE[9]/decimals=2,
+                                   G_CHECK_AMOUNT[9]/decimals=2,
+                                   g_grace_days[2],
+                                   g_apply_amount[9]/decimals=2 ;
+
+        Global Unsigned Ascii Number G_ZIP_CODE[9] ;
+
+        global wdate g_starting_date,
+                     g_ending_date,
+                     g_post_date ;
+
+
+
+        access arsbilling, set arsbilling:company_id = arschksu:company_id, approximate
+
+        Include "STDKEYS7.INC"
+
+functions
+
+        include "stdfunc7.inc"
+
+menu definition
+
+        INCLUDE "stdmenu7.inc"
+}
+
+
+toolbar definition
+
+        include "stdtoolbar7.inc"
+}
+
+Screen
+Properties
+        {
+        Layouttype = column
+        }
+{
+panel
+Properties
+        {
+        borderstyle = raised
+        scrollbarpolicy = asneeded
+        }
+
+{
+%%
+                                                     ___________
+                   *---------------------------------*
+                   |~~~~~~~~~~~Amount~~~~~~~~~~~~~~~~|
+                   |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+                   |~~~~~~~~~___________~~~~~~~~~~~~~|
+                   *---------------------------------*
+
+%%
+
+Components
+
+Fields
+101    function/noecho/showasguidetext ;
+501    g_apply_amount ;
+
+}
+
+}
+
+update
+if abort = "YES" then
+    function = "redisplay"
+
+Screen Exit
+
+
+
+
+End

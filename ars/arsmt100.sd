@@ -1,0 +1,226 @@
+%%
+Screen
+        Name = "Arsmt100" ;
+        Type = "Multiline" ;
+        Repeat line_item_tg, 10 Times Down;
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize = "dynamic";
+        Windowtitle ="%s    %a   Write-offs Processing - Version 7.00   %m";
+        iconline = 0;
+
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+        Global Wdate G_TRANS_DATE ;
+        Global Wdate G_TRANS_EFF ;
+        Global Wdate G_TRANS_EXP ;
+        Global Unsigned Ascii Number G_TRANS_CODE[4] ;
+        Global Unsigned Ascii Number G_LINE_OF_BUSINESS[4] ;
+        Global Unsigned Ascii Number G_COMM_RATE[4]/decimals=2 ;
+        Global Unsigned Ascii Number G_SUB_CODE[4] ;
+        Global Unsigned Ascii Number G_BILLING_CTR[4] ;
+        Global Unsigned Ascii Number G_RETURN_CHECK_CTR[4] ;
+
+
+        include "arsmenu.var"
+
+
+        Signed Ascii Number L_CANCEL_BALANCE[9]=0.00/decimals=2;
+        Signed Ascii Number L_WRITE_OFF_PROCESSED[9]=0.00/decimals=2;
+        Signed Ascii Number L_DIFFERENCE[9]=0.00/decimals=2;
+        String L_CX_UPDATED[1]="";
+
+        Access ARSBILLING,
+           Set ARSBILLING:COMPANY_ID = G_COMPANY_ID ,
+               ARSBILLING:POLICY_NO = G_POLICY_NO , Generic
+--               ARSBILLING:TRANS_DATE = G_TRANS_DATE ,
+--               ARSBILLING:TRANS_EFF = G_TRANS_EFF ,
+--               ARSBILLING:TRANS_EXP = G_TRANS_EXP ,
+--               ARSBILLING:TRANS_CODE = G_TRANS_CODE ,
+--               ARSBILLING:LINE_OF_BUSINESS = G_LINE_OF_BUSINESS ,
+--               ARSBILLING:COMM_RATE = G_COMM_RATE ,
+--               ARSBILLING:SUB_CODE = G_SUB_CODE ,
+--               ARSBILLING:BILLING_CTR = G_BILLING_CTR ,
+--               ARSBILLING:RETURN_CHECK_CTR = G_RETURN_CHECK_CTR ;
+
+       Include "STDKEYS12.INC"
+       !F9="Roll"/function ;
+
+Style definition
+
+        include "styles.inc"
+
+Functions
+
+        Include "STDFUNC7.INC"
+
+        include "arsfunc7.inc"
+
+       "Roll" Continue Begin FUNCTION = "redisplay" End ;
+       "redisplay" Display/noreturn PROGRAMID ;
+
+        -- include "SCIPSPRINT.FUN"
+
+Menu Definition
+        include "stdmenu7.inc"
+        include "arsmenu7.inc"
+}
+
+Toolbar Definition
+        include "stdtoolbar7.inc"
+}
+
+Screen Entry
+
+Access Validation
+
+    Skip If ARSBILLING:STATUS = "C" Or -- do not process cancellations
+            ARSBILLING:INSTALLMENT_AMOUNT = (ARSBILLING:TOTAL_AMOUNT_PAID +
+                                             ARSBILLING:WRITE_OFF_AMOUNT)
+
+screen at 1,1 to 20,80
+properties
+        {
+        LayOutType = Column
+        }
+{
+Panel Tagged header_pl
+Properties
+        {
+        BorderStyle     = Raised
+        ScrollBarPolicy = asneeded
+        }
+{
+%%
+                                                                  ____________
+*------------------------------------------------------------------------------*
+| Company Id:    __________ __________________________________________________ |
+| Policy Number:  _________ __________________________________________________ |
+*------------------------------------------------------------------------------*
+| W     Due        Trans      Description   Installment   Amount     Balance   |
+| O     Date       Date                       Amount     Received              |
+| _  __________ __________ _______________ ___________ ___________ ___________ |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+*------------------------------------------------------------------------------*
+%%
+
+components
+
+Fields
+101     FUNCTION/noecho/showasguidetext;
+301     ARSBILLING:COMPANY_ID/displayonly                    Mandatory
+        Include "companyhlp.inc"
+302     SFSCOMPANY:NAME[1];
+401     ARSBILLING:POLICY_NO/displayonly                     Mandatory;
+402     SFPNAME:NAME[1];
+
+/* multiline items start here */
+801     ARSBILLING:WRITE_OFF/checkbox/values="0,1" tagged line_item_tg
+        Hide If ARSBILLING:INSTALLMENT_AMOUNT = 0 ;
+
+801     Begin
+        If FUNCTION = "CHANGE" And
+           ARSBILLING:WRITE_OFF = 1 Then
+           Begin
+               ARSBILLING:WRITE_OFF_AMOUNT =
+               ARSBILLING:INSTALLMENT_AMOUNT - ARSBILLING:TOTAL_AMOUNT_PAID
+               ARSBILLING:WRITE_OFF_DATE = TODAYSDATE
+               ARSBILLING:STATUS = "P"
+               ARSBILLING:STATUS_DATE = TODAYSDATE
+               L_WRITE_OFF_PROCESSED = L_WRITE_OFF_PROCESSED + ARSBILLING:WRITE_OFF_AMOUNT
+               L_DIFFERENCE          = L_CANCEL_BALANCE - L_WRITE_OFF_PROCESSED
+               If L_CANCEL_BALANCE = 0 Then
+               Begin
+                   L_WRITE_OFF_PROCESSED = 0
+                   L_DIFFERENCE          = 0
+               End
+           End
+        End
+        ARSBILLING:WRITE_OFF/checkbox/values="0,1" tagged line_item_tg
+        Hide If ARSBILLING:INSTALLMENT_AMOUNT = 0;
+802     ARSBILLING:DUE_DATE/displayonly tagged line_item_tg;
+803     ARSBILLING:TRANS_DATE/displayonly tagged line_item_tg;
+804     ARSCODE:DESCRIPTION/displayonly tagged line_item_tg;
+805     ARSBILLING:INSTALLMENT_AMOUNT/displayonly tagged line_item_tg;
+806     ARSBILLING:TOTAL_AMOUNT_PAID/displayonly tagged line_item_tg;
+807     ARSBILLING:INSTALLMENT_AMOUNT - ARSBILLING:TOTAL_AMOUNT_PAID tagged line_item_tg;
+
+}
+}
+
+Postupdate
+
+If UPDATEOK = "YES" And
+   Abort    = "NO"  Then
+Begin
+
+Do UPDATE_ARSCANCEL
+If L_CX_UPDATED = "Y" Then
+Begin
+    Warning "Cancellation Status for this due date has been updated to 'R' "
+End
+
+G_COMPANY_ID = ARSBILLING:COMPANY_ID
+G_POLICY_NO  = ARSBILLING:POLICY_NO
+FUNCTION = "Roll"
+
+End
+
+Screen Exit
+        If ARSBILLING:COMPANY_ID > ""
+        Then G_COMPANY_ID = ARSBILLING:COMPANY_ID ;
+        If ARSBILLING:POLICY_NO > 0 Then G_POLICY_NO = ARSBILLING:POLICY_NO ;
+        If ARSBILLING:TRANS_DATE > 0
+        Then G_TRANS_DATE = ARSBILLING:TRANS_DATE ;
+        If ARSBILLING:TRANS_EFF > 0 Then G_TRANS_EFF = ARSBILLING:TRANS_EFF ;
+        If ARSBILLING:TRANS_EXP > 0 Then G_TRANS_EXP = ARSBILLING:TRANS_EXP ;
+        If ARSBILLING:TRANS_CODE > 0
+        Then G_TRANS_CODE = ARSBILLING:TRANS_CODE ;
+        If ARSBILLING:LINE_OF_BUSINESS > 0
+        Then G_LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS ;
+        If ARSBILLING:COMM_RATE > 0 Then G_COMM_RATE = ARSBILLING:COMM_RATE ;
+        If ARSBILLING:SUB_CODE > 0 Then G_SUB_CODE = ARSBILLING:SUB_CODE ;
+        If ARSBILLING:BILLING_CTR > 0
+        Then G_BILLING_CTR = ARSBILLING:BILLING_CTR ;
+        If ARSBILLING:RETURN_CHECK_CTR > 0
+        Then G_RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR ;
+
+
+Procedure Definition
+
+Procedure UPDATE_ARSCANCEL
+Begin
+
+L_CX_UPDATED = "N"
+
+Access ARSCANCEL, Set ARSCANCEL:COMPANY_ID = ARSBILLING:COMPANY_ID,
+                      ARSCANCEL:POLICY_NO  = ARSBILLING:POLICY_NO, Approximate
+
+While ARSCANCEL:COMPANY_ID  = ARSBILLING:COMPANY_ID And
+      ARSCANCEL:POLICY_NO   = ARSBILLING:POLICY_NO
+      Begin
+          If ARSCANCEL:CX_STATUS One Of "P" And
+             ARSCANCEL:DUE_DATE  = ARSBILLING:DUE_DATE Then
+          Begin
+              Change ARSCANCEL
+              Begin
+                   ARSCANCEL:TRANS_DATE = TODAYSDATE
+                   ARSCANCEL:CX_STATUS  = "R"
+                   L_CX_UPDATED = "Y"
+              End
+          End
+      Next ARSCANCEL
+End
+
+End
+
+End

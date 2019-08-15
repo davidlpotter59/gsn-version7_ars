@@ -1,0 +1,291 @@
+%%
+Screen
+        Name = "Arsin045" ;
+        Type = "Multiline" ;
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize = "dynamic";
+        Repeat repeat_items_tg, 15 Times Down;
+        Windowtitle = "%s    %a   Check Summary Inquiry - Version 7.01    %m";
+        Domain = "ARSINQWRK3" ;
+        iconline = 0;
+        resizable = yes ;
+
+        Global String G_COMPANY_ID[10] ;
+        Global String G_COMPANY[10];
+
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+
+        Global Unsigned Ascii Number G_CHECK_REFERENCE[7] ;
+
+        Global Wdate G_EFF_DATE;
+
+        String L_ENTER[1],
+               l_server_url[100],
+               l_image_name[100],
+               l_url[250];
+
+        Access ARSINQWRK3,
+           Set ARSINQWRK3:COMPANY_ID = G_COMPANY_ID, Approximate
+
+--        Include "inqKEYS.INC"
+
+Style Definition
+    include "styles.inc"
+
+Functions
+   "redisplay" display/noreturn "arsin045" ;
+   "Display_Image" sequence "display_image_seq" tagged display_image_tg ;
+   "display_image_seq" continue {
+                               do set_browser
+                               showdocument (l_url)
+                            };
+
+"Exit"  Return  tagged exit_tg ;
+        Return ;
+
+        "display_current" sequence "display_current_seq" tagged display_current_tg;
+        "display_current_seq" continue
+        {
+           Display Modal Screen "arsin042"
+        } ;
+
+        "display_detail" sequence "display_detail_seq" tagged display_detail_tg;
+        "display_detail_seq" continue
+        {
+           Display Modal Screen "arsin047"
+        } ;
+
+        "display_checks" sequence "display_checks_seq" tagged display_checks_tg;
+        "display_checks_seq" continue
+        {
+           Display Modal Screen "arsin045"
+        } ;
+
+        "display_mort" sequence "display_mort_seq" tagged display_mort_tg;
+        "display_mort_seq" continue
+        {
+           Display Modal Screen "sfpin02c"
+        } ;
+
+        "display_nonpay" sequence "display_nonpay_seq" tagged display_nonpay_tg;
+        "display_nonpay_seq" continue
+        {
+           Display Modal Screen "arsin041"
+        } ;
+
+ToolBar Definition
+
+Screen Entry
+access arscontrol2, set arscontrol2:company_id = arsinqwrk3:company_id
+
+Access Validation
+Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = ARSINQWRK3:COMPANY_ID
+
+Error "No more checks for this policy" If
+ARSINQWRK3:POLICY_NO <> G_POLICY_NO
+Skip If ARSINQWRK3:POLICY_NO <> G_POLICY_NO Or
+(ARSCONTROL2:HIDE_ALL_INTERNAL_CHECKS One Of 1 And
+    ARSINQWRK3:INTERNAL_CHECK One Of 1)
+
+Screen
+
+Properties
+    {
+    LayOutType      = Column
+    }
+{
+
+Panel tagged icon_line1_tg
+
+Properties
+     {
+         LayoutType = Row
+     }
+{
+Components
+
+    Button at 1,1 to 1.0,18 tagged display_current_tg
+    Properties {
+        Text     = "View Current"
+        Iconname = "file.gif"
+               }
+    Events
+    {
+        Action = display_current_tg
+    }
+
+    Button at 1,1 to 1.0,18 tagged display_detail_tg
+    Properties {
+        Text     = "View Detail"
+        Iconname = "magnif.bmp"
+               }
+    Events
+    {
+        Action = display_Detail_tg
+    }
+
+    Button at 1,1 to 1.0,18 tagged display_mort_tg
+    Properties {
+        Text     = "View Mortgagee"
+        Iconname = "folder.gif"
+               }
+    Events
+    {
+        Action = display_mort_tg
+    }
+
+    Button at 1,1 to 1.0,18 tagged display_nonpay_tg
+    Properties {
+        Text     = "View Non Pays"
+        Iconname = "signpost.bmp"
+               }
+    Events
+    {
+        Action = display_nonpay_tg
+    }
+
+    Button at 1,1 to 1.0,18 tagged exit_tg
+    Properties {
+        Text     = "EXIT"
+        Iconname = "exit.bmp"
+               }
+    Events
+    {
+        Action = exit_tg
+    }
+}
+
+Listbox
+{ Heading
+   Properties {
+       LayoutType        = Row
+       LayoutConstraints = "North"
+       }
+       {Components
+       Button to 1,10.0
+           Properties {
+                  Text = "Reference"
+          }
+       Button to 1, 15.0
+           Properties {
+                  Text = "Policy No"
+          }
+       Button to 1,20.0
+           Properties {
+                  Text = "Check No"
+          }
+       Button to 1, 5.0
+           Properties {
+                  Text = "Year"
+          }
+       Button to 1,15.0
+           Properties {
+                  Text = "Amount"
+          }
+       Button to 1, 10.0
+           Properties {
+                  Text = "Status"
+          }
+       Button to 1, 15.0
+           Properties {
+                  Text = "Received"
+          }
+    }
+Panel
+    Properties {
+         LayoutType        = Row
+         LayoutConstraints = Stretch
+         ScrollBarPolicy   = asNeeded
+    }
+{
+
+Fields
+ARSINQWRK3:CHECK_REFERENCE to 1.0, 10.0 tagged repeat_items_tg
+    properties {
+                 cursorshape     = hand
+                 foregroundcolor = "blue"
+               }
+    events     {
+    MouseClicked {
+                  Currentrecord = EVENT.LINE
+                  function = "Display_Image"
+                  Abort()
+                  }
+                } ;
+ARSINQWRK3:POLICY_NO  to 1.0, 15.0 tagged repeat_items_tg;
+ARSINQWRK3:CHECK_NO  to 1.0, 20.0 tagged repeat_items_tg  ;
+Year(ARSINQWRK3:TRANS_EFF)/mask="9999" to 1.0, 5.0 tagged repeat_items_tg ;
+ARSINQWRK3:CHECK_AMOUNT  to 1.0, 15.0 tagged repeat_items_tg ;
+ARSINQWRK3:DISPOSITION  to 1.0, 10.0 tagged repeat_items_tg;
+ARSINQWRK3:TRANS_DATE to 1.0, 15.0 tagged repeat_items_tg ;
+
+}
+
+}
+}
+
+/* Panel tagged BROWSER_TAG
+    Properties
+    {
+        Text              = "Image"
+        LayoutType        = Border
+        LayoutConstraints = Stretch
+        ScrollBarPolicy   = asNeeded
+    }
+    {
+    Components
+        Browser at 1,1 to 30,60 Tagged T_Browser
+        Properties
+        {
+            layoutconstraints=Stretch
+        }
+        Events
+        {
+        "SETURL" {setproperty(T_Browser,"url",event.value)}
+        }
+
+
+} -- end of components
+
+}
+
+*/
+
+Screen Exit
+        If ARSINQWRK3:COMPANY_ID > "" Then G_COMPANY_ID = ARSINQWRK3:COMPANY_ID ;
+        If ARSINQWRK3:CHECK_REFERENCE > 0
+        Then G_CHECK_REFERENCE = ARSINQWRK3:CHECK_REFERENCE ;
+
+
+Procedure Definition
+
+Procedure Set_Browser
+begin
+
+        l_server_url = ""
+        l_image_name = ""
+        l_url        = ""
+
+        access arscontrol2, set arscontrol2:company_id = arsinqwrk3:company_id
+
+        l_server_url = trun(arscontrol2:check_scan_url)
+
+        access arschksu_image, set arschksu_image:company_id      = arsinqwrk3:company_id,
+                                   arschksu_image:check_reference = arsinqwrk3:check_reference
+
+        l_image_name = trun(arschksu_image:pdf_name)
+
+    if l_image_name <> "" then
+    {
+        l_url=trun(l_server_url) + trun(l_image_name)
+    }
+
+    if l_image_name = "" then
+    {
+        l_url = l_server_url
+    }
+
+end -- end of procedure
+
+End

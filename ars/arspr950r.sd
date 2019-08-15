@@ -1,0 +1,94 @@
+%%
+Screen
+        Name = "Arspr950r" ;
+        Type = "Detail" ;
+        Padcharacter=Space;
+        Highlite=Underscore;
+        Domain="ARSDATES";
+        Screensize = "dynamic";
+        Windowtitle="%a     %s - A/R Date Entry For Checks - Version 7.00   %m";
+        iconline = 0 ;
+
+        Global Wdate G_STARTING_DATE ;
+        Global Wdate G_ENDING_DATE ;
+        Global String G_COMPANY_ID[10];
+        Global Unsigned Ascii Number G_REPRINT_OPTION[1];
+
+        Access ARSDATES, Set ARSDATES:COMPANY_ID = G_COMPANY_ID, Approximate ;
+
+        Include "STDKEYS7.INC"
+
+Style Definition
+    include "styles.inc"
+
+Functions
+
+        Include "STDFUNC7.INC"
+
+Menu Definition
+    include "stdmenu7.inc"
+}
+
+ToolBar Definition
+    include "stdtoolbar7.inc"
+}
+
+
+Screen
+Properties
+    {
+    LayOutType      = Column
+    }
+{
+
+Panel Tagged Header_pl
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = AsNeeded
+    }
+{
+
+%%
+                                                       ____________
+            *----------------------------------------*
+            |                                        |
+            |       Starting Date: __________        |
+            |                                        |
+            |       Ending Date:   __________        |
+            |                                        |
+            |       Reprint Checks: _                |
+            |                                        |
+            *----------------------------------------*
+%%
+
+components
+
+Fields
+101     FUNCTION/noecho/showasguidetext ;
+401     Begin
+        G_STARTING_DATE = TODAYSDATE
+        End
+        G_STARTING_DATE/mask="MM/DD/YYYY"/default { Mandatory } ;
+0601    Begin
+        G_ENDING_DATE = G_STARTING_DATE
+        End
+        G_ENDING_DATE/mask="MM/DD/YYYY"/default   { Mandatory }
+        Begin
+            Error "Ending Date Can Not be Less Than the Starting Date"
+            If G_ENDING_DATE < G_STARTING_DATE
+        End
+        ;
+801     G_REPRINT_OPTION/checkbox;
+
+}
+
+}
+
+Screen Exit
+        If ARSDATES:COMPANY_ID <> ""
+            Then G_COMPANY_ID = ARSDATES:COMPANY_ID;
+        Access ARSDATES_ALT, Set ARSDATES_ALT:COMPANY_ID = ARSDATES:COMPANY_ID
+        Delete ARSDATES_ALT -- cleans up file for next date entry
+
+End

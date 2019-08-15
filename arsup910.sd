@@ -1,0 +1,1608 @@
+%%
+Program
+        Name = "arsup910" ;
+        Type = "File";
+        Domain="FLAT";
+        Padcharacter = Space ;
+/*
+must compile for 730_3a too
+
+*/
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+        Global Unsigned Ascii Number G_RUN_MODE[1];
+        Global Wdate G_TRANS_DATE ;
+        Global Wdate G_TRANS_EFF ;
+        Global Wdate G_TRANS_EXP ;
+
+        Global Wdate G_STARTING_DATE,
+                     G_ENDING_DATE;
+
+        Global Unsigned Ascii Number G_TRANS_CODE[4] ;
+        Global Unsigned Ascii Number G_LINE_OF_BUSINESS[4] ;
+        Global Unsigned Ascii Number G_COMM_RATE[4]/decimals=2 ;
+        Global Unsigned Ascii Number G_SUB_CODE[4] ;
+        Global Unsigned Ascii Number G_BILLING_CTR[4] ;
+
+        Global Unsigned Ascii Number G_RETURN_CHECK_CTR[4],
+                                     g_image_array_position[1],
+                                     g_scan[1] ;
+
+        Global String G_REPORT_DEVICE[10];
+
+        String L_OPTION[1]="";
+        array [2] of string l_reinstatement_name[50] ;
+        Unsigned Ascii Number L_LINE_CTR[3]=0;
+        String L_ENTER[1];
+        String L_FIRST_TIME[1]="Y";
+        string L_ANOTHER_LAPSE[1]="N" ;
+        Unsigned Ascii Number L_SUB[2];
+        Unsigned Ascii Number L_V_POSITION[5]=0/decimals=0;
+        String L_ZIPCODE[10]="";
+        Unsigned Ascii Number L_LOOP_CTR[2]=0;
+        Unsigned Ascii Number L_LINES_PRINTED[2]=0;
+        Unsigned Ascii Number L_COPY_CTR[2]=0;
+
+        Unsigned Ascii Number L_PAGES_CTR[4]=0;
+        Unsigned Ascii Number L_HOLD_AGENT_NO[4]=0;
+        string l_check_no[20] ;
+        Signed Ascii Number L_COMMISSION[9]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_PREMIUM[9]=0/dec=2;
+        Signed Ascii Number L_TOTAL_COMMISSION[9]=0/decimals=2;
+        Unsigned Ascii Number L_COMM_RATE[4]=0/decimals=0;
+        String L_COMPANY[10]="";
+        String L_COMPANY1[10]="";
+        Unsigned Ascii Number L_PAID_YEAR[4]=0/decimals=0;
+        Unsigned Ascii Number L_PAID_MONTH[2]=0/decimals=0;
+        Signed Ascii Number L_YTD_PREMIUM[9]=0/decimals=2;
+        Signed Ascii Number L_YTD_COMMISSION[9]=0/decimals=2;
+        Unsigned Ascii Number L_SUB_CODE[4]=0/decimals=0;
+
+        String L_TRANSACTION[30]="";
+        String L_LOGFILE[15]="arsup910.log";
+        String L_TOTALS_PAGE[1]="N";
+        Unsigned Ascii Number L_HOLD_POLICY_NO[9]=0/decimals=0;
+        Unsigned Ascii Number L_COPIES_REQUIRED[2]=0;
+        Unsigned Ascii Number L_POL_YEAR[4]=0;
+        Unsigned Ascii Number L_END_SEQUENCE[4]=0;
+        Unsigned Ascii Number L_POLICY_NO[9]=0,
+                              l_mm[2]=0,
+                              l_dd[2]=0,
+                              l_yy[4]=0 ;
+
+        String L_COPY_LIT[20]="",
+               l_invoice_PDF_1[20]="",
+               l_header_name[50],
+               l_policy_str[11],
+               l_file_number[80]="",
+               l_file_name[70]="",
+               l_file_type[150],
+               l_drawer[45]="",
+               l_folder_type[80]="",
+               l_doc_type[45]="",
+               l_doc_date[70]="",
+               l_unix_path[100],
+               L_py_policy_year[150],
+               l_policy[9];
+
+
+        Unsigned Ascii Number L_HOLD_COPY_CTR[4]=0;
+        Unsigned Ascii Number L_H_POSITION[4]=0;
+        Unsigned Ascii Number L_AGENT_PRODUCER_POSITION[4]=0;
+
+/* buidling the array to hold sfpname keys */
+Array [200] Of Unsigned Ascii Number L_SFPNAME_POLICY_NO[9],
+                                     L_SFPNAME_POL_YEAR[4],
+                                     L_SFPNAME_END_SEQUENCE[4],
+                                     L_SFPNAME_PREM_NO[4],
+                                     L_SFPNAME_BUILD_NO[4],
+                                     L_SFPNAME_SUB_CODE[4];
+
+Unsigned Ascii Number L_SFPNAME_LOOP_CTR[4]=0;
+Unsigned Ascii Number L_TEMP_POLICY_NO[9]=0;
+Unsigned Ascii Number L_TEMP_POL_YEAR[4]=0;
+Unsigned Ascii Number L_TEMP_END_SEQUENCE[4]=0;
+Unsigned Ascii Number L_TEMP_PREM_NO[4]=0;
+Unsigned Ascii Number L_TEMP_BUILD_NO[4]=0;
+Unsigned Ascii Number L_TEMP_SUB_CODE[4]=0;
+Signed Ascii Number L_TOTAL_PAID[9]=0/decimals=2;
+String L_HOLD_COMPANY_ID[10]="";
+string l_lob_subline[2]="00";
+String L_LINE_PRINTED[1]="N";
+Unsigned Ascii Number L_HOLD_LINE_OF_BUSINESS[4]=0;
+Unsigned Ascii Number L_HOLD_PAYMENT_PLAN[2]=0;
+Unsigned Ascii Number L_HOLD_CHECK_REFERENCE[7]=0;
+Wdate L_HOLD_EFF_DATE;
+String L_NOTICE_DESCRIPTION[20];
+String L_NOTICE_TYPE[5]="RS";
+String L_SFS_CODE[3]="";
+
+Unsigned Ascii Number L_COUNTER[7]=0/decimals=0;
+
+        Include "scipserr.var"
+
+        Include "sfsrevname.var"
+
+        Include "csfonts.inc"
+
+        Include "sfscsexec.var"
+
+        Include "sdpqueue.var"
+
+Initialization
+  -- added 03/20/2007
+  l_reinstatement_name[1] = lowercase(programid) + ".pcl"
+  l_reinstatement_name[2] = lowercase(programid) + "i.pcl"
+  l_header_name = programid + "_header"
+  deletefile(l_header_name)
+  deletefile(l_reinstatement_name[1])
+  deletefile(l_reinstatement_name[2])
+
+  /*  run mode
+      1 - All reinstatement notices
+      2 - Selected by a policy number which is included on the commandline
+      3 - Over ride the ending date and starting date with user entered values from arsmt910
+  */
+  G_STARTING_DATE = Date(COMMANDLINE[1,8])
+  G_ENDING_DATE   = Date(COMMANDLINE[9,16])
+  G_RUN_MODE      = Val(COMMANDLINE[17,17])
+  G_POLICY_NO     = Val(COMMANDLINE[18,26])
+
+  if g_run_mode   = 3 then
+    {
+      g_scan                 = Val(COMMANDLINE[18,18])
+      g_image_array_position = VAL(COMMANDLINE[19,19])
+    }
+
+  if g_run_mode = 2 then
+    {
+      g_scan                 = Val(COMMANDLINE[27,27])
+      g_image_array_position = VAL(COMMANDLINE[28,28])
+    }
+
+  L_SFS_CODE = "SFS"
+
+  Access SFSDEFAULT,
+     Set SFSDEFAULT:SFS_CODE = L_SFS_CODE
+
+  L_COMPANY = SFSDEFAULT:COMPANY_ID
+  L_COMPANY1 = SFSDEFAULT:COMPANY_ID
+
+  access scipsimage,
+     set scipsimage:company_id = l_company1, generic
+
+  access scipsimage_version5,
+     set scipsimage_version5:company_id = l_company1, generic
+
+  Access ARSCONTROL2,
+     Set ARSCONTROL2:COMPANY_ID = SFSDEFAULT:COMPANY_ID
+
+-- this should NEVER EVER be true - if it is then every day every rescind
+-- notice will print from the {ning of time.  These forms REQUIRE
+-- from / to date range selection only!
+
+If ARSCONTROL2:AS_OF_REINSTATEMENTS One Of 1 Then
+  {
+    G_STARTING_DATE = 01.01.0000
+  }
+
+If G_RUN_MODE One Of 1 Then
+  {
+    G_ENDING_DATE   = TODAYSDATE - 1 -- in batch mode, running at night - 1 day = yesterday
+    G_STARTING_DATE = G_ENDING_DATE
+  }
+
+    Write ("<014>")
+    Write ("%c%s",01001,"Processing Reinstatements - arsup910 ")
+    write ("%c%s%d",03001,"Starting Date   = ",g_starting_date)
+    write ("%c%s%d",05001,"Ending Date     = ",g_ending_date)
+    write ("%c%s%n",07001,"g run mode      = ",g_run_mode)
+    Write ("<014>")
+
+    Write ("%c%s%s",08001,"scipsimage_version5:items_as_image[7]7=",scipsimage_version5:items_as_image[g_image_array_position])
+    write ("%c%s%n",09001,"g scan  = ",g_scan)
+    write ("%c%s%n",10001,"g image arraypos  = ",g_image_array_position)
+    write ("%c%s%n",07001,"g run mode      = ",g_run_mode)
+    Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+
+
+Switch (G_RUN_MODE)
+  Case 1    : Do NEW_NOTICES
+  Case 2    : {
+                Do NEW_NOTICES_SELECT
+                For L_SUB = 1 To L_COPY_CTR
+                  {
+                    L_HOLD_COPY_CTR = L_SUB
+                    Do EJECT_PAGE
+                    do setup_for_image_file  --only done on l_copy_ctr = 3 and imaging
+                    Do PRINT_FORM
+                    L_LINES_PRINTED = 0
+                    L_V_POSITION    = 1800
+                    Do print_detail_line
+/*
+  Write ("<014>")
+  Write ("%c%s%s",2001,"scipsimage:company_id",scipsimage:company_id)
+  Write ("%c%s%n",15001,"g_run_mode =",g_run_mode)
+  Write ("%c%s%s",16001,"scipsimage:items_as_image7=",scipsimage:items_as_image[g_image_array_position])
+  write ("%c%s%n",17001,"g scan  = ",g_scan)
+  write ("%c%s%n",18001,"g image array pos  = ",g_image_array_position)
+  write ("%c%s%n",19001,"g run mode      = ",g_run_mode)
+  Write ("%c%s",01001,"Processing Reinstatements - arsup910 ")
+  write ("%c%s%d",03001,"Starting Date   = ",g_starting_date)
+  write ("%c%s%d",05001,"ending Date     = ",g_ending_date)
+  Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+*/
+                    do close_imageing_file   --only done on l_copy_ctr = 3 and imaging
+                  } -- of loop
+
+              }
+  Case 3    : Do NEW_NOTICES
+  Default   : {
+                Do NEW_NOTICES_SELECT
+                For L_SUB = 1 To L_COPY_CTR
+                  {
+                    L_HOLD_COPY_CTR = L_SUB
+                    Do EJECT_PAGE
+                    Do PRINT_FORM
+                    L_LINES_PRINTED = 0
+                    L_V_POSITION    = 1800
+                    Do print_detail_line
+                  }   -- of loop
+              }
+}
+
+Do PROCESS_QUEUE
+
+Update
+
+Screen Exit
+
+/*
+write ("<014>")
+write ("%c%s%n",01001,"Policy Number    = ",l_hold_policy_no)
+write ("%c%s%n",02001,"copy ctr         = ",l_copy_ctr)
+*/
+
+    -- loop here for the number of copies needed
+if g_run_mode one of 1,3 then
+  {
+    For L_SUB = 1 To L_COPY_CTR
+      {
+        L_HOLD_COPY_CTR = L_SUB
+        Do EJECT_PAGE
+        Do setup_for_image_file  --only done if g_scan is one and image is on
+        Do PRINT_FORM
+        L_LINES_PRINTED = 0
+        L_V_POSITION    = 1800
+        Do print_detail_line
+        Do close_imageing_file   --only done if g_scan is one and image is on
+      } -- of loop
+  } -- end of g_run_mode = 2 checking
+Closefile( L_LOGFILE )
+
+Errors
+  If ERRORNUMBER <> ERR_EOF Then
+    {
+      Writefile (L_LOGFILE,"arsmt910 had errors<NL>")
+      Writefile (L_LOGFILE,"Date of run: %d<NL> ",TODAYSDATE )
+      Writefile (L_LOGFILE,"Policy No  : %n<NL> ",ARSCANCEL:POLICY_NO )
+      Writefile (L_LOGFILE,"Error        %s<NL><NL> ",ERRORTEXT)
+      Writefile (L_LOGFILE,"========================================<NL><NL>")
+    }
+
+Procedure Definition
+
+procedure setup_for_image_file
+
+{
+  if scipsimage:items_as_image[g_image_array_position] one of "1" and
+     g_scan one of 1 then
+    {
+      if l_hold_copy_ctr one of 3 then
+        {
+          l_reinstatement_name[1] = programid + "i.pcl"
+          l_reinstatement_name[2] = programid + ".pcl"
+        }
+    }
+  else
+    if scipsimage_version5:items_as_image[g_image_array_position] one of "1" and
+       g_scan one of 1 then
+      {
+        if l_hold_copy_ctr one of 3 then
+          {
+            l_reinstatement_name[1] = programid + "i.pcl"
+            l_reinstatement_name[2] = programid + ".pcl"
+          }
+      }
+}
+
+procedure close_imageing_file
+
+{
+  if scipsimage:items_as_image[g_image_array_position] one of "1" and
+     g_scan one of 1 then
+    {
+      if l_hold_copy_ctr one of 3 then
+        {
+          closefile(l_reinstatement_name[1])
+          do add_image_header
+          --I need to reset the l_reinstatement to the orginal file that has the batch run after the home office
+          -- copy has been imaged
+          l_reinstatement_name[1] = programid + ".pcl"
+          l_reinstatement_name[2] = programid + "i.pcl"
+        }
+    }
+  else
+    if scipsimage_version5:items_as_image[g_image_array_position] one of "1" and
+       g_scan one of 1 then
+      {
+        if l_hold_copy_ctr one of 3 then
+          {
+            write ("%c%s%s",05001,"scipsimage:items_as_image[7] = ",scipsimage_version5:items_as_image[7])
+            Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+            closefile(l_reinstatement_name[1])
+            do add_image_header_version5
+            --I need to reset the l_reinstatement to the orginal file that has the batch run after the home office
+            -- copy has been imaged
+            l_reinstatement_name[1] = programid + ".pcl"
+            l_reinstatement_name[2] = programid + "i.pcl"
+          }
+      }
+}
+
+Procedure PROCESS_QUEUE
+
+{
+  -- new document processing system interface
+  L_SFS_CODE = "SFS"
+  Access SFSDEFAULT,
+     Set SFSDEFAULT:SFS_CODE = L_SFS_CODE
+  -- these need to be assigned prior to the include file
+  I_INVOICE_NAME  = l_reinstatement_name[1]
+  I_COMPANY_ID    = SFSDEFAULT:COMPANY_ID
+  I_REPORT_DEVICE = G_REPORT_DEVICE
+  I_STARTING_DATE = G_STARTING_DATE
+  I_ENDING_DATE   = G_ENDING_DATE
+  I_RUN_MODE      = G_RUN_MODE
+  Include "sdpqueue.pro"
+}
+
+Procedure NEW_NOTICES
+
+{
+  L_HOLD_AGENT_NO   = 0
+  L_FIRST_TIME      = "Y"
+  L_COMPANY         = ""
+  L_TOTALS_PAGE     = "N"
+  L_COPIES_REQUIRED = 0
+  L_COUNTER         = 0
+  Deletefile(l_reinstatement_name[1])
+  Writefile(l_reinstatement_name[1],"%s<NL>",L_RESET)  -- reset the printer
+  Writefile(l_reinstatement_name[1],"%s<NL>","<033>&l2A")  -- set to letter size
+  L_HOLD_AGENT_NO = 0
+  L_LINES_PRINTED = 0 -- to track the lines being printed
+  L_PAGES_CTR     = 0
+  L_COPY_CTR      = 0 -- this is only to control the # of stmts for testing, remove for live
+
+
+  Access ARSCANCEL,
+     Set ARSCANCEL:COMPANY_ID = L_COMPANY, Approximate
+
+  While ARSCANCEL:ERRORNUMBER = 0
+    {
+       l_another_lapse = "N"
+       access arscancel_alt, set arscancel_alt:company_id  = arscancel:company_id,
+                                 arscancel_alt:policy_no   = arscancel:policy_no, generic
+
+       while arscancel_alt:company_id = arscancel:company_id and
+             arscancel_alt:policy_no  = arscancel:policy_no
+               {
+                 If ARSCANCEL_alt:CX_STATUS = "P" And
+                    ARSCANCEL_alt:TRANS_DATE >= G_STARTING_DATE And
+                    ARSCANCEL_alt:TRANS_DATE <= G_ENDING_DATE Then
+                     {
+                      l_another_lapse = "Y"
+                     }
+                next arscancel_alt
+                }
+
+
+      L_COUNTER = L_COUNTER + 1
+      If L_COUNTER Mod 100 = 0 Then
+        {
+          write ("<14>")
+          Write ("%c%s%n",05010,"Counter = ",L_COUNTER)
+        }
+
+      If ARSCANCEL:CX_STATUS = "R" And
+         l_another_lapse one of "N" and
+         ARSCANCEL:TRANS_DATE >= G_STARTING_DATE And
+         ARSCANCEL:TRANS_DATE <= G_ENDING_DATE Then
+        {
+-- print rescind on audit field has to be not checked in arscontrol2
+-- if they want to print a recind on an audit cancellation.
+         if (arscancel:trans_code not one of 15) or
+             (arscontrol2:print_rescind_on_audit = 0 and
+             arscancel:trans_code one of 15) then
+          {
+
+
+          If L_FIRST_TIME = "Y" Then
+            {
+              L_FIRST_TIME = "N"
+              L_HOLD_COMPANY_ID       = ARSCANCEL:COMPANY_ID
+              L_HOLD_POLICY_NO        = ARSCANCEL:POLICY_NO
+              L_HOLD_AGENT_NO         = ARSCANCEL:AGENT_NO
+              L_HOLD_LINE_OF_BUSINESS = ARSCANCEL:LINE_OF_BUSINESS
+              L_HOLD_PAYMENT_PLAN     = ARSCANCEL:PAYMENT_PLAN
+              L_HOLD_CHECK_REFERENCE  = ARSCANCEL:CHECK_REFERENCE
+              L_HOLD_EFF_DATE         = ARSCANCEL:CX_EFF_DATE
+              L_PAGES_CTR = 1
+              L_TOTAL_PAID = 0.00
+              Do GET_CURRENT_SFPNAME
+              Access SFPNAME,
+                 Set SFPNAME:POLICY_NO    = L_POLICY_NO,
+                     SFPNAME:POL_YEAR     = L_POL_YEAR,
+                     SFPNAME:END_SEQUENCE = L_END_SEQUENCE
+
+              L_COPY_CTR = 3 -- start at 3 since this is a fixed number
+              Do GET_NUMBER_OF_COPIES
+            } -- end of l_first_time = Y
+
+          --force the notice effective date to be the last cx_eff_date for
+          --the policy in arscancel
+          If L_HOLD_POLICY_NO = ARSCANCEL:POLICY_NO And
+             L_HOLD_EFF_DATE <  ARSCANCEL:CX_EFF_DATE Then
+            {
+              L_HOLD_EFF_DATE = ARSCANCEL:CX_EFF_DATE
+            }
+          If L_HOLD_POLICY_NO <> ARSCANCEL:POLICY_NO Then
+            {
+              For L_SUB = 1 To L_COPY_CTR  --loop here for the number of copies needed
+                {
+                  L_HOLD_COPY_CTR = L_SUB
+                  Do EJECT_PAGE
+
+                  write ("<014>")
+                  write ("%c%s%n",01001,"Policy Number                = ", l_hold_policy_no)
+                  write ("%c%s%n",03001,"copy ctr                     = ", l_copy_ctr)
+                  write ("%c%s%s",05001,"scipsimage:items_as_image[7] = ",scipsimage_version5:items_as_image[7])
+                  Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+
+                  do setup_for_image_file
+                  Do PRINT_FORM
+                  L_LINES_PRINTED = 0
+                  L_V_POSITION    = 1800
+                  do print_detail_line
+                  do close_imageing_file
+                } -- end of loop for l_sub = 1 to l_copy_ctr
+              Do GET_CURRENT_SFPNAME
+              Access SFPNAME,
+                 Set SFPNAME:POLICY_NO    = L_POLICY_NO,
+                     SFPNAME:POL_YEAR     = L_POL_YEAR,
+                     SFPNAME:END_SEQUENCE = L_END_SEQUENCE
+              L_COPY_CTR = 3 -- start at 3 since this is a fixed number
+              Do GET_NUMBER_OF_COPIES
+              L_HOLD_COPY_CTR = 1
+              L_HOLD_COMPANY_ID       = ARSCANCEL:COMPANY_ID
+              L_HOLD_POLICY_NO        = ARSCANCEL:POLICY_NO
+              L_HOLD_AGENT_NO         = ARSCANCEL:AGENT_NO
+              L_HOLD_LINE_OF_BUSINESS = ARSCANCEL:LINE_OF_BUSINESS
+              L_HOLD_PAYMENT_PLAN     = ARSCANCEL:PAYMENT_PLAN
+              L_HOLD_CHECK_REFERENCE  = ARSCANCEL:CHECK_REFERENCE
+              L_HOLD_EFF_DATE         = ARSCANCEL:CX_EFF_DATE
+              L_TOTAL_PAID = 0.00
+            }                                   -- end of policy number control break
+          L_TOTAL_PAID = L_TOTAL_PAID + ARSCANCEL:AMOUNT_PAST_DUE
+         }
+        }                                       -- end of status = "R" and date checking
+      Next ARSCANCEL
+    }                                           -- end of the while stmt
+  Closefile(l_reinstatement_name[2])
+}                                               -- } of new_invoices
+
+Procedure NEW_NOTICES_SELECT
+
+{
+  L_HOLD_AGENT_NO = 0
+  L_FIRST_TIME = "Y"
+  L_COMPANY = ""
+  L_TOTALS_PAGE = "N"
+  L_COPIES_REQUIRED = 0
+
+  Deletefile(l_reinstatement_name[1])
+  Writefile(l_reinstatement_name[1],"%s<NL>",L_RESET)  -- reset the printer
+  Writefile(l_reinstatement_name[1],"%s<NL>","<033>&l2A")  -- set to letter size
+
+  L_HOLD_AGENT_NO = 0
+  L_LINES_PRINTED = 0 -- to track the lines being printed
+  L_PAGES_CTR     = 0
+  L_COPY_CTR      = 0 -- this is only to control the # of stmts for testing, remove for live
+
+  Access ARSCANCEL,
+     Set ARSCANCEL:COMPANY_ID = L_COMPANY, Approximate
+
+  While ARSCANCEL:COMPANY_ID <> "<0>" -- NULL aka EOF
+    {
+      If ARSCANCEL:CX_STATUS = "R" And
+         ARSCANCEL:TRANS_DATE >= G_STARTING_DATE And
+         ARSCANCEL:TRANS_DATE <= G_ENDING_DATE And
+         ARSCANCEL:POLICY_NO  = G_POLICY_NO  Then
+        {
+
+          If L_FIRST_TIME = "Y" Then
+            {
+              L_FIRST_TIME = "N"
+              L_HOLD_COMPANY_ID       = ARSCANCEL:COMPANY_ID
+              L_HOLD_POLICY_NO        = ARSCANCEL:POLICY_NO
+              L_HOLD_AGENT_NO         = ARSCANCEL:AGENT_NO
+              L_HOLD_LINE_OF_BUSINESS = ARSCANCEL:LINE_OF_BUSINESS
+              L_HOLD_PAYMENT_PLAN     = ARSCANCEL:PAYMENT_PLAN
+              L_HOLD_CHECK_REFERENCE  = ARSCANCEL:CHECK_REFERENCE
+              L_HOLD_EFF_DATE         = ARSCANCEL:CX_EFF_DATE
+              L_PAGES_CTR = 1
+              L_TOTAL_PAID = 0.00
+              Do GET_CURRENT_SFPNAME
+              Access SFPNAME,
+                 Set SFPNAME:POLICY_NO    = L_POLICY_NO,
+                     SFPNAME:POL_YEAR     = L_POL_YEAR,
+                     SFPNAME:END_SEQUENCE = L_END_SEQUENCE
+/*              Write ("<014>")
+              Write ("%c%s",01001,"IN NEW NOTICES SELECT - arsup910 ")
+              write ("%c%s%n",03001,"g_scan = ",g_scan)
+              write ("%c%s%s",05001,"items as image = ",scipsimage:items_as_image[g_image_array_position])
+              Read (23,1,"NEW SELECT ",L_ENTER,1)
+*/
+
+              L_COPY_CTR = 3 -- start at 3 since this is a fixed number
+              Do GET_NUMBER_OF_COPIES
+            }
+          If L_HOLD_POLICY_NO <> ARSCANCEL:POLICY_NO Then
+            {
+              For L_SUB = 1 To L_COPY_CTR  --loop here for the number of copies needed
+                {
+                  L_HOLD_COPY_CTR = L_SUB
+                  Do EJECT_PAGE
+                  Do setup_for_image_file
+                  Do PRINT_FORM
+                  L_LINES_PRINTED = 0
+                  L_V_POSITION    = 1800
+                  Do print_detail_line
+                  Do close_imageing_file
+                } -- end of for loop l_sub
+              Do GET_CURRENT_SFPNAME
+              Access SFPNAME,
+                 Set SFPNAME:POLICY_NO    = L_POLICY_NO,
+                     SFPNAME:POL_YEAR     = L_POL_YEAR,
+                     SFPNAME:END_SEQUENCE = L_END_SEQUENCE
+
+              L_COPY_CTR = 3 -- start at 3 since this is a fixed number
+              Do GET_NUMBER_OF_COPIES
+              L_HOLD_COPY_CTR = 1
+              L_HOLD_COMPANY_ID       = ARSCANCEL:COMPANY_ID
+              L_HOLD_POLICY_NO        = ARSCANCEL:POLICY_NO
+              L_HOLD_AGENT_NO         = ARSCANCEL:AGENT_NO
+              L_HOLD_LINE_OF_BUSINESS = ARSCANCEL:LINE_OF_BUSINESS
+              L_HOLD_PAYMENT_PLAN     = ARSCANCEL:PAYMENT_PLAN
+              L_HOLD_CHECK_REFERENCE  = ARSCANCEL:CHECK_REFERENCE
+              L_HOLD_EFF_DATE         = ARSCANCEL:CX_EFF_DATE
+              L_TOTAL_PAID = 0.00
+            }                         -- end of policy number control break
+          L_TOTAL_PAID = L_TOTAL_PAID + ARSCANCEL:AMOUNT_PAST_DUE
+        }                             -- end of status = "R" and date checking
+      Next ARSCANCEL
+    }                                 -- end of while stmt
+  Closefile(l_reinstatement_name[1])
+}                                     -- end of new_invoices_select
+
+/* *****************  Printing Invoice Form ************************** */
+Procedure PRINT_FORM
+{
+L_TOTALS_PAGE = "N"
+L_NOTICE_TYPE = "RS"
+
+/*  setup access to all external files here */
+
+Access SFSCOMPANY,
+   Set SFSCOMPANY:COMPANY_ID = L_HOLD_COMPANY_ID, Approximate
+
+Access ARSCONTROL,
+   Set ARSCONTROL:COMPANY_ID = L_HOLD_COMPANY_ID, Approximate
+
+Access SFSAGENT,
+   Set SFSAGENT:COMPANY_ID = L_HOLD_COMPANY_ID,
+       SFSAGENT:AGENT_NO   = L_HOLD_AGENT_NO, Generic
+
+Access SFSLINE,
+   Set SFSLINE:COMPANY_ID       = L_HOLD_COMPANY_ID,
+       SFSLINE:LINE_OF_BUSINESS = L_HOLD_LINE_OF_BUSINESS, Approximate
+
+Access ARSPAYPLAN,
+   Set ARSPAYPLAN:COMPANY_ID       = L_HOLD_COMPANY_ID,
+       ARSPAYPLAN:LINE_OF_BUSINESS = L_HOLD_LINE_OF_BUSINESS,
+       ARSPAYPLAN:PAYMENT_PLAN     = L_HOLD_PAYMENT_PLAN, Approximate
+
+Access ARSCHKSU,
+   Set ARSCHKSU:COMPANY_ID = L_HOLD_COMPANY_ID,
+       ARSCHKSU:CHECK_REFERENCE = L_HOLD_CHECK_REFERENCE
+
+Access ARSCXNOTICE,
+   Set ARSCXNOTICE:COMPANY_ID = L_HOLD_COMPANY_ID,
+       ARSCXNOTICE:NOTICE_TYPE = L_NOTICE_TYPE
+/* end of access setup */
+
+Writefile(l_reinstatement_name[1],"<033>&a90h0V") -- CAP to top
+Writefile(l_reinstatement_name[1],"%s<NL>",L_ARIAL)
+
+/* draw the box around the form */
+
+     -- left and right verticle lines --          2900 replaced by 3050
+     -- was 2900
+Writefile(l_reinstatement_name[1],"<033>&a90h0V<033>*c5a3000b0P<NL>")
+Writefile(l_reinstatement_name[1],"<033>&a5670h0V<033>*c5a3000b0P")
+Writefile(l_reinstatement_name[1],"<033>&a0h0V<NL>") -- CAP
+
+     -- top and bottom horizontal lines --
+Writefile(l_reinstatement_name[1],"<033>&a90h0V<033>*c5580h5v0P<NL>")
+-- was 6960
+Writefile(l_reinstatement_name[1],"<033>&a90h7200V<033>*c5580h5v0P")
+Writefile(l_reinstatement_name[1],"<033>&a0h0V<NL>") -- CAP
+
+/* draw lines within the form */
+Writefile(l_reinstatement_name[1],"<033>&a90h1440V<033>*c5580h5v0P<NL>") -- 1st line
+Writefile(l_reinstatement_name[1],"<033>&a90h1620V<033>*c5580h5v0P<NL>") -- 2nd line
+Writefile(l_reinstatement_name[1],"<033>&a90h1800V<033>*c5580h5v0P<NL>") -- 3rd line
+-- was 5390
+Writefile(l_reinstatement_name[1],"<033>&a90h5040V<033>*c5580h5v0P<NL>") -- 4th line
+Writefile(l_reinstatement_name[1],"<033>&a90h1620V<033>*c2325a75b5g2P<NL>") -- shading
+
+/* draw small verticle lines in headings */
+Writefile(l_reinstatement_name[1],"<033>&a810h1620V<033>*c5a80b0P<NL>")  -- 1st line
+Writefile(l_reinstatement_name[1],"<033>&a1530h1620V<033>*c5a80b0P<NL>") -- 2nd line
+Writefile(l_reinstatement_name[1],"<033>&a3780h1620V<033>*c5a80b0P<NL>") -- 3rd line
+Writefile(l_reinstatement_name[1],"<033>&a4680h1620V<033>*c5a80b0P<NL>") -- 4th line
+
+/* draw pay this amount box */
+-- was 5390
+Writefile(l_reinstatement_name[1],"<033>&a2800h5040V<033>*c5a150b0P<NL>") -- left side verticle line
+-- was 5750
+Writefile(l_reinstatement_name[1],"<033>&a2800h5400V<033>*c2880h5v0P<NL>") -- bottom of box
+
+/* draw fold tick mark */
+Writefile(l_reinstatement_name[1],"<033>&a90h4635V<033>*c150h5v0P<NL>")
+
+/* print arscontrol items */
+Writefile(l_reinstatement_name[1],"%s<NL>",L_ARIAL)
+-- was 5040
+Writefile(l_reinstatement_name[1],"<033>&a180h4770V")
+Writefile(l_reinstatement_name[1],"%s",ARSCONTROL:INVOICE_PAYTO+"<NL>")
+-- was 5040
+Writefile(l_reinstatement_name[1],"<033>&a3240h4770V")
+Writefile(l_reinstatement_name[1],"%s",ARSCONTROL:INVOICE_COMPANY+"<NL>")
+Writefile(l_reinstatement_name[1],"<033>&a3040h5160V")
+Writefile(l_reinstatement_name[1],"%s",ARSCONTROL:INVOICE_SLOGAN+"<NL>")
+-- was 5390
+Writefile(l_reinstatement_name[1],"<033>&a180h5040V")
+Writefile(l_reinstatement_name[1],"%s",ARSCONTROL:INVOICE_SEPERATOR+"<NL>")
+Writefile(l_reinstatement_name[1],"<033>&a2800h5940V<NL>")
+Writefile(l_reinstatement_name[1],"%s<NL>",ARSCONTROL:INVOICE_PAYMENT_OPTIONS)
+Writefile(l_reinstatement_name[1],"%s<NL>",L_ARIAL_ITALIC_12)
+Writefile(l_reinstatement_name[1],"<033>&a2800h6060V<NL>")
+Writefile(l_reinstatement_name[1],"%s<NL>",ARSCONTROL:INVOICE_CLOSING)
+Writefile(l_reinstatement_name[1],"%s<NL>",L_ARIAL)
+
+/* print cancellation acknowledgement information */
+L_V_POSITION              = 3720
+L_H_POSITION              =  450
+L_AGENT_PRODUCER_POSITION =  1170  -- prints the variable or word "Agent:" in the correct
+                                   -- position in the paragraph below
+
+Writefile(l_reinstatement_name[1],"%s<NL>",L_ARIAL_ITALIC_12)
+Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) +"h" + Trun(Str(L_V_POSITION)+"V"))
+If ARSCXNOTICE:HEADING_WORDING <> "" Then
+{
+    Writefile(l_reinstatement_name[1],"%s<NL>","Rescinding Notice, Payment has been received.  Your policy is reinstated with")
+}
+Else
+{
+    Writefile(l_reinstatement_name[1],"%s<NL>","Reinstatement Notice, Payment has been received.  Your policy is reinstated with")
+}
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) +"h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"%s<NL>","no lapse in coverage unless payment by check is not honored and rejected by the")
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) +"h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"%s<NL>","bank.  Then our cancellation notice already mailed to you continues to apply and")
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) +"h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"%s%s<NL>","Coverage terminates according to that notice.  Original Notice Effective Date: ",Str(L_HOLD_EFF_DATE,"MM/DD/YYYY"))
+L_V_POSITION = L_V_POSITION + 240
+Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) +"h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"%s<NL>","Contact your ")
+access arscontrol2,
+   set arscontrol2:company_id = sfsdefault:company_id, approximate
+
+if ARScontrol2:AGENT_PRODUCER <> "" then
+  {
+    Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_AGENT_PRODUCER_POSITION)) +"h" + Trun(Str(L_V_POSITION)+"V"))
+    Writefile(l_reinstatement_name[1],"%s",trun(arscontrol2:AGENT_PRODUCER))
+  }
+else
+  {
+    Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_AGENT_PRODUCER_POSITION)) +"h" + Trun(Str(L_V_POSITION)+"V"))
+    Writefile(l_reinstatement_name[1],"%s","agent")
+  }
+Writefile(l_reinstatement_name[1],"%s"," at the address and phone number above for assistance.")
+
+/* print the fixed literals */
+Writefile(l_reinstatement_name[1],"%s",L_ARIAL)
+
+Writefile(l_reinstatement_name[1],"<033>&a3420h1155V<NL>")
+Writefile(l_reinstatement_name[1],"Policy Type:<NL>")
+Writefile(l_reinstatement_name[1],"<033>&a3420h1290V<NL>")
+Writefile(l_reinstatement_name[1],"%s<NL>",SFSLINE:DESCRIPTION)
+Writefile(l_reinstatement_name[1],"<033>&a180h1455V<NL>")
+Writefile(l_reinstatement_name[1],"Run Date: %d<NL>",TODAYSDATE)
+Writefile(l_reinstatement_name[1],"<033>&a2620h1455V<NL>")
+Writefile(l_reinstatement_name[1],"Payment Plan: %s<NL>",ARSPAYPLAN:DESCRIPTION)
+
+Writefile(l_reinstatement_name[1],"%s",L_ARIAL_BOLD)
+L_V_POSITION = 1755
+
+Writefile(l_reinstatement_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"Reference<NL>")
+
+Writefile(l_reinstatement_name[1],"%s","<033>&a910h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"Number<NL>")
+
+Writefile(l_reinstatement_name[1],"%s","<033>&a2100h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"Description")
+
+Writefile(l_reinstatement_name[1],"%s","<033>&a3990h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1]," Date<NL>")
+
+Writefile(l_reinstatement_name[1],"%s","<033>&a4920h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"Amount<NL>")
+
+-- print the company name and address here
+
+Writefile(l_reinstatement_name[1],"%s",L_ARIAL)
+L_V_POSITION = 5330
+
+Access SFSCOMPANY,  Set SFSCOMPANY:COMPANY_ID  = L_HOLD_COMPANY_ID
+Access SFSCOMPMAIL, Set SFSCOMPMAIL:COMPANY_ID = L_HOLD_COMPANY_ID
+
+If SFSCOMPANY:USE_OTHER_MAILING = 0 Then -- use primary mailing address
+{
+-- was 180h - per Bob D. on 12/4/2018 this needs to be moved to the left
+Writefile(l_reinstatement_name[1],"%s","<033>&a120h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"%s",Trun(SFSCOMPANY:NAME[1])+"<NL>"+"<CR>")
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_reinstatement_name[1],"%s","<033>&a120h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"%s",Trun(SFSCOMPANY:NAME[2])+"<NL>"+"<CR>")
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_reinstatement_name[1],"%s","<033>&a120h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"%s",Trun(SFSCOMPANY:ADDRESS[1])+"<NL>"+"<CR>")
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_reinstatement_name[1],"%s","<033>&a120h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"%s",Trun(SFSCOMPANY:CITY)+", "+
+                              Trun(SFSCOMPANY:STR_STATE) +
+                              "  " + Str(Val(SFSCOMPANY:STR_ZIPCODE),"99999-9999") + "<NL>")
+}
+Else If SFSCOMPANY:USE_OTHER_MAILING = 1 Then -- use optional mailing address
+{
+
+Writefile(l_reinstatement_name[1],"%s","<033>&a120h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"%s",Trun(SFSCOMPMAIL:NAME[1])+"<NL>"+"<CR>")
+If SFSCOMPMAIL:NAME[2] <> "" Then
+{
+    L_V_POSITION = L_V_POSITION + 120
+    Writefile(l_reinstatement_name[1],"%s","<033>&a120h" + Trun(Str(L_V_POSITION)+"V"))
+    Writefile(l_reinstatement_name[1],"%s",Trun(SFSCOMPMAIL:NAME[2])+"<NL>"+"<CR>")
+}
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_reinstatement_name[1],"%s","<033>&a120h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"%s",Trun(SFSCOMPMAIL:ADDRESS[1])+"<NL>"+"<CR>")
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_reinstatement_name[1],"%s","<033>&a120h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"%s",Trun(SFSCOMPMAIL:CITY)+", "+
+                              Trun(SFSCOMPMAIL:STR_STATE) +
+                              "  " + Str(Val(SFSCOMPMAIL:STR_ZIPCODE),"99999-9999") + "<NL>")
+}
+
+Writefile (l_reinstatement_name[1],"%s<NL>",L_ARIAL_ITALIC_BOLD_16)
+Writefile (l_reinstatement_name[1],"<033>&a1700h0V")
+If ARSCXNOTICE:HEADING_WORDING <> "" Then
+{
+    Writefile (l_reinstatement_name[1],"%s%s",Trun(ARSCXNOTICE:HEADING_WORDING),"<nl>")
+}
+Else
+{
+    Writefile (l_reinstatement_name[1],"REINSTATEMENT NOTICE<nl>")
+}
+
+/* =====================  Insured =========================   */
+Writefile (l_reinstatement_name[1],"%s<NL>",L_ARIAL_BOLD)
+
+Writefile(l_reinstatement_name[1],"<033>&a180h90V")
+Writefile(l_reinstatement_name[1],"   Insured<NL>")
+Writefile(l_reinstatement_name[1],"%s<NL>",L_ARIAL)
+Writefile (l_reinstatement_name[1],"<033>&a180h210V")
+Writefile(l_reinstatement_name[1],"%s", Trun(SFSLINE:ALPHA) + str(val(Str(L_HOLD_POLICY_NO,"ZZZZZZZZZ")))+"<NL>")
+
+L_LOOP_CTR = 0
+L_V_POSITION = 210
+For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the name
+{
+    If SFPNAME:NAME[L_LOOP_CTR] <> "" Then
+    {
+        L_V_POSITION = L_V_POSITION + 120
+        Writefile(l_reinstatement_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+        I_NAME=SFPNAME:NAME[L_LOOP_CTR]
+        Do REVERSE_NAME
+        Writefile(l_reinstatement_name[1],"%s",I_REV_NAME + "<NL>")
+    }
+}
+
+For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the address
+{
+    If SFPNAME:ADDRESS[L_LOOP_CTR] <> "" Then
+    {
+        L_V_POSITION = L_V_POSITION + 120
+        Writefile(l_reinstatement_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+        Writefile(l_reinstatement_name[1],"%s",SFPNAME:ADDRESS[L_LOOP_CTR] + "<NL>")
+    }
+}
+
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_reinstatement_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+if (val(sfpname:str_zipcode[6,9]) = 0) then
+{
+Writefile(l_reinstatement_name[1],"%s",Trun(SFPNAME:CITY) + ", " +
+                              Trun(SFPNAME:STR_STATE) + "  " +
+                              Str(Val(SFPNAME:STR_ZIPCODE[1,5]),"99999")) --  + "<NL>")
+}
+else
+{
+Writefile(l_reinstatement_name[1],"%s",Trun(SFPNAME:CITY) + ", " +
+                              Trun(SFPNAME:STR_STATE) + "  " +
+                              Str(Val(SFPNAME:STR_ZIPCODE),"99999-9999")) -- + "<NL>")
+}
+
+/* =====================   AGENT  =========================   */
+
+Writefile(l_reinstatement_name[1],"%s<NL>",L_ARIAL_BOLD)
+Writefile(l_reinstatement_name[1],"<033>&a3130h90V")
+if ARScontrol2:AGENT_PRODUCER <> "" then
+  {
+    Writefile(l_reinstatement_name[1],"%s",trun(arscontrol2:AGENT_PRODUCER))
+  }
+else
+  {
+    Writefile(l_reinstatement_name[1],"%s","Agent: ")
+  }
+
+Writefile(l_reinstatement_name[1],"%s",Str(L_HOLD_AGENT_NO,"ZZZZ")+"<NL>")
+Writefile(l_reinstatement_name[1],"%s<NL>",L_ARIAL)
+
+L_LOOP_CTR = 0
+L_V_POSITION = 90
+For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the name
+{
+
+    If SFSAGENT:NAME[L_LOOP_CTR] <> "" Then
+    {
+      if len(trun(sfsagent:name[l_loop_ctr])) > 40 then
+       {
+        Writefile(l_reinstatement_name[1],"%s<NL>",L_arial_8)
+       }
+      else
+       {
+        Writefile(l_reinstatement_name[1],"%s<NL>",L_ARIAL)
+       }
+      L_V_POSITION = L_V_POSITION + 120
+      Writefile(l_reinstatement_name[1],"%s","<033>&a3130h" + Trun(Str(L_V_POSITION)+"V"))
+      Writefile(l_reinstatement_name[1],"%s",SFSAGENT:NAME[L_LOOP_CTR] + "<NL>")
+    }
+}
+Writefile(l_reinstatement_name[1],"%s<NL>",L_ARIAL)
+
+For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the address
+{
+    If SFSAGENT:ADDRESS[L_LOOP_CTR] <> "" Then
+    {
+        L_V_POSITION = L_V_POSITION + 120
+        Writefile(l_reinstatement_name[1],"%s","<033>&a3130h" + Trun(Str(L_V_POSITION)+"V"))
+        Writefile(l_reinstatement_name[1],"%s",SFSAGENT:ADDRESS[L_LOOP_CTR] + "<NL>")
+    }
+}
+
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_reinstatement_name[1],"%s","<033>&a3130h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"%s",Trun(SFSAGENT:CITY) + ", " +
+                              Trun(SFSAGENT:STR_STATE) + "  " +
+                              Str(Val(SFSAGENT:STR_ZIPCODE),"99999-9999") + "<NL>")
+L_V_POSITION = L_V_POSITION + 120
+Writefile (l_reinstatement_name[1],"%s","<033>&a3130h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile (l_reinstatement_name[1],"%s",Str(Val(SFSAGENT:TELEPHONE[1]),"(999) 999-9999") + "<NL>")
+
+/* copy literal */
+
+Switch(L_HOLD_COPY_CTR)
+    Case 1  : L_COPY_LIT = "Insured Copy       "
+    Case 2  : if ARScontrol2:AGENT_PRODUCER <> "" then
+                {
+                  L_COPY_LIT = trun((arscontrol2:AGENT_PRODUCER)+ "Copy")
+                }
+              Else
+                {
+                  L_COPY_LIT = "Agent Copy         "
+                }
+    Case 3  : L_COPY_LIT = "Home Office Copy   "
+    Default : L_COPY_LIT = "Mortgagee Copy     "
+}
+
+L_V_POSITION = 0
+Writefile (l_reinstatement_name[1],"%s","<033>&a4860h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile (l_reinstatement_name[1],"%s<NL>",Trun(L_COPY_LIT))
+
+/* bottom of invoce name and address */
+
+If L_HOLD_COPY_CTR <= 3 Then
+{
+
+L_LOOP_CTR = 0
+--L_V_POSITION = 6340
+L_V_POSITION = 6275
+L_H_POSITION = 540
+
+For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the name
+{
+    If SFPNAME:NAME[L_LOOP_CTR] <> "" Then
+    {
+        L_V_POSITION = L_V_POSITION + 120
+        Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+        I_NAME=SFPNAME:NAME[L_LOOP_CTR]
+        Do REVERSE_NAME
+        Writefile(l_reinstatement_name[1],"%s",I_REV_NAME + "<NL>")
+    }
+}
+
+For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the address
+{
+    If SFPNAME:ADDRESS[L_LOOP_CTR] <> "" Then
+    {
+        L_V_POSITION = L_V_POSITION + 120
+--        Writefile(l_reinstatement_name[1],"%s","<033>&a540h" + Trun(Str(L_V_POSITION)+"V"))
+        Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+        Writefile(l_reinstatement_name[1],"%s",SFPNAME:ADDRESS[L_LOOP_CTR] + "<NL>")
+    }
+}
+
+L_V_POSITION = L_V_POSITION + 120
+-- Writefile(l_reinstatement_name[1],"%s","<033>&a540h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+if val(sfpname:str_zipcode[6,9]) = 0 then
+{
+Writefile(l_reinstatement_name[1],"%s",Trun(SFPNAME:CITY) + ", " +
+                              Trun(SFPNAME:STR_STATE) + "  " +
+                              Str(SFPNAME:STR_ZIPCODE[1,5],"99999"))
+}
+else
+{
+Writefile(l_reinstatement_name[1],"%s",Trun(SFPNAME:CITY) + ", " +
+                              Trun(SFPNAME:STR_STATE) + "  " +
+                              Str(SFPNAME:STR_ZIPCODE,"99999-9999"))
+}
+
+} -- } of if l_hold_copy_ctr <= 3
+
+If L_HOLD_COPY_CTR >= 4 and
+   l_sfpname_policy_no[l_hold_copy_ctr] > 0 Then
+ {
+  L_TEMP_POLICY_NO    = L_SFPNAME_POLICY_NO[L_HOLD_COPY_CTR]
+  L_TEMP_POL_YEAR     = L_SFPNAME_POL_YEAR[L_HOLD_COPY_CTR]
+  L_TEMP_END_SEQUENCE = L_SFPNAME_END_SEQUENCE[L_HOLD_COPY_CTR]
+  L_TEMP_PREM_NO      = L_SFPNAME_PREM_NO[L_HOLD_COPY_CTR]
+  L_TEMP_BUILD_NO     = L_SFPNAME_BUILD_NO[L_HOLD_COPY_CTR]
+  L_TEMP_SUB_CODE     = L_SFPNAME_SUB_CODE[L_HOLD_COPY_CTR]
+
+    Access SFPSUPP, Set SFPSUPP:POLICY_NO    = L_TEMP_POLICY_NO,
+                        SFPSUPP:POL_YEAR     = L_TEMP_POL_YEAR,
+                        SFPSUPP:END_SEQUENCE = L_TEMP_END_SEQUENCE,
+                        SFPSUPP:PREM_NO      = L_TEMP_PREM_NO,
+                        SFPSUPP:BUILD_NO     = L_TEMP_BUILD_NO,
+                        SFPSUPP:SUB_CODE     = L_TEMP_SUB_CODE
+
+  If SFPSUPP:POLICY_NO    = L_TEMP_POLICY_NO And
+     SFPSUPP:POL_YEAR     = L_TEMP_POL_YEAR And
+     SFPSUPP:END_SEQUENCE = L_TEMP_END_SEQUENCE And
+     SFPSUPP:PREM_NO      = L_TEMP_PREM_NO And
+     SFPSUPP:BUILD_NO     = L_TEMP_BUILD_NO And
+     SFPSUPP:SUB_CODE     = L_TEMP_SUB_CODE Then
+     {
+
+
+       L_COMPANY = SFPNAME:COMPANY_ID
+
+       Access SFSMORT, Set SFSMORT:COMPANY_ID  = L_COMPANY,
+                           SFSMORT:MORTGAGE_ID = SFPSUPP:MORTGAGE_ID,Generic
+
+       L_LOOP_CTR = 0
+       L_V_POSITION = 6340
+       L_H_POSITION = 540
+
+       If SFSMORT:COMPANY_ID = L_COMPANY And
+          SFSMORT:MORTGAGE_ID = SFPSUPP:MORTGAGE_ID Then
+       {
+         For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the name
+          {
+           If SFSMORT:NAME[L_LOOP_CTR] <> "" Then
+           {
+               L_V_POSITION = L_V_POSITION + 120
+       --        Writefile(l_reinstatement_name[1],"%s","<033>&a540h" + Trun(Str(L_V_POSITION)+"V"))
+               Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+               I_NAME=SFSMORT:NAME[L_LOOP_CTR]
+               Do REVERSE_NAME
+               Writefile(l_reinstatement_name[1],"%s",I_REV_NAME + "<NL>")
+           }
+          }
+
+         For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the address
+          {
+           If SFSMORT:ADDRESS[L_LOOP_CTR] <> "" Then
+           {
+               L_V_POSITION = L_V_POSITION + 120
+       --        Writefile(l_reinstatement_name[1],"%s","<033>&a540h" + Trun(Str(L_V_POSITION)+"V"))
+               Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+               Writefile(l_reinstatement_name[1],"%s",SFSMORT:ADDRESS[L_LOOP_CTR] + "<NL>")
+           }
+          }
+
+         L_V_POSITION = L_V_POSITION + 120
+       -- Writefile(l_reinstatement_name[1],"%s","<033>&a540h" + Trun(Str(L_V_POSITION)+"V"))
+         Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+         Writefile(l_reinstatement_name[1],"%s",Trun(SFSMORT:CITY) + ", " +
+                                     Trun(SFSMORT:STR_STATE) + "  " +
+                                     Str(SFSMORT:STR_ZIPCODE,"99999-9999"))
+
+
+       } -- } of sfsmort record exist checking
+       Else
+       {
+        For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the name
+        {
+           If SFPSUPP:NAME[L_LOOP_CTR] <> "" Then
+           {
+               L_V_POSITION = L_V_POSITION + 120
+       --        Writefile(l_reinstatement_name[1],"%s","<033>&a540h" + Trun(Str(L_V_POSITION)+"V"))
+               Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+               I_NAME=SFPSUPP:NAME[L_LOOP_CTR]
+               Do REVERSE_NAME
+               Writefile(l_reinstatement_name[1],"%s",I_REV_NAME + "<NL>")
+           }
+        }
+
+        For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the address
+        {
+           If SFPSUPP:ADDRESS[L_LOOP_CTR] <> "" Then
+           {
+               L_V_POSITION = L_V_POSITION + 120
+       --        Writefile(l_reinstatement_name[1],"%s","<033>&a540h" + Trun(Str(L_V_POSITION)+"V"))
+               Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+               Writefile(l_reinstatement_name[1],"%s",SFPSUPP:ADDRESS[L_LOOP_CTR] + "<NL>")
+           }
+        }
+
+        L_V_POSITION = L_V_POSITION + 120
+      -- Writefile(l_reinstatement_name[1],"%s","<033>&a540h" + Trun(Str(L_V_POSITION)+"V"))
+        Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+        Writefile(l_reinstatement_name[1],"%s",Trun(SFPSUPP:CITY) + ", " +
+                                 Trun(SFPSUPP:STR_STATE) + "  " +
+                                 Str(SFPSUPP:STR_ZIPCODE,"99999-9999"))
+     } -- } of sfpsupp record exist checking
+
+
+     access arscontrol2, set arscontrol2:company_id = arscontrol:company_id, approximate
+
+     if sfpsupp:account_no <> "" and arscontrol2:print_loan_no_bottom one of 1  then
+      {
+        /**** Account number information here ****/
+        L_V_POSITION = L_V_POSITION + 120
+        Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+        Writefile(l_reinstatement_name[1],"%s","LOAN NO.: " + sfpsupp:account_no + "<nl>")
+      }
+
+     } -- checking for policy_no, pol_year and end_sequence match
+
+} -- } of l_hold_copy_ctr >= 4
+
+/* Print policy Number on return Invoice */
+
+L_V_POSITION = 5940
+L_H_POSITION = 180
+
+Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+--Writefile(l_reinstatement_name[1],"%s","<033>&a2880h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"Policy Number: <NL>")
+
+L_H_POSITION = L_H_POSITION + 720
+Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+--Writefile(l_reinstatement_name[1],"%s","<033>&a3600h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_reinstatement_name[1],"%s", Trun(SFSLINE:ALPHA) + str(val(Str(L_HOLD_POLICY_NO,"ZZZZZZZZZ")))+"<NL>")
+
+Writefile(l_reinstatement_name[1],"%s<NL>",L_ARIAL_BOLD_14)
+
+L_V_POSITION = 5310
+L_H_POSITION = 3060
+Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+
+--Writefile(l_reinstatement_name[1],"%s<NL>","<033>&a2880h5100V<NL>")
+if arscontrol:company_id not one of "DELOS","GGUND" then
+{
+ Writefile(l_reinstatement_name[1],"%s<NL>",ARSCONTROL:INVOICE_PAY_AMOUNT)
+}
+L_H_POSITION = L_H_POSITION + 1440 -- 2.0" to the right
+Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+
+--Writefile(l_reinstatement_name[1],"%s<NL>","<033>&a4680h5100V<NL>")
+if arscontrol:company_id not one of "DELOS" then
+{
+Writefile(l_reinstatement_name[1],"%s<NL>",Str(0.00,"($ZZ,ZZZ,ZZZ.99)"))
+}
+
+If ARSCONTROL2:PRINT_RUN_DATE_ON_rescind One Of 1 Then
+Begin
+    Writefile (l_reinstatement_name[1],"%s<NL>",L_ARIAL_8)
+    L_V_POSITION = ARSCONTROL2:DATE_ON_INVOICE_V_POSITION
+    L_H_POSITION = ARSCONTROL2:DATE_ON_INVOICE_H_POSITION
+    Writefile(l_reinstatement_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+    Writefile(l_reinstatement_name[1],"%s",Str(TODAYSDATE,"MM/DD/YYYY")+ "-Rescinds ")
+End
+
+
+}
+
+Procedure EJECT_PAGE
+{
+
+    Writefile(l_reinstatement_name[1],"%s",L_FORMFEED+"<NL>")
+    Writefile(l_reinstatement_name[1],"%s",L_RESET + "<NL>")
+-- options are:
+--     1 = Executive
+--     2 = Letter
+--     3 = Legal
+--     4 = A4
+--     5 = Monarch
+--     6 = Commercial 10
+--     7 = International DL
+--     8 = International C5
+
+Writefile(l_reinstatement_name[1],"<033>&l2A")   -- set the printer to Letter, see above
+--Writefile(l_reinstatement_name[1],"<033>&k2G") -- set to cr=cr+lf, lf=lf, ff=ff
+--Writefile(l_reinstatement_name[1],"<033>&s0C") -- enable } of line wrap
+
+    L_PAGES_CTR = L_PAGES_CTR + 1
+
+}
+
+Procedure REVERSE_NAME
+{
+
+Include "sfsrevname7.pro"
+
+}
+
+Procedure GET_CURRENT_SFPNAME
+
+{
+if arscancel:pol_year <> 0000 then
+   l_pol_year  = arscancel:pol_year
+else
+   L_POL_YEAR     = Year(ARSCANCEL:EXP_DATE) - 1
+
+L_END_SEQUENCE = 0
+--write ("<014>")
+--write ("%c%s%d",2001,"arscancel exp date =    ",arscancel:exp_date)
+--write ("%c%s%n",3001,"l pol -year        =    ",l_pol_year)
+--Read (23,1,"in get current sfpname --- Press Enter to Continue ",L_ENTER,1)
+
+Access SFPNAME,
+   Set SFPNAME:POLICY_NO = ARSCANCEL:POLICY_NO,
+       SFPNAME:POL_YEAR  = L_POL_YEAR, Approximate
+
+While SFPNAME:POLICY_NO = ARSCANCEL:POLICY_NO And
+      SFPNAME:POL_YEAR  = L_POL_YEAR
+  {
+    L_POLICY_NO    = SFPNAME:POLICY_NO
+    L_END_SEQUENCE = SFPNAME:END_SEQUENCE
+    Next SFPNAME
+  }
+}  -- } of get_current_sfpname procedure
+
+Procedure GET_NUMBER_OF_COPIES
+
+{
+  For L_SFPNAME_LOOP_CTR = 1 To 200
+    {
+      L_SFPNAME_POLICY_NO[L_SFPNAME_LOOP_CTR] = 0
+      L_SFPNAME_POL_YEAR[L_SFPNAME_LOOP_CTR]  = 0
+      L_SFPNAME_END_SEQUENCE[L_SFPNAME_LOOP_CTR] = 0
+      L_SFPNAME_PREM_NO[L_SFPNAME_LOOP_CTR]   = 0
+      L_SFPNAME_BUILD_NO[L_SFPNAME_LOOP_CTR]  = 0
+      L_SFPNAME_SUB_CODE[L_SFPNAME_LOOP_CTR]  = 0
+    }
+  L_SFPNAME_LOOP_CTR = 0
+  Access SFPSUPP,
+     Set SFPSUPP:POLICY_NO = L_POLICY_NO,
+         SFPSUPP:POL_YEAR  = L_POL_YEAR,
+         sfpsupp:end_sequence = l_end_sequence, Approximate
+/*
+write ("<014>")
+write ("%c%s%n",01001,"sfpsupp:Policy Num       = ",sfpsupp:policy_no)
+write ("%c%s%n",03001,"l_pol #                  = ",l_policy_no)
+write ("%c%s%n",05001,"sfpsupp:pol_year         = ",sfpsupp:pol_year)
+write ("%c%s%n",07001,"l_pol_year               = ",l_pol_year)
+write ("%c%s%n",09001,"sfpsupp:end_sequence = ",sfpsupp:end_sequence)
+write ("%c%s%n",11001,"l_end_sequence       = ",l_end_sequence)
+write ("%c%s%s",13001,"sfpsupp:name[1]          = ",sfpsupp:name[1])
+write ("%c%s%s",15001,"sfpsupp:mortgage_id      = ",sfpsupp:mortgage_id)
+Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+*/
+  While SFPSUPP:POLICY_NO = L_POLICY_NO And
+        SFPSUPP:POL_YEAR  = L_POL_YEAR and
+        sfpsupp:end_sequence = l_end_sequence
+    {
+
+/*
+      write ("<014>")
+      write ("%c%s%n",01001,"Policy Number        = ",sfpsupp:policy_no)
+      write ("%c%s%s",03001,"Mort ID              = ",sfpsupp:mortgage_id)
+      write ("%c%s%s",05001,"sfpsupp:name[1]      = ",sfpsupp:name[1])
+      write ("%c%s%n",07001,"l_end_sequence       = ",l_end_sequence)
+      write ("%c%s%n",08001,"l_copy ctr           = ",l_copy_ctr)
+      write ("%c%s%n",09001,"sfpsupp:end_sequence = ",sfpsupp:end_sequence)
+      Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+*/
+
+      if sfpsupp:mortgage_id not one of "" then
+        {
+         L_COPY_CTR = L_COPY_CTR + 1
+         L_SFPNAME_LOOP_CTR = L_COPY_CTR  -- the first 3 positions are blank
+         L_SFPNAME_POLICY_NO[L_SFPNAME_LOOP_CTR] = SFPSUPP:POLICY_NO
+         L_SFPNAME_POL_YEAR[L_SFPNAME_LOOP_CTR]  = SFPSUPP:POL_YEAR
+         L_SFPNAME_END_SEQUENCE[L_SFPNAME_LOOP_CTR] = SFPSUPP:END_SEQUENCE
+         L_SFPNAME_PREM_NO[L_SFPNAME_LOOP_CTR]   = SFPSUPP:PREM_NO
+         L_SFPNAME_BUILD_NO[L_SFPNAME_LOOP_CTR]  = SFPSUPP:BUILD_NO
+         L_SFPNAME_SUB_CODE[L_SFPNAME_LOOP_CTR]  = SFPSUPP:SUB_CODE
+
+        }
+
+      else
+      If sfpsupp:name[1] <> "" Then
+      {
+
+         L_COPY_CTR = L_COPY_CTR + 1
+         L_SFPNAME_LOOP_CTR = L_COPY_CTR  -- the first 3 positions are blank
+         L_SFPNAME_POLICY_NO[L_SFPNAME_LOOP_CTR] = SFPSUPP:POLICY_NO
+         L_SFPNAME_POL_YEAR[L_SFPNAME_LOOP_CTR]  = SFPSUPP:POL_YEAR
+         L_SFPNAME_END_SEQUENCE[L_SFPNAME_LOOP_CTR] = SFPSUPP:END_SEQUENCE
+         L_SFPNAME_PREM_NO[L_SFPNAME_LOOP_CTR]   = SFPSUPP:PREM_NO
+         L_SFPNAME_BUILD_NO[L_SFPNAME_LOOP_CTR]  = SFPSUPP:BUILD_NO
+         L_SFPNAME_SUB_CODE[L_SFPNAME_LOOP_CTR]  = SFPSUPP:SUB_CODE
+      }
+       Next SFPSUPP
+    }
+}  -- } of get_number_of_copies
+
+procedure add_image_header_version5
+
+BEGIN
+  L_DD = Day(TODAYSDATE)
+  L_MM = Month(TODAYSDATE)
+  L_YY = Year(TODAYSDATE)
+
+  Access SFSLINE,
+     Set SFSLINE:COMPANY_ID       = SFPNAME:COMPANY_ID,
+         SFSLINE:LINE_OF_BUSINESS = SFPNAME:LINE_OF_BUSINESS,
+         SFSLINE:LOB_SUBLINE      = L_LOB_SUBLINE
+
+  Access SFSLINE2,
+     Set SFSLINE2:COMPANY_ID       = SFPNAME:COMPANY_ID,
+         SFSLINE2:LINE_OF_BUSINESS = SFPNAME:LINE_OF_BUSINESS,
+         SFSLINE2:LOB_SUBLINE      = L_LOB_SUBLINE
+
+  l_policy_no = sfpname:policy_no
+
+  If scipsimage_version5:ZEROSUPPRESS_NUMBER = 1 Then
+    {
+      L_policy = Str(L_policy_No)
+    }
+  Else
+    {
+      L_policy = Str(L_policy_NO,"999999999")
+    }
+
+
+  If scipsimage_version5:ALPHA_CHARACTER = 1 Then
+    Begin
+      If scipsimage_version5:SPACE_BETWEEN_ALPHA_NUMBER = 0 Then
+        {
+          if trun(sfsline2:ADDITIONAL_ALPHA_PREFIX) <> "" then
+            {
+
+              L_policy_str = Trun(SFSLINE2:ADDITIONAL_ALPHA_PREFIX) + l_policy
+            }
+          else
+            {
+              L_policy_str = Trun(SFSLINE:ALPHA) + L_policy
+            }
+        }
+      Else
+        {
+          if trun(sfsline2:ADDITIONAL_ALPHA_PREFIX) <> "" then
+            {
+              L_policy_str = Trun(SFSLINE2:ADDITIONAL_ALPHA_PREFIX + L_policy)
+            }
+          else
+            {
+              L_policy_str = Trun(SFSLINE:ALPHA + " " + L_policy)
+            }
+        }
+    End
+  Else
+    {
+      L_policy_STR = Trun(L_policy)
+    }
+
+  L_FILE_NUMBER = Trun(scipsimage_version5:FILE_NUMBER[1]) + Trun(L_policy_STR) +
+                  Trun(scipsimage_version5:FILE_NUMBER[2])
+
+  I_NAME = sfpname:name[1]
+  Include "sfsrevname7.pro"
+  If scipsimage_version5:REVERSE_NAME = 1 Then
+    {
+      L_FILE_NAME = Trun(scipsimage_version5:FILE_NAME[1]) + Trun(I_REV_NAME) +
+                    Trun(scipsimage_version5:FILE_NAME[2])
+    }
+  else
+    {
+      L_FILE_NAME = Trun(scipsimage_version5:FILE_NAME[1]) + Trun(sfpname:name[1]) +
+                    Trun(scipsimage_version5:FILE_NAME[2])
+    }
+
+  if (sfsline:personal_commercial = "P") then  --if the line is Personal Lines then I need a different Drawer
+    {
+      L_DRAWER  = Trun(scipsimage_version5:DRAWER[1]) +
+                  Trun(scipsimage_version5:DRAWER_NAME[1]) +
+                  Trun(scipsimage_version5:DRAWER[2])
+    }
+  else  --COMMERCIAL LINES HERE
+    {
+      L_DRAWER  = Trun(scipsimage_version5:DRAWER[1]) +
+                  Trun(scipsimage_version5:DRAWER_NAME[2]) +
+                  Trun(scipsimage_version5:DRAWER[2])
+    }
+
+  L_FOLDER_TYPE = Trun(scipsimage_version5:FOLDER_TYPE[1]) +
+                  Trun(scipsimage_version5:FOLDER_TYPEs[10]) +
+                  Trun(scipsimage_version5:FOLDER_TYPE[2])
+
+--  Write ("%c%s%x",06001,"l_folder_type      = ",L_folder_type)
+--  Write ("%c%s%x",07001,"scipsimage_version5:FOLDER_TYPE[10] = ",scipsimage_version5:FOLDER_TYPE[10])
+--  read(10,01,"press enter here ",l_enter,1)
+
+  l_file_type =  Trun(scipsimage_version5:File_type[1]) +
+                 Trun(scipsimage_version5:file_types[10])+
+                 Trun(scipsimage_version5:file_type[2])
+
+  L_DOC_TYPE    = Trun(scipsimage_version5:DOC_TYPE[1]) +
+                  Trun(scipsimage_version5:DOC_TYPEs[10]) +
+                  Trun(scipsimage_version5:DOC_TYPE[2])
+
+  L_doc_date = Trun(scipsimage_version5:DOC_DATE[1]) + Str(L_MM,2) + "-" + Str(L_DD,2) + "-" +
+             Str(L_YY,4) + Trun(scipsimage_version5:DOC_DATE[2])
+
+  L_py_policy_year = Trun(scipsimage_version5:py_year[1]) + trun(str(sfpname:pol_year)) +
+                     Trun(scipsimage_version5:py_year[2])
+
+  Deletefile(l_header_name)   --name for the header information to be added for imaging
+
+  If scipsimage_version5:ZEROSUPPRESS_NUMBER = 1 Then
+    {
+      Writefile (l_header_name,"%s%s%s<nl>",Trun(scipsimage_version5:FILE_NUMBER[1]),
+                               trun(L_policy_str),Trun(scipsimage_version5:FILE_NUMBER[2]))
+    }
+
+  Writefile (l_header_name,"%s<nl>",trun(L_FILE_NAME))
+  Writefile (l_header_name,"%s<nl>",trun(L_DRAWER))
+  Writefile (l_header_name,"%s<nl>",trun(L_FOLDER_TYPE))
+  Writefile (l_header_name,"%s<nl>",trun(L_DOC_TYPE))
+  Writefile (l_header_name,"%s<nl>",trun(L_DOC_DATE))
+  Writefile (l_header_name,"%s<nl>",trun(L_file_type))
+  Writefile (l_header_name,"%s<nl>",trun(L_py_policy_year))
+  Writefile (l_header_name,"%s<nl>",scipsimage_version5:START_CAPTURE)
+  Writefile (l_header_name,"%s<ff>",scipsimage_version5:END_CAPTURE)
+  Closefile (l_header_name)
+
+  Proc("cli joinit %s %s",l_reinstatement_name[1],l_header_name)  --this is because the sfpindex will need to go at the beginning
+
+  do get_unique_pcl_file
+  Proc("cli mv %s %s",l_header_name,L_invoice_PDF_1)/noconsole  --moving it to a unique file
+  --make sure we have a unique file name.
+
+  L_UNIX_PATH = scipsimage_version5:DIRECTORY_PATH/raw
+  Proc("cli mv %s %s",L_invoice_PDF_1,L_UNIX_PATH)/noconsole
+  Deletefile (L_header_name)
+  Deletefile (l_reinstatement_name[1])
+END
+
+procedure add_image_header
+
+{
+  L_DD = Day(TODAYSDATE)
+  L_MM = Month(TODAYSDATE)
+  L_YY = Year(TODAYSDATE)
+
+  If scipsimage:ZEROSUPPRESS_NUMBER = 1 Then
+    {
+      L_policy = Str(L_policy_NO,"ZZZZZZZZZ")
+    }
+  Else
+    {
+      L_policy = Str(L_policy_NO,"999999999")
+    }
+  If scipsimage:ALPHA_CHARACTER = 1 Then
+    {
+      If scipsimage:SPACE_BETWEEN_ALPHA_NUMBER = 0 Then
+        {
+          L_policy_str = Trun(SFSLINE:ALPHA + L_policy)
+        }
+      Else
+        {
+          L_policy_str = Trun(SFSLINE:ALPHA + " " + L_policy)
+        }
+    }
+  Else
+    {
+      L_policy_STR = Trun(L_policy)
+    }
+
+  L_FILE_NUMBER = Trun(scipsimage:FILE_NUMBER[1]) + Trun(L_policy_STR) +
+                  Trun(scipsimage:FILE_NUMBER[2])
+
+  I_NAME = sfpname:name[1]
+  Include "sfsrevname7.pro"
+  If scipsimage:REVERSE_NAME = 1 Then
+    {
+      L_FILE_NAME = Trun(scipsimage:FILE_NAME[1]) + Trun(I_REV_NAME) +
+                    Trun(scipsimage:FILE_NAME[2])
+    }
+
+  Access SFSLINE,
+     Set SFSLINE:COMPANY_ID       = SFPNAME:COMPANY_ID,
+         SFSLINE:LINE_OF_BUSINESS = SFPNAME:LINE_OF_BUSINESS,
+         SFSLINE:LOB_SUBLINE      = L_LOB_SUBLINE
+
+  if (sfsline:personal_commercial = "P") then  --if the line is Personal Lines then I need a different Drawer
+    {
+      L_DRAWER  = Trun(scipsimage:DRAWER[1]) +
+                  Trun(scipsimage:DRAWER_NAME_2[1]) +
+                  Trun(scipsimage:DRAWER[2])
+    }
+  else  --COMMERCIAL LINES HERE
+    {
+      L_DRAWER  = Trun(scipsimage:DRAWER[1]) +
+                  Trun(scipsimage:DRAWER_NAME) +
+                  Trun(scipsimage:DRAWER[2])
+    }
+
+  L_FOLDER_TYPE = Trun(scipsimage:FOLDER_TYPE[1]) +
+                  Trun(scipsimage:FOLDER_TYPE2[2]) +
+                  Trun(scipsimage:FOLDER_TYPE[2])
+  L_DOC_TYPE    = Trun(scipsimage:DOC_TYPE[1]) +
+                  Trun(scipsimage:DOC_TYPE2[2]) +
+                  Trun(scipsimage:DOC_TYPE[2])
+  L_DOC_DATE    = Trun(scipsimage:DOC_DATE[1]) +
+                  Str(L_YY,4) + Str(L_MM,2) + Str(L_DD,2) +
+                  Trun(scipsimage:DOC_DATE[2])
+
+  Deletefile(l_header_name)   --name for the header information to be added for imaging
+
+  If scipsimage:ZEROSUPPRESS_NUMBER = 1 Then
+    {
+      Writefile (l_header_name,"%s%n%s<nl>",Trun(scipsimage:FILE_NUMBER[1]),
+                               L_policy_no,Trun(scipsimage:FILE_NUMBER[2]))
+    }
+  Writefile (l_header_name,"%s<nl>",L_FILE_NAME)
+  Writefile (l_header_name,"%s<nl>",L_DRAWER)
+  Writefile (l_header_name,"%s<nl>",L_FOLDER_TYPE)
+  Writefile (l_header_name,"%s<nl>",L_DOC_TYPE)
+  Writefile (l_header_name,"%s<nl>",L_DOC_DATE)
+  Writefile (l_header_name,"%s<nl>",scipsimage:START_CAPTURE)
+  Writefile (l_header_name,"%s<ff>",scipsimage:end_CAPTURE)
+  Closefile (l_header_name)
+  Proc("cli joinit %s %s",l_reinstatement_name[1],l_header_name)  --this is because the sfpindex will need to go at the beginning
+  do get_unique_pcl_file
+  Proc("cli mv %s %s",l_header_name,L_invoice_PDF_1)/noconsole  --moving it to a unique file
+  --make sure we have a unique file name.
+  L_UNIX_PATH  = scipsimage:DIRECTORY_PATH/raw
+  Proc("cli mv %s %s",L_invoice_PDF_1,L_UNIX_PATH)/noconsole
+  Deletefile (L_reinstatement_NAME[1])
+}
+
+Procedure get_unique_pcl_file
+
+{
+  I_CSEXEC_APPLICATION = "PRINT                    "/raw
+  Include "sfscsexec.pro"
+  L_invoice_PDF_1 = programid+"_"+Str(I_CSEXEC_NUMBER)+".pcl"
+}
+
+Procedure print_detail_line
+
+{
+  L_LINE_PRINTED = "N"
+  I_NAME = SFPNAME:NAME[1]
+  Include "sfsrevname7.pro"
+
+  Access ARSCANCEL_ALIAS,
+     Set ARSCANCEL_ALIAS:COMPANY_ID = L_HOLD_COMPANY_ID,
+         ARSCANCEL_ALIAS:POLICY_NO  = L_HOLD_POLICY_NO, Approximate
+
+  While ARSCANCEL_ALIAS:COMPANY_ID = L_HOLD_COMPANY_ID And
+        ARSCANCEL_ALIAS:POLICY_NO  = L_HOLD_POLICY_NO And
+        ARSCANCEL_ALIAS:CX_STATUS  = "R" And
+        L_LINE_PRINTED             = "N"
+    {
+      Switch(ARSCANCEL:TRANS_CODE)
+        Case 10     : L_TRANSACTION = "New Policy     "
+        Case 11     : L_TRANSACTION = "Cancellation   "
+        Case 12,13  : L_TRANSACTION = "Endorsement    "
+        Case 14     : L_TRANSACTION = "Renewal        "
+        Case 15     : L_TRANSACTION = "Audit Premium  "
+        Case 16     : L_TRANSACTION = "Reinstatement  "
+        Case 18,28  : L_TRANSACTION = "Installment Chg"
+        Case 19,22,23,29 :
+                      L_TRANSACTION = "Sur Charge     "
+        Default     : L_TRANSACTION = "Transaction    "
+      }
+
+
+      access arschksu, set arschksu:company_id = l_hold_company_id,
+                           arschksu:check_reference = l_hold_check_reference
+
+      L_TRANSACTION = "Payment Received - Thank you"
+      Writefile(l_reinstatement_name[1],"%s<NL>",L_LETTER_GOTHIC_12)
+      L_V_POSITION = L_V_POSITION + 120
+--      l_check_no = val(arschksu:check_no)
+      l_check_no = arschksu:check_no
+      Writefile(l_reinstatement_name[1],"%s","<033>&a210h" + Trun(Str(L_V_POSITION) + "V"))
+      Writefile(l_reinstatement_name[1],"%s<NL>",Trun(Str(ARSCHKSU:CHECK_REFERENCE,"ZZZZZZZ")))
+      Writefile(l_reinstatement_name[1],"%s","<033>&a850h" + Trun(Str(L_V_POSITION) + "V"))
+      Writefile(l_reinstatement_name[1],"%s<NL>",trun(l_check_no))
+--      Writefile(l_reinstatement_name[1],"%s<NL>",trun(str(l_check_no,"ZZZZZZZZZZZZZZZZZZZZ")))
+      Writefile(l_reinstatement_name[1],"%s","<033>&a1620h" + Trun(Str(L_V_POSITION) + "V"))
+      Writefile(l_reinstatement_name[1],"%s<NL>",Trun(L_TRANSACTION))
+      Writefile(l_reinstatement_name[1],"%s","<033>&a4000h" + Trun(Str(L_V_POSITION) + "V"))
+      Writefile(l_reinstatement_name[1],"%s<NL>",Trun(Str(ARSCHKSU:TRANS_DATE,"MM/DD/YYYY")))
+      Writefile(l_reinstatement_name[1],"%s","<033>&a4590h" + Trun(Str(L_V_POSITION) + "V"))
+      Writefile(l_reinstatement_name[1],"%s<NL>",Trun(Str(ARSCHKSU:CHECK_AMOUNT,"($ZZ,ZZZ,ZZZ.99)")))
+
+      L_LINES_PRINTED = L_LINES_PRINTED + 1
+      If L_LINES_PRINTED >= 29 Then
+        {
+          Do EJECT_PAGE
+          Do PRINT_FORM
+          L_LINES_PRINTED = 0
+          L_PAGES_CTR = L_PAGES_CTR + 1
+          L_V_POSITION = 1800
+        }
+      L_LINE_PRINTED = "Y"
+      Next ARSCANCEL_ALIAS
+    } -- while
+}  -- end of print detail lines
+
+}  -- end of program
+
+/* } of file */

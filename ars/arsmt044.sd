@@ -1,0 +1,176 @@
+%%
+Screen
+        Name = "Arsmt044" ;
+        Type = "Detail" ;
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize = "dynamic";
+        domain = "arscontrol2" ;
+        Windowtitle="%a    %s  Additional Control Maintenance - Ver 7.00     %m";
+--      resizeable = yes ;
+        iconline = 0 ;
+
+        Include "stdkeys7.inc"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        add/reuse  tagged add_fn;
+
+        Include "stdfunc7.inc"
+
+Menu Definition
+
+        Include "stdmenu7.inc"
+
+}
+
+Toolbar Definition
+
+        Include "stdtoolbar7.inc"
+}
+
+screen
+{
+%%
+                                                        _______________
+*-------------------------------------------------------------------------------------------------------*
+| Company Id: __________ __________________________________________________                             |
+| Invoice Failure Literal:                                                                              |
+| ____________________________________________________________________________________________________  |
+| Back of Invoice Balance Due Wording: _________________________                                        |
+| Back of Invoice Notice: _                                                                             |
+|    __________________________________________________________________________________________         |
+| Total Due Literal on Invoice Face: ________________________________________                           |
+| Hide All Internal Checks:  _                                             *---------------------------*|
+| Copy Order: __________ __________ __________ __________                  | Reinstatement Options     ||
+|                                                                          | Reinstate A/R Side:     _ ||
+| Remove Installment Question: ______________________________              | Reinstate Premium Side: _ ||
+| Accounts Payable Return Premium Default Release Code: __                 *---------------------------*|
+| Print Ctr On Cx Notices: _                                               |   Commissions Run Options ||
+| Whole Dollar Installments: _                                             | Commissions On Cash: _    ||
+| Reinstatement Warning in Customer Service: _                             *---------------------------*|
+| Print Invoice Message: _ Invoice Message V Position: ____ Invoice Message H Position: ____            |
+*---------------------------------------*---------------------------------------*                       |
+| Special Date Selection Options        | Print Loan Number Part 1: _           |                       |
+| Select Non Pay Notices As of        _ | Print Loan Number Part 2: _           |                       |
+| Select Installment Invoices As of   _ *---------------------------------------*----------------------*|
+| Select Reinstatements As of         _ | Return Check Options                  | Date On Invoice Stub ||
+*---------------------------------------* Days to Pay (Not NonPay):  ___        *----------------------*|
+|        Forms Sorting Options          | Days to Pay - Non Pay:     ___        | Print: _             ||
+|                 Agent    Mortgagee    | Include Charge (Not NonPay): _        | V Position: ____     ||
+| Invoices          _          _        | Include Charge - Non Pay:    _        | H Position: ____     ||
+| CX Notices        _          _        *---------------------------------------*----------------------*|
+| Reinstatements    _          _        | Consent Order Flag: __ Do Not Print Consent Cancel: _         |
+| Balance Due       _          _        | Print Total Due on all Installments: _                        |
+|                                       | Fully Earned Sur-Charges : _                                  |
+*---------------------------------------*---------------------------------------------------------------*
+
+%%
+
+components
+
+Fields
+        FUNCTION/noecho/showasguidetext ;
+301     ARSCONTROL2:COMPANY_ID                  Mandatory
+        include "companyhlp.inc"
+302     SFSCOMPANY:NAME[1];
+501     ARSCONTROL2:INVOICE_FAILURE_LITERAL;
+601     ARSCONTROL2:TOTAL_BALANCE_LIT;
+701     ARSCONTROL2:BACK_OF_INVOICE_NOTICE/checkbox/values="0,1";
+801     ARSCONTROL2:BACK_OF_INVOICE_REFERENCE;
+901     ARSCONTROL2:TOTAL_DUE_LITERAL_FACE;
+1001    ARSCONTROL2:HIDE_ALL_INTERNAL_CHECKS /checkbox/values="0,1";
+1101    ARSCONTROL2:COPIES[1]/uppercase
+        Error "Copy Literal Has Already Been Selected"
+            If ARSCONTROL2:COPIES[1] <> "" And
+              (ARSCONTROL2:COPIES[1] = ARSCONTROL2:COPIES[2] Or
+               ARSCONTROL2:COPIES[1] = ARSCONTROL2:COPIES[3] Or
+               ARSCONTROL2:COPIES[1] = ARSCONTROL2:COPIES[4])
+
+        Activehelp/optionlist
+                "COPY             ",
+                "AGENT            ",
+                "PAYOR            ",
+                "OTHER            ";
+1102    ARSCONTROL2:COPIES[2]/uppercase
+        Error "Copy Literal Has Already Been Selected"
+            If ARSCONTROL2:COPIES[2] <> "" And
+              (ARSCONTROL2:COPIES[2] = ARSCONTROL2:COPIES[1] Or
+               ARSCONTROL2:COPIES[2] = ARSCONTROL2:COPIES[3] Or
+               ARSCONTROL2:COPIES[2] = ARSCONTROL2:COPIES[4])
+
+        Activehelp/optionlist
+                "COPY             ",
+                "AGENT            ",
+                "PAYOR            ",
+                "OTHER            ";
+1103    ARSCONTROL2:COPIES[3]/uppercase
+        Error "Copy Literal Has Already Been Selected"
+            If ARSCONTROL2:COPIES[3] <> "" And
+              (ARSCONTROL2:COPIES[3] = ARSCONTROL2:COPIES[1] Or
+               ARSCONTROL2:COPIES[3] = ARSCONTROL2:COPIES[2] Or
+               ARSCONTROL2:COPIES[3] = ARSCONTROL2:COPIES[4])
+
+        Activehelp/optionlist
+                "COPY             ",
+                "AGENT            ",
+                "PAYOR            ",
+                "OTHER            ";
+1104    ARSCONTROL2:COPIES[4]/uppercase
+        Error "Copy Literal Has Already Been Selected"
+            If ARSCONTROL2:COPIES[4] <> "" And
+              (ARSCONTROL2:COPIES[4] = ARSCONTROL2:COPIES[1] Or
+               ARSCONTROL2:COPIES[4] = ARSCONTROL2:COPIES[2] Or
+               ARSCONTROL2:COPIES[4] = ARSCONTROL2:COPIES[3])
+
+        Activehelp/optionlist
+                "COPY             ",
+                "AGENT            ",
+                "PAYOR            ",
+                "OTHER            ";
+1201    ARSCONTROL2:REINSTATE_AR/checkbox/values = "0,1"        Hide If REINSTATE_PREMIUMS One Of 1;
+1301    ARSCONTROL2:REMOVE_INSTALLMENT_QUESTION;
+1302    ARSCONTROL2:REINSTATE_PREMIUMS/checkbox/values="0,1"        Hide If REINSTATE_AR One Of 1;
+1401    ARSCONTROL2:DEFAULT_CHECK_RELEASE /mask="XX"/uppercase
+        Error If ARSCONTROL2:DEFAULT_CHECK_RELEASE Not One Of "S","V"," ","";
+1501    ARSCONTROL2:PRINT_CTR_ON_CX_NOTICES /checkbox/values="0,1";
+1601    ARSCONTROL2:WHOLE_DOLLAR_INSTALLMENTS /checkbox/values="0,1";
+1602    ARSCONTROL2:COMMISSIONS_ON_CASH /checkbox/values="0,1";
+1701    ARSCONTROL2:REINSTATEMENT_WARNING/checkbox/values="0,1";
+1801    ARSCONTROL2:PRINT_INVOICE_MESSAGE/checkbox/values="0,1";
+1802    ARSCONTROL2:INVOICE_MESSAGE_V_POSITION/mask="9999";
+1803    ARSCONTROL2:INVOICE_MESSAGE_H_POSITION/mask="9999";
+2001    ARSCONTROL2:PRINT_LOAN_NO_TOP/checkbox/values="0,1";
+2101    ARSCONTROL2:AS_OF_NON_PAYS/checkbox/values="0,1";
+2102    ARSCONTROL2:PRINT_LOAN_NO_BOTTOM/checkbox/values="0,1";
+2201    ARSCONTROL2:AS_OF_INVOICES/checkbox/values="0,1";
+2301    ARSCONTROL2:AS_OF_REINSTATEMENTS/checkbox/values="0,1";
+2401    ARSCONTROL2:NSF_DAYS_TO_PAY_NORMAL/mask="ZZZ";
+2501    ARSCONTROL2:NSF_DAYS_TO_PAY_NONPAY/mask="ZZZ";
+2502    ARSCONTROL2:PRINT_RUN_DATE_ON_INVOICE /checkbox/values="0,1";
+2601    ARSCONTROL2:NSF_INCLUDE_CHARGE_NORMAL/checkbox/values="0,1";
+2701    ARSCONTROL2:PRINT_INVOICES_BY_AGENT/checkbox/values="0,1";
+2702    ARSCONTROL2:PRINT_INVOICES_BY_MORT/checkbox/values="0,1";
+2703    ARSCONTROL2:NSF_INCLUDE_CHARGE_NONPAY/checkbox/values="0,1";
+2602    ARSCONTROL2:DATE_ON_INVOICE_V_POSITION
+        Hide If ARSCONTROL2:PRINT_RUN_DATE_ON_INVOICE One Of 0;
+2704    ARSCONTROL2:DATE_ON_INVOICE_H_POSITION
+        Hide If ARSCONTROL2:PRINT_RUN_DATE_ON_INVOICE One Of 0;
+2801    ARSCONTROL2:PRINT_CX_NOTICES_BY_AGENT/checkbox/values="0,1";
+2802    ARSCONTROL2:PRINT_CX_NOTICES_BY_MORT/checkbox/values="0,1";
+2901    ARSCONTROL2:PRINT_REINSTATEMENTS_BY_AGENT/checkbox/values="0,1";
+2902    ARSCONTROL2:PRINT_REINSTATEMENTS_BY_MORT/checkbox/values="0,1";
+2903    ARSCONTROL2:CONSENT_ORDER_FLAG;
+2904    ARSCONTROL2:DO_NOT_PRINT_CONSENT_CANCEL /checkbox/values="0,1";
+3001    ARSCONTROL2:PRINT_CX_BALANCE_BY_AGENT/checkbox/values="0,1";
+3002    ARSCONTROL2:PRINT_CX_BALANCE_BY_MORT/checkbox/values="0,1";
+3003    ARSCONTROL2:PRINT_TOTAL_DUE_ALL_INSTALLMENTS /checkbox/values="0,1";
+3101    ARSCONTROL2:SELECTIVE_REINSTATEMENTS /checkbox/values="0,1";
+
+}
+
+End

@@ -1,0 +1,101 @@
+                                                                  ____________
+*------------------------------------------------------------------------------*
+| Company Id: __________ __________________________________________________    |
+|                                                                              |
+| Check    Policy         Check          Eff     Check     Status     Date     |
+| Ref.     Number         Number         Year    Amount              Received  |
+| _______ _________ ____________________ ____ _____________ _____   __________ |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+*------------------------------------------------------------------------------*
+
+%%
+Screen
+        Name = "Arsin045" ;
+        Type = "Multiline" ;
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize = "dynamic";
+        Repeat 701 To 707, 8 Times Down;
+        Windowtitle = "%s    %a   Check Summary Inquiry - Version 4.10    %m";
+        Domain = "ARSINQWRK3" ;
+        iconline = 0;
+
+
+        Global String G_COMPANY_ID[10] ;
+        Global String G_COMPANY[10];
+
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+
+        Global Unsigned Ascii Number G_CHECK_REFERENCE[7] ;
+
+        Global Wdate G_EFF_DATE;
+
+        String L_ENTER[1];
+
+        Access ARSINQWRK3,
+           Set ARSINQWRK3:COMPANY_ID = G_COMPANY_ID, Approximate
+
+        Include "STDKEYS.INC"
+        !F7="Check"/function ;
+
+Functions
+
+/* STDFUNC.INC */
+
+--        Add/SECURITY=50   ;            /* Add a record */
+--        Change ;         /* Change an existing record */
+--        Delete;         /* Delete an existing record */
+
+        Search;         /* Select a record using an approximate key */
+        Next;           /* Display the next record(s) in key sequence */
+        Previous;       /* Display the previous record(s) in key sequence */
+
+"Back"  Return ;         /* Back to previous screen */
+"Exit"  Return ;
+        Return ;
+
+"Bye"   Stop;           /* Terminate this session */
+        Stop;
+
+--        Include "STDFUNC.INC"
+
+        -- include "SCIPSPRINT.FUN"
+        "CHECK" Display "arsin001" ;
+
+Access Validation
+Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = ARSINQWRK3:COMPANY_ID
+
+Error "No more checks for this policy" If
+ARSINQWRK3:POLICY_NO <> G_POLICY_NO
+Skip If ARSINQWRK3:POLICY_NO <> G_POLICY_NO Or
+(ARSCONTROL2:HIDE_ALL_INTERNAL_CHECKS One Of 1 And
+    ARSINQWRK3:INTERNAL_CHECK One Of 1)
+--Skip If arsinqwrk3:TRANS_EFF <> 00.00.0000 And
+--arsinqwrk3:TRANS_EFF < G_EFF_DATE And arsinqwrk3:COMPANY_ID <> "CCMI"
+
+
+Fields
+FUNCTION/noecho/showasguidetext ;
+0301    ARSINQWRK3:COMPANY_ID/displayonly                      Mandatory;
+0302    SFSCOMPANY:NAME[1];
+0701    ARSINQWRK3:CHECK_REFERENCE/displayonly                 Mandatory;
+0702    ARSINQWRK3:POLICY_NO/displayonly                       Mandatory;
+0703    ARSINQWRK3:CHECK_NO/displayonly                        Mandatory;
+0704    Year(ARSINQWRK3:TRANS_EFF)/displayonly/mask="9999";
+0705    ARSINQWRK3:CHECK_AMOUNT/displayonly                    Mandatory;
+0706    ARSINQWRK3:DISPOSITION /displayonly;
+0707    ARSINQWRK3:TRANS_DATE/displayonly ;
+
+Screen Exit
+        If ARSINQWRK3:COMPANY_ID > "" Then G_COMPANY_ID = ARSINQWRK3:COMPANY_ID ;
+        If ARSINQWRK3:CHECK_REFERENCE > 0
+        Then G_CHECK_REFERENCE = ARSINQWRK3:CHECK_REFERENCE ;
+
+
+End

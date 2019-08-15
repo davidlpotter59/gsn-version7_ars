@@ -1,0 +1,244 @@
+%%
+Screen
+     Name = "arsin001" ;
+     Type = "Detail" ;
+     Padcharacter = Space ;
+     Highlight = Underscore ;
+     Screensize="dynamic";
+     Domain="ARSCHKSU";
+     Windowtitle = "%a     %s  C Check Processing - Entry - Ver. 7.00    %m";
+     Recordlock = Immediate ;
+     resizeable = yes ;
+     iconline = 0 ;
+
+     global string g_lib[10] ;
+
+     Global Unsigned Ascii Number G_CHECK_REFERENCE[7],
+                                  G_POLICY_NO[9],
+                                  G_QUOTE_NO[8] ,
+                                  G_AGENT_NO[4] ;
+
+     Global String G_SUPP_NAME[50],
+                   G_CARE_OF[50],
+                   G_STREET[30],
+                   G_CITY_STATE[30],
+                   G_COMPANY[10],
+                   G_CHECK_NUMBER[20];
+
+     Global Signed Ascii Number G_TOTAL_DUE[9]/decimals=2,
+                                G_CHECK_AMOUNT[9]/decimals=2;
+
+     Global Unsigned Ascii Number G_ZIP_CODE[9] ;
+
+     Include "arsmenu.var"
+
+     Signed Ascii Number L_TOTAL[9]=0/dec=2,
+                         L_TOTAL_1[9]=0/dec=2,
+                         L_TOTAL_DUE[9]=0/decimals=2,
+                         L_BATCH[11]=0/decimals=2 ;
+
+     String L_APPLICATION_STR[30]="Application ";
+     String L_ENTER[1];
+     String L_SFS_CODE[3]="SFS";
+
+     Wdate L_TRANS_DATE=00.00.0000;
+     /* these globals are needed for arsmt01d */
+     Global Signed Ascii Number G_TOTAL_DUE_NET[9]/decimals=2,
+                                G_INSTALLMENT_AMT[9]/decimals=2,
+                                G_TOTAL_PREMIUM[9]/decimals=2,
+                                G_TOTAL_SURCHARGE[9]/decimals=2,
+                                G_TOTAL_INSTALLMENT_CHARGE[9]/decimals=2;
+
+     Global String G_BANK_NO[15];
+     Global Unsigned Ascii Number G_APPLY_INSTALLMENT_CREDIT[1];
+     String L_CANCELLATION_EXISTS[1]="N";
+     Unsigned Ascii Number L_BUILDING_NO[4]=0;
+     Unsigned Ascii Number L_PREM_NO[4]=0;
+     Unsigned Ascii Number L_SUB_CODE[4]=0;
+     Unsigned Ascii Number L_BUILD_NO[4]=0;
+     Unsigned Ascii Number L_HOLD_POLICY_NO[9]=0;
+     Unsigned Ascii Number L_HOLD_POL_YEAR[4]=0;
+     Unsigned Ascii Number L_HOLD_END_SEQUENCE[4]=0;
+     Wdate L_HOLD_CX_EFF_DATE;
+     String L_POLICY_CX[1]="N";
+     String L_STR_ZIPCODE[9]="";
+     String L_UNPOSTED_CHECK[1]="N";
+     Unsigned Ascii Number L_PRIOR_POLICY_NO[9]=0;
+     Unsigned Ascii Number L_HOLD_BILLING_CTR[2]=0/decimals=0;
+     Signed Ascii Number L_TOTAL_OUTSTANDING[9]=0/decimals=2;
+
+     Access ARSCHKSU,
+            Set ARSCHKSU:COMPANY_ID      = G_COMPANY,
+                ARSCHKSU:CHECK_REFERENCE = G_CHECK_REFERENCE ;
+
+     Include "csexec.var"
+
+     Include "scipsprint.var"
+
+     Include "inqkeys.inc"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        Include "stdfunc7.inc"
+
+Menu Definition
+
+        Include "stdmenu7.inc"
+
+}
+
+Toolbar Definition
+
+        Include "stdtoolbar7.inc"
+}
+
+Screen Entry
+disable(add_fn)
+disable(change_fn)
+disable(delete_fn)
+
+screen at 2,1 to 23, 81
+{
+%%
+                                                        _______________
+*------------------------------------------------------------------------------*
+|   Company:     __________           Bank:   _____________________________    |
+|   Description: __________________   Branch: ___________________________      |
+*------------------------------------------------------------------------------*
+|   Payor Type:[R _~Insured _~Mortgagee _~Billing _~Agent _~Credit _~Other R]  |
+*------------------------------------------------------------------------------*
+|~~~Policy~No.:~~_________~______________________________~~Money~Order:~_~~~~~ |
+|~~~Check~No.:~~~____________________~Post~Dated:~_~~Check~Date:~~__________~~ |
+|~~~Bank~No:~~~~~_______________~~~~~~Deposit~Date:~__________~~~~~~~~~~~~~~~~ |
+|~~~Trans~Date:~~__________~~~Status~:~_____~________________________________~ |
+|~~~Amount:~~~~~~___________~~Balance:~___________~Hold~Check:~_ Deposit:~_~~~ |
+|~~~Comments:~~~~___________________________________________________________~~ |
+*-----------------------------------------------------------*------------------*
+|                      Payor Information                    |    Total Due     |
+|  Name:       _______________________________________      |    _________     |
+|  Care of:    ______________________________               *------------------*
+|  Address:    _____________________________                |   Reference      |
+|  City/State: _____________________________ ___ __________ |     _______      |
+*------------------------------------------------*----------*------------------*
+|~Total~Due~Net:~_________~Installment~Charges:~_________~Surcharge:~_________ |
+*------------------------------------------------------------------------------*
+
+
+%%
+
+components
+
+Fields
+        FUNCTION/noecho/showasguidetext;
+301     ARSCHKSU:COMPANY_ID/displayonly ;
+401     SFSCOMPANY:NAME[1]/displayonly/mask="X(18)"   ;
+302     ARSCONTROL:BANK_NAME/displayonly ;
+402     ARSCONTROL:BANK_BRANCH/displayonly ;
+601     ARSCHKSU:PAYOR_TYPE/button/values="I,M,B,A,C,O"/displayonly ;
+801     ARSCHKSU:POLICY_NO/displayonly ;
+1602    Begin
+        If ARSCHKSU:POLICY_NO <> 0 Then
+            Begin
+            Do GET_AMOUNT_DUE
+            End
+        end
+        L_TOTAL_DUE/displayonly ;
+2101    G_TOTAL_DUE_NET/displayonly;
+2102    G_TOTAL_INSTALLMENT_CHARGE/displayonly;
+2103    G_TOTAL_SURCHARGE/displayonly;
+
+802     SFPNAME:NAME[1]/displayonly ;
+803     ARSCHKSU:MONEY_ORDER/checkbox/displayonly;
+901     ARSCHKSU:CHECK_NO/displayonly ;
+902     ARSCHKSU:POST_DATED/checkbox/displayonly;
+903     ARSCHKSU:CHECK_DATE/displayonly
+        Hide when ARSCHKSU:POST_DATED <> "Y" ;
+1001    ARSCHKSU:BANK_NO/displayonly ;
+1101    ARSCHKSU:TRANS_DATE/displayonly ;
+1102    ARSCHKSU:DISPOSITION/displayonly ;
+1201    ARSCHKSU:CHECK_AMOUNT/displayonly ;
+1301    ARSCHKSU:COMMENTS/default/displayonly  ;
+1202    ARSCHKSU:BALANCE/displayonly ;
+1203    ARSCHKSU:CHECK_HOLD/checkbox/values="0,1"/displayonly ;
+1204    ARSCHKSU:DEPOSIT_PREMIUM/checkbox/values="0,1"/displayonly ;
+1002    ARSCHKSU:DEPOSIT_DATE/displayonly ;
+1103    ARSDISP:DESCRIPTION/displayonly ;
+1301    ARSCHKSU:COMMENTS/displayonly ;
+1601    ARSCHKSU:PAYOR_NAME/displayonly ;
+1701    ARSCHKSU:PAYOR_CARE_OF/displayonly/uppercase;
+1801    ARSCHKSU:PAYOR_ADDRESS/displayonly/uppercase ;
+1901    ARSCHKSU:PAYOR_CITY/displayonly ;
+1902    ARSCHKSU:PAYOR_STR_STATE/displayonly ;
+1903    ARSCHKSU:PAYOR_ZIPCODE/mask="99999-9999"/displayonly;
+1904    ARSCHKSU:CHECK_REFERENCE/displayonly ;
+
+}
+
+Procedure Definition
+
+Procedure GET_AMOUNT_DUE
+Begin
+L_TOTAL_DUE                = 0
+G_TOTAL_DUE_NET            = 0
+G_TOTAL_INSTALLMENT_CHARGE = 0
+G_TOTAL_SURCHARGE          = 0
+L_HOLD_BILLING_CTR         = 0
+
+Access ARSBILLING, Set ARSBILLING:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                       ARSBILLING:POLICY_NO = ARSCHKSU:POLICY_NO, Approximate
+
+While ARSBILLING:COMPANY_ID = ARSCHKSU:COMPANY_ID And
+      ARSBILLING:POLICY_NO = ARSCHKSU:POLICY_NO
+    Begin
+    If ARSBILLING:STATUS = "B" Then
+        Begin
+        L_TOTAL_DUE        = L_TOTAL_DUE + (ARSBILLING:INSTALLMENT_AMOUNT -
+                                            ARSBILLING:TOTAL_AMOUNT_PAID)
+        L_HOLD_BILLING_CTR = ARSBILLING:BILLING_CTR
+        End
+
+    If ARSBILLING:STATUS One Of "O", "B" Then
+        Begin
+        L_TOTAL_OUTSTANDING = L_TOTAL_OUTSTANDING + (ARSBILLING:INSTALLMENT_AMOUNT -
+                                                    ARSBILLING:TOTAL_AMOUNT_PAID -
+                                                    ARSBILLING:WRITE_OFF_AMOUNT )
+        End
+
+    If (ARSBILLING:STATUS = "B" Or
+       ARSBILLING:STATUS = "O") And
+       ARSBILLING:TRANS_CODE <> ARSCONTROL:INSTALLMENT_CHARGE_TRANS_CODE Then
+        begin
+        G_TOTAL_DUE_NET = G_TOTAL_DUE_NET + (ARSBILLING:INSTALLMENT_AMOUNT -
+                                            (ARSBILLING:TOTAL_AMOUNT_PAID +
+                                            ARSBILLING:WRITE_OFF_AMOUNT))
+        G_TOTAL_PREMIUM    = G_TOTAL_DUE_NET
+        end
+
+    If (ARSBILLING:STATUS = "B" Or
+       ARSBILLING:STATUS = "O") And
+       ARSBILLING:TRANS_CODE = ARSCONTROL:INSTALLMENT_CHARGE_TRANS_CODE Then
+        begin
+        G_TOTAL_INSTALLMENT_CHARGE  = G_TOTAL_INSTALLMENT_CHARGE +
+                                      (ARSBILLING:INSTALLMENT_AMOUNT -
+                                      ARSBILLING:TOTAL_AMOUNT_PAID)
+        end
+
+    If (ARSBILLING:STATUS = "B" Or
+       ARSBILLING:STATUS = "O") And
+       ARSBILLING:TRANS_CODE = ARSCONTROL:SURCHARGE_TRANS_CODE Then
+        begin
+        G_TOTAL_SURCHARGE = G_TOTAL_SURCHARGE +
+                            (ARSBILLING:INSTALLMENT_AMOUNT -
+                            ARSBILLING:TOTAL_AMOUNT_PAID)
+        end
+
+    Next ARSBILLING
+    End
+
+End
+
+End

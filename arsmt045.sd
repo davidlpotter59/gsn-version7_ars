@@ -1,0 +1,69 @@
+%%
+Screen
+        Name = "arsmt045" ;
+        Type = "Detail" ;
+        Screensize = "dynamic" ;
+        Highlite = Underscore;
+        Padcharacter = Space ;
+        domain = "arsreturn" ;
+        Windowtitle ="%a     %s Return Check Description - Ver. 7.00     %m";
+--      resizeable = yes ;
+        iconline = 0 ;
+
+        Include "stdkeys7.inc"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        add/reuse  tagged add_fn;
+
+        Include "stdfunc7.inc"
+
+Menu Definition
+
+        Include "stdmenu7.inc"
+
+}
+
+Toolbar Definition
+
+        Include "stdtoolbar7.inc"
+}
+
+screen
+{
+%%
+                                                       _______________
+*------------------------------------------------------------------------------*
+| Company Id:    __________  _________________________________________________ |
+| Reason:        __________                                                    |
+| Description:   ________________________________________                      |
+| Notice to use: _____  ______________________________________                 |
+*------------------------------------------------------------------------------*
+
+
+%%
+
+components
+
+Fields
+        FUNCTION/noecho/showasguidetext;
+0301    ARSRETURN:COMPANY_ID/uppercase                  Mandatory
+        include "companyhlp.inc"
+0302    SFSCOMPANY:NAME[1] ;
+0401    ARSRETURN:RETURN_REASON/upper                     Mandatory;
+0501    ARSRETURN:DESCRIPTION/upper ;
+0601    ARSRETURN:NOTICE_TYPE
+        Error "Notice is invalid "
+            if ARSCXNOTICE:NOTICE_TYPE = ""
+
+        Activehelp ARSCXNOTICE:NOTICE_TYPE,
+                   ARSCXNOTICE:LINE_FIELD[1];
+0602    ARSCXNOTICE:LINE_FIELD[1]/mask="X(40)";
+
+}
+
+End

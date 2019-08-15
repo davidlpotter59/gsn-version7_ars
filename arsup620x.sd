@@ -1,0 +1,637 @@
+%%
+Program
+        Name         = "arsup620x" ;
+        Type         = "File" ;
+        Domain       = "ivrmaster" ;
+        Padcharacter = Space ;
+/*
+        Salem for MOB outfile Custinvoice in xml format.
+
+*/
+
+        Local String L_COMPANY_ID[10],
+                     l_address3[30],
+                     l_remit_address3[30],
+                     l_service_address1[30],
+                     l_service_address2[30],
+                     l_record_creation_date[19],
+                     l_record_creation_date1[19],
+                     l_enter[1],
+                     l_statement_date_str[19],
+                     l_purchase_order[30],
+                     l_policy_no[12],
+                     l_past_due_date_str[8],
+                     l_agent_address[30],
+                     l_mort_address[30],
+                     l_mort_zip[5],
+                     l_time[8],
+                     l_time1[9],
+                     l_day1[2],
+                     l_month1[2],
+                     l_over_90_amount1[13],
+                     l_bal_forward1[13],
+                     l_temp[13],
+                     l_invoice_total[13],
+                     l_future_installments[13],
+                     l_future_installments1[13],
+                     l_31_60_amount[13],
+                     l_unapplied_amount[13];
+
+        string function format_number(string);
+
+        local unsigned ascii number l_counter[10000],
+                                    l_mob_id[6],
+                                    l_pol_length[2]=0,
+                                    l_pol_count[2]=0,
+                                    l_master_counter[10000],
+                                    l_61_90_amount[13]=0.00/decimals=2,
+                                    l_over_90_amount[13]=0.00/decimals=2,
+                                    l_bal_forward[13]=0.00/decimals=2,
+                                    l_statement_date[8],
+                                    l_past_due_date[8],
+                                    l_rec_date[14],
+                                    l_year[4],
+                                    l_month[2],
+                                    l_day[2]=00,
+                                    l_second[2]=00,
+                                    l_loop[3] ;
+
+
+        local string l_bal_due1[13],
+                     l_bal_due2[13] ;
+
+        local signed ascii number   l_bal_due[13]/decimals=2 ;
+
+/* mobout.txt file name - the ./ will force the file to the current directory and
+   not to where it may find the existence of another file */
+--        String l_mobout_file[29]="CUSTInvoiceData"  + str(todaysdate,"YYYYMMDD") + "01" + ".xml" ;
+        String l_mobout_file[29]="CUSTInvoiceData"  + str(todaysdate,"YYYYMMDD") + ".xml" ;
+--        String l_mobout_file[29]="custinvoicedata"  + str(todaysdate,"YYYYMMDD") + ".xml" ;
+--        string L_filename_script[30]="cust_invoice_conversion.sh";
+        Unsigned Ascii Number L_END_OF_STRING[4]=0/decimals=0;
+        Unsigned Ascii Number L_POS_SUB[5]=0/decimals=0;
+        String L_mob_DONE[7]="mobdone";
+        String L_mob_LOG[10]="moblog.out";
+
+/* reverse name include file */
+        Include "sfsrevname7.var"
+
+Style Definition
+   include "styles.inc"
+
+Initialisation
+Write ("<014>")
+Write ("%c%s",01001,"Processing arsup620x - Please Wait ......")
+
+
+--Deletefile (L_mob_LOG)
+--Writefile (L_mob_LOG,"%s%s","Log File Created on : ",Str(TODAYSDATE)+" "+Str(SYSTEMTIME)+"<NL>")
+-- mob_id
+l_mob_id = 10868
+writefile(l_mobout_file,"%s%s",'<?xml version="1.0" encoding="utf-8"?>',"<NL>")
+writefile(l_mobout_file,"%s%s",'<Invoices mobId="10868" xmlns="http://myonlinebill.com/core/xml/invoice">',"<NL>")
+
+
+Update
+
+L_COUNTER = L_COUNTER + 1
+
+If L_COUNTER Mod 100 = 0 Then
+Begin
+   Write ("%c%s%n",05001,"Counter ",L_COUNTER)
+End
+
+if ivrmaster:policy_status one of "CURRENT" and
+   ivrmaster:policy_no <> 105003122 then
+{
+ access sfpcurrent, set sfpcurrent:policy_no = ivrmaster:policy_no, generic
+
+ access sfpname, set sfpname:policy_no    = ivrmaster:policy_no,
+                     sfpname:pol_year     = sfpcurrent:pol_year,
+                     sfpname:end_sequence = sfpcurrent:end_sequence, generic
+
+
+ if sfpname:policy_no = ivrmaster:policy_no and
+    sfpname:pol_year  = sfpcurrent:pol_year and
+    sfpname:end_sequence = sfpcurrent:end_sequence and
+    sfpname:status = "CURRENT" then
+  {
+   access sfplocation, set sfplocation:policy_no    = ivrmaster:policy_no,
+                           sfplocation:pol_year     = sfpname:pol_year,
+                           sfplocation:end_sequence = sfpname:end_sequence,generic
+
+   access sfscompany, set sfscompany:company_id = sfpname:company_id, generic
+
+   writefile(l_mobout_file,"%s%s","<Invoice>","<NL>")
+
+   -- invoice number
+   writefile(l_mobout_file,"%s%s%s","<InvoiceNo>","</InvoiceNo>","<NL>")
+--   Writefile (l_mobOUT_FILE,"%s%s","","<tab>")
+
+
+access sfsagent, set sfsagent:Company_id = ivrmaster:company_id,
+                     sfsagent:agent_no   = ivrmaster:agent_no, exact
+
+--   writefile(l_mobout_file,"%s%s%s%s","<InstallationId>","10870","</InstallationId>","<NL>")
+   writefile(l_mobout_file,"%s%s%s%s","<InstallationId>",str(sfsagent:mob_agent_no),"</InstallationId>","<NL>")
+
+
+-- record creation date
+   l_year = year(todaysdate)
+   l_month = month(todaysdate)
+   l_day = day(todaysdate)
+   l_time =  trun(str(systemtime,"HH:MM:SS"))
+   l_time1 = "T00:00:00"
+   if l_month < 10 then
+    {
+     l_month1 = "0" + str(l_month)
+    }
+   else
+     l_month1 = str(l_month)
+
+   if l_day < 10 then
+    {
+     l_day1 = "0" + str(l_day)
+    }
+   else
+    l_day1 = str(l_day)   l_record_creation_date = " "
+
+   l_record_creation_date = str(l_year) + "-" + l_month1 + "-" + l_day1
+   l_record_creation_date1 = trun(l_record_creation_date) + "T" + trun(l_time)
+   l_rec_date = 0
+   l_rec_date = val(l_record_creation_date1)
+   Writefile (l_mobout_file,"%s%s%s%s","<CreateDate>",l_record_creation_date1,"</CreateDate>","<NL>")
+
+
+-- acct_number
+   l_policy_no = str(ivrmaster:policy_no)
+   l_pol_length = 0
+   l_pol_count = 0
+   l_pol_length = len(trun(l_policy_no))
+   l_pol_count = (9 - l_pol_length)
+   switch(l_pol_count)
+     case 1   :  l_policy_no = '0000' + str(ivrmaster:policy_no)
+     case 2   :  l_policy_no = '00000' + str(ivrmaster:policy_no)
+     case 3   :  l_policy_no = '000000' + str(ivrmaster:policy_no)
+     case 4   :  l_policy_no = '0000000' + str(ivrmaster:policy_no)
+     case 5   :  l_policy_no = '00000000' + str(ivrmaster:policy_no)
+     case 6   :  l_policy_no = '000000000' + str(ivrmaster:policy_no)
+     case 7   :  l_policy_no = '0000000000' + str(ivrmaster:policy_no)
+     default  :  l_policy_no = "000" + str(ivrmaster:policy_no)
+   end
+--   Writefile (L_mobout_file,"%s%s%s%s","<AccountNo>",trun(l_policy_no),"</AccountNo>","<NL>")
+   Writefile (l_mobout_file,"%s%s%s%s","<AccountNo>",str(ivrmaster:policy_no),"</AccountNo>","<NL>")
+
+    -- statement_date
+   l_statement_date_str = " "
+   l_statement_date_str = str(ivrmaster:current_due_date,"YYYY-MM-DD") + l_time1
+   l_statement_date = 0
+   l_statement_date = val(l_statement_date_str)
+
+   if ivrmaster:current_due_date <> 00.00.0000 then
+    {
+     Writefile (l_mobout_file,"%s%s%s%s","<StatementDate>",trun(l_statement_date_str),"</StatementDate>","<NL>")
+    }
+   else
+    if ivrmaster:current_due_date = 00.00.0000 and
+       ivrmaster:past_due_due_date <> 00.00.0000 then
+        {
+         l_statement_date_str = " "
+         l_statement_date_str = str(ivrmaster:past_due_due_date,"YYYY-MM-DD") + l_time1
+         Writefile (l_mobout_file,"%s%s%s%s","<StatementDate>",trun(l_statement_date_str),"</StatementDate>","<NL>")
+        }
+    else
+    if ivrmaster:current_due_date = 00.00.0000 and
+       ivrmaster:past_due_due_date = 00.00.0000 then
+        {
+         Writefile (l_mobout_file,"%s%s%s","<StatementDate>","</StatementDate>","<NL>")
+        }
+
+-- aging 30
+   if ivrmaster:past_due_amount = 0 then
+      l_31_60_amount = str(ivrmaster:past_due_amount,"9.99")
+   else
+     {
+     l_temp = str(ivrmaster:past_due_amount,"ZZZZZZZZZ9.99")
+     l_loop = 1
+     while l_temp[l_loop] = " " and
+      l_loop <= 13
+      {
+       l_loop = l_loop + 1
+      }
+
+      l_31_60_amount = l_temp[l_loop,13]
+     }
+
+   -- balance due
+   l_bal_due = ivrmaster:current_amount_due
+   if ivrmaster:current_amount_due = 0 then
+   {
+     if ivrmaster:past_due_amount = 0 then
+      {
+       l_bal_due1 = str(l_bal_due,"9.99")
+       writefile(l_mobout_file,"%s%s%s%s","<BalanceDue>",trun(l_bal_due1),"</BalanceDue>","<NL>")
+      }
+     else
+     {
+      l_bal_due1 = str(ivrmaster:past_due_amount,"ZZZZZZZZZ9.99")
+      l_temp = str(l_bal_due1)
+      l_loop = 1
+      while l_temp[l_loop] = " " and
+       l_loop <= 13
+       {
+        l_loop = l_loop + 1
+       }
+
+      l_bal_due1 =  l_temp[l_loop,13]
+      writefile(l_mobout_file,"%s%s%s%s","<BalanceDue>",trun(l_bal_due1),"</BalanceDue>","<NL>")
+     }
+
+     l_bal_due2 = "$" + trun(l_bal_due1)
+
+   }
+   else
+   {
+     l_temp = str(l_bal_due,"ZZZZZZZZZ9.99")
+     l_loop = 1
+     while l_temp[l_loop] = " " and
+      l_loop <= 13
+      {
+       l_loop = l_loop + 1
+      }
+
+     l_bal_due1 =  l_temp[l_loop,13]
+     l_bal_due2 = "$" + trun(l_bal_due1)
+     writefile(l_mobout_file,"%s%s%s%s","<BalanceDue>",trun(l_bal_due1),"</BalanceDue>","<NL>")
+   }
+
+-- unapplied amount
+   if ivrmaster:future_installments = 0 then
+     l_unapplied_amount = str(ivrmaster:future_installments,"9.99")
+   else
+    {
+     l_temp = str(ivrmaster:future_installments,"ZZZZZZZZZ9.99")
+     l_loop = 1
+     while l_temp[l_loop] = " " and
+      l_loop <= 13
+      {
+       l_loop = l_loop + 1
+      }
+
+     l_unapplied_amount = l_temp[l_loop,13]
+    }
+   Writefile (l_mobout_file,"%s%s%s%s","<UnappliedAmount>",trun(l_unapplied_amount),"</UnappliedAmount>","<NL>")
+
+-- statement page number
+   Writefile (l_mobout_file,"%s%s","<Pages>","<NL>")
+   Writefile (l_mobout_file,"%s%s",'<Page templatepage = "1">',"<NL>")
+
+
+   Writefile (l_mobout_file,"%s%s","<OtherFields>","<NL>")
+
+-- bill to name
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="ClientName">',"<Value>",trun(ivrmaster:insureds_name),"</Value>","</Key>","<NL>")
+
+-- billing address1
+   if sfpname:address[1] <> "" then
+   {
+   writefile(l_mobout_file,"%s%s%s%s%s%s",'<Key name="Address1">',"<Value>",trun(sfpname:address[1]),"</Value>","</Key>","<NL>")
+   }
+
+-- billing address2
+   if sfpname:address[2] <> "" then
+   {
+   writefile(l_mobout_file,"%s%s%s%s%s%s",'<Key name="Address2">',"<Value>",trun(sfpname:address[2]),"</Value>","</Key>","<NL>")
+   }
+
+-- billing address3
+   l_address3 = " "
+   l_address3 = trun(sfpname:city) + ", " +  trun(sfpname:str_state) + " " + trun(str(sfpname:zipcode_5_9))
+   if l_address3 <> "" then
+   {
+   writefile(l_mobout_file,"%s%s%s%s%s%s",'<Key name="Address3">',"<Value>",trun(l_address3),"</Value>","</Key>","<NL>")
+   }
+
+-- service address 1
+
+if sfpname:policy_no = 105003122 then
+{
+write ("<014>")
+write ("%c%s%n",2001,"sfplocation:policy_no     = ",sfplocation:policy_no)
+write ("%c%s%n",3001,"sfpcurrent:policy_no      = ",sfpcurrent:policy_no)
+write ("%c%s%n",4001,"sfplocation:pol_year      = ",sfplocation:pol_year)
+write ("%c%s%n",5001,"sfpname:pol_year          = ",sfpname:pol_year)
+Read (23,1,"top at ServiceName -- Press Enter to Continue ",L_ENTER,1)
+}
+   if sfplocation:policy_no    = sfpcurrent:policy_no and
+        sfplocation:pol_year     = sfpname:pol_year and
+        sfplocation:end_sequence = sfpname:end_sequence then
+      {
+        Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="ServiceName">',"<Value>",trun(ivrmaster:insureds_name),"</Value>","</Key>","<NL>")
+        l_service_address1 = " "
+        l_service_address1 = trun(str(sfplocation:st_number)) + " " + trun(sfplocation:st_direction) +
+                   " " + trun(sfplocation:street) + " " + trun(sfplocation:st_type)
+
+        if l_service_address1 <> "" then
+        {
+        writefile(l_mobout_file,"%s%s%s%s%s%s",'<Key name="ServiceAddress1">',"<Value>",trun(l_service_address1),"</Value>","</Key>","<NL>")
+        }
+
+        -- service address 2
+        l_service_address2 = trun(sfplocation:city) + ", " + trun(sfplocation:str_state) + " " + trun(sfplocation:str_zipcode)
+
+        if l_service_address2 <> "" then
+        {
+        writefile(l_mobout_file,"%s%s%s%s%s%s",'<Key name="ServiceAddress2">',"<Value>",trun(l_service_address2),"</Value>","</Key>","<NL>")
+        }
+
+        -- service address 3
+--        writefile(l_mobout_file,"%s%s%s%s%s%s",'<Key name="ServiceAddress3">',"<Value>",trun(l_service_address3),"</Value>","</Key>","<NL>")
+        -- service address 4
+
+      }
+   else
+      {
+if sfpname:policy_no = 105003122 then
+{
+write ("<014>")
+write ("%c%s%n",2001,"sfplocation:policy_no     = ",sfplocation:policy_no)
+write ("%c%s%n",3001,"sfpcurrent:policy_no      = ",sfpcurrent:policy_no)
+write ("%c%s%n",4001,"sfplocation:pol_year      = ",sfplocation:pol_year)
+write ("%c%s%n",5001,"sfpname:pol_year          = ",sfpname:pol_year)
+write ("%c%s%s",6001,"l_address3                = ",l_address3)
+write ("%c%s%s",7001,"ivrmaster:insureds_name   = ",ivrmaster:insureds_name)
+Read (23,1,"middle ServiceName -- Press Enter to Continue ",L_ENTER,1)
+}
+       Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="ServiceName">',"<Value>",trun(ivrmaster:insureds_name),"</Value>","</Key>","<NL>")
+       -- service address 1
+       if sfpname:address[1] <> "" then
+       {
+       writefile(l_mobout_file,"%s%s%s%s%s%s",'<Key name="ServiceAddress1">',"<Value>",trun(sfpname:address[1]),"</Value>","</Key>","<NL>")
+       }
+       -- service address 2
+       if sfpname:address[2] <> "" then
+       {
+       writefile(l_mobout_file,"%s%s%s%s%s%s",'<Key name="ServiceAddress2">',"<Value>",trun(sfpname:address[2]),"</Value>","</Key>","<NL>")
+       }
+       -- service address 3
+       if l_address3 <> "" then
+       {
+       writefile(l_mobout_file,"%s%s%s%s%s%s",'<Key name="ServiceAddress3">',"<Value>",trun(l_address3),"</Value>","</Key>","<NL>")
+       }
+       -- service address 4
+--       writefile(l_mobout_file,"%s%s"," ","<NL>")
+      }
+
+
+-- billing period message
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="Installments">',"<Value>","Installments","</Value>","</Key>","<NL>")
+
+-- attention line
+   if ivrmaster:total_amount_due = 0 then
+    {
+if sfpname:policy_no = 105003122 then
+{
+--write ("<014>")
+--write ("%c%s%n",2001,"sfplocation:policy_no     = ",sfplocation:policy_no)
+--write ("%c%s%n",3001,"sfpcurrent:policy_no      = ",sfpcurrent:policy_no)
+--write ("%c%s%n",4001,"sfplocation:pol_year      = ",sfplocation:pol_year)
+--write ("%c%s%n",5001,"sfpname:pol_year          = ",sfpname:pol_year)
+Read (23,1,"policy status  -- Press Enter to Continue ",L_ENTER,1)
+}
+     if ivrmaster:past_due_amount > 0 then
+     {
+      l_statement_date_str = " "
+      l_statement_date_str = str(ivrmaster:past_due_due_date,"MM-DD-YYYY")
+      Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="PolicyStatus">',"<Value>",trun(l_statement_date_str),"</Value>","</Key>","<NL>")
+     }
+     else
+     {
+      Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="PolicyStatus">',"<Value>","CURRENT","</Value>","</Key>","<NL>")
+     }
+    }
+   else
+    {
+    if ivrmaster:current_due_date <> 00.00.0000 then
+     Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="PolicyStatus">',"<Value>",str(ivrmaster:current_due_date,"MM-DD-YYYY"),"</Value>","</Key>","<NL>")
+    else
+     Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="PolicyStatus">',"<Value>",str(ivrmaster:past_due_due_date,"MM-DD-YYYY"),"</Value>","</Key>","<NL>")
+    }
+
+--Purchase order number
+   l_purchase_order = " "
+   l_purchase_order = str(ivrmaster:eff_date,"MM/DD/YYYY") + " - " + str(ivrmaster:exp_date,"MM/DD/YYYY")
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="Effdate-Expdate">',"<Value>",trun(l_purchase_order),"</Value>","</Key>","<NL>")
+
+access sfsagent, set sfsagent:Company_id = ivrmaster:company_id,
+                     sfsagent:agent_no   = ivrmaster:agent_no, exact
+
+-- comments 1 MOB agent number
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="InstallationID">',"<Value>",trun(str(sfsagent:mob_agent_no)),"</Value>","</Key>","<NL>")
+
+-- comments 2 agent number
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="AgentNumber">',"<Value>",trun(str(sfsagent:agent_no)),"</Value>","</Key>","<NL>")
+
+-- comments 3 agent name
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="AgentName">',"<Value>",trun(sfsagent:name[1]),"</Value>","</Key>","<NL>")
+
+-- comments 4 agent address
+   if sfsagent:address[1] <> "" then
+   {
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="AgentAddress1">',"<Value>",trun(sfsagent:address[1]),"</Value>","</Key>","<NL>")
+   }
+
+-- comments 5 agent cit state zip
+--   if l_agent_address = "" then
+  -- {
+    l_agent_address = trun(sfsagent:city) + " " + trun(sfsagent:str_state) + " " + trun(str(sfsagent:zipcode_5_9))
+    Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="AgentAddress3">',"<Value>",trun(l_agent_address),"</Value>","</Key>","<NL>")
+  -- }
+
+-- comments 8 agent telephone
+   if sfsagent:telephone[1] <> "" then
+   {
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="AgentTele">',"<Value>",str(sfsagent:telephone[1],"(999)999-9999"),"</Value>","</Key>","<NL>")
+   }
+
+
+   if ivrmaster:mortgagee_account_number <> "" or
+      ivrmaster:mortgagee_name <> "" then
+   {
+-- Detail Line #2 mortgagee account number
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="MortgAcct">',"<Value>",trun(ivrmaster:mortgagee_account_number),"</Value>","</Key>","<NL>")
+
+-- Detail Line #3 mortgagee name
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="MortgName">',"<Value>",trun(ivrmaster:mortgagee_name),"</Value>","</Key>","<NL>")
+
+-- Detail Line #4 mortgagee address
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="MortgAddress">',"<Value>",trun(ivrmaster:mortgagee_address),"</Value>","</Key>","<NL>")
+
+-- Detail Line #5 mortgagee city
+--   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="MortCity">',"<Value>",trun(ivrmaster:mortgagee_city),"</Value>","</Key>","<NL>")
+
+-- Detail Line #6 mortgagee state
+--   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="MortState">',"<Value>",trun(ivrmaster:mortgagee_state),"</Value>","</Key>","<NL>")
+
+-- Detail Line #7 mortgagee zip
+--   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="MortZip">',"<Value>",trun(ivrmaster:mortgagee_zipcode),"</Value>","</Key>","<NL>")
+
+   l_mort_zip = trun(ivrmaster:mortgagee_zipcode)
+   l_mort_address = trun(ivrmaster:mortgagee_city) + " " + trun(ivrmaster:mortgagee_state) + " " + l_Mort_zip
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="MortgCityStateZip">',"<Value>",trun(l_mort_address),"</Value>","</Key>","<NL>")
+
+-- Detail Line #8 mortgagee telephone
+   if ivrmaster:mortgagee_telephone <> "" then
+    Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="MortTele">',"<Value>",str(ivrmaster:mortgagee_telephone,"(999)999-9999"),"</Value>","</Key>","<NL>")
+--   else
+  --  Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="MortTele">',"<Value>","</Value>","</Key>","<NL>")
+   }
+
+
+-- Detail Line #9 payment plan
+   if ivrmaster:payment_plan_str <> "" then
+   {
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="PayPlan">',"<Value>",trun(ivrmaster:payment_plan_str),"</Value>","</Key>","<NL>")
+   }
+
+-- Detail Line #10 line of business
+   if ivrmaster:line_of_business_str <> "" then
+   {
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="LineofBusiness">',"<Value>",trun(ivrmaster:line_of_business_str),"</Value>","</Key>","<NL>")
+   }
+
+-- remit name
+   if sfscompany:name[1] <> "" then
+   {
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="RemitName">',"<Value>",trun(sfscompany:name[1]),"</Value>","</Key>","<NL>")
+   }
+
+-- remit address 1
+   if sfscompany:address[1] <> "" then
+   {
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="RemitAddress1">',"<Value>",trun(sfscompany:address[1]),"</Value>","</Key>","<NL>")
+   }
+
+-- remit address 2
+   if sfscompany:address[2] <> "" then
+   {
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="RemitAddress2">',"<Value>",trun(sfscompany:address[2]),"</Value>","</Key>","<NL>")
+   }
+
+-- remit address3
+   l_remit_address3 = " "
+   l_remit_address3 = trun(sfscompany:city) + ", " +  trun(sfscompany:str_state) + " " + trun(sfscompany:str_zipcode)
+   if l_remit_address3 <> "" then
+   {
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="RemitAddress3">',"<Value>",trun(l_remit_address3),"</Value>","</Key>","<NL>")
+   }
+
+-- aging 0-30
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="Aging00">',"<Value>",trun(l_bal_due1),"</Value>","</Key>","<NL>")
+
+-- aging 31-60
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="Aging30">',"<Value>",trun(l_31_60_amount),"</Value>","</Key>","<NL>")
+
+-- aging 61-90
+-- past due date
+   if ivrmaster:past_due_amount <> 0 then
+   {
+     l_past_due_date_str = " "
+     l_past_due_date_str = str(ivrmaster:past_due_due_date,"YYYYMMDD")
+     l_past_due_date = 0
+     l_past_due_date = val(l_past_due_date_str)
+     Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="Aging60">',"<Value>",l_past_due_date_str,"</Value>","</Key>","<NL>")
+   }
+--   else
+--     Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="Aging60">',"<Value>","0.00","</Value>","</Key>","<NL>")
+
+
+   if l_over_90_amount = 0 then
+   {
+    l_over_90_amount1 = str(l_over_90_amount,"9.99")
+-- aging over 90
+    Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="Aging90">',"<Value>",trun(l_over_90_amount1),"</Value>","</Key>","<NL>")
+   }
+
+-- balance forward
+   l_bal_forward1 = str(l_bal_forward,"9.99")
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="BalanceForward">',"<Value>",trun(l_bal_forward1),"</Value>","</Key>","<NL>")
+
+-- invoice total
+--   if ivrmaster:total_amount_due = 0 then
+  --   l_invoice_total = str(ivrmaster:total_amount_due,"9.99")
+  -- else
+   --  l_invoice_total = str(ivrmaster
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="BalanceDue">',"<Value>",trun(l_bal_due2),"</Value>","</Key>","<NL>")
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="CurrentCharge">',"<Value>",trun(l_bal_due2),"</Value>","</Key>","<NL>")
+
+-- unapplied amount
+   l_future_installments = ""
+   l_future_installments1 =""
+   if ivrmaster:future_installments = 0 then
+    l_future_installments = str(ivrmaster:future_installments,"9.99")
+   else
+   {
+     l_temp = str(ivrmaster:future_installments,"ZZZZZZZZZ9.99")
+     l_loop = 1
+     while l_temp[l_loop] = " " and
+      l_loop <= 13
+      {
+       l_loop = l_loop + 1
+      }
+
+     l_future_installments = l_temp[l_loop,13]
+     l_future_installments1 = "$" + trun(l_future_installments)
+    }
+   Writefile (l_mobout_file,"%s%s%s%s%s%s",'<Key name="UnappliedAmount">',"<Value>",trun(l_future_installments1),"</Value>","</Key>","<NL>")
+
+   writefile(l_mobout_file,"%s%s","</OtherFields>","<NL>")
+   writefile(l_mobout_file,"%s%s","</Page>","<NL>")
+
+   writefile(l_mobout_file,"%s%s","</Pages>","<NL>")
+   writefile(l_mobout_file,"%s%s","</Invoice>","<NL>")
+  }
+}
+
+Screen Exit
+writefile(l_mobout_file,"%s%s","</Invoices>","<NL>")
+Write ("%c%s%n",18001,"Number of Records on File .........",L_COUNTER)
+Write ("<NL><NL>")
+
+--Writefile (L_mob_LOG,"%s%s","User running update : ",USERNAME+"<NL><NL>")
+--Writefile (L_mob_LOG,"%s%s","Number of Records on SFPCURRENT File : ",Str(L_COUNTER,"999999")+"<NL><NL>")
+--Writefile (L_mob_LOG,"%s%s","Number of Records on custinvoicedata  File : ",Str(L_MASTER_COUNTER,"999999")+"<NL><NL>")
+--Writefile (L_mob_LOG,"%s%s","Processing Complete at : ",Str(TODAYSDATE) + " " + Str(SYSTEMTIME)+"<NL>")
+--Closefile (L_mob_LOG)
+closefile (l_mobout_file)
+
+proc("cli /usr/bin/perl -pi -e 's/\n/\r\n/;' %s",l_mobOUT_FILE)/casesensitive
+proc("cli /usr/bin/perl -pi -e 's/&/&amp;/g;' %s",l_mobOUT_FILE)/casesensitive
+
+--writefile(l_filename_script,"mv %s %s",l_mobout_file,l_mobout_file1)
+--closefile(l_filename_script)
+
+--proc ("cli chmod 777 %s",l_filename_script)
+
+--proc ("cli %s",l_filename_script)
+
+
+/*
+procedure definition
+
+string function format_number(string p_number)
+ BEGIN
+     l_loop = 1
+     while p_number[l_loop] = " " and
+      l_loop <= 13
+      {
+       l_loop = l_loop + 1
+      }
+
+ return p_number[l_loop,13]
+ END
+
+
+*/
+
+End

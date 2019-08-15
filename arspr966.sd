@@ -1,0 +1,71 @@
+                                                       ____________
+            *----------------------------------------*
+            |                                        |
+            |                                        |
+            |       Printer:       __________        |
+            |       All Copies:    _                 |
+            |                                        |
+            *----------------------------------------*
+
+%%
+Screen
+        Name = "arspr966" ;
+        Type = "Detail" ;
+        Padcharacter=Space;
+        Highlite=Underscore;
+        Domain="ARSPRINTER";
+        Screensize = "dynamic";
+        Windowtitle="%a     %s - A/R Date - Printer Entry    %m";
+        iconline = 0;
+
+        Global Wdate G_STARTING_DATE ;
+        Global Wdate G_ENDING_DATE ;
+        Global String G_COMPANY_ID[10];
+        Global String G_COMPANY[10];
+        Global String G_REPORT_DEVICE[10];
+        Global Unsigned Ascii Number G_COPIES[1];
+        Global unsigned ascii number G_printer_no[4];
+
+        String L_USERNAME[15];
+        String L_ENTER[1];
+        Unsigned Ascii Number L_COPIES[1];
+
+        Access ARSPRINTER, Set ARSPRINTER:COMPANY_ID = G_COMPANY_ID, Approximate;
+
+        Include "STDKEYS.INC"
+        !F11="work";
+Functions
+
+        Include "STDFUNC7.INC"
+        "WORK" Proc/noconsole "cli arsprinter.mk" ;
+
+        -- include "SCIPSPRINT.FUN"
+
+Fields
+101     FUNCTION/noecho/showasguidetext ;
+501     Begin
+          L_USERNAME = USERNAME
+          Access SFSPRINTER,
+             Set SFSPRINTER:COMPANY_ID = G_COMPANY_ID,
+                 SFSPRINTER:USER_ID    = L_USERNAME, Generic
+        End
+        ARSPRINTER:PRINTER
+        Begin
+          G_REPORT_DEVICE = SFSPRINTER:REPORT_DEVICE
+          G_printer_no    = sfsprinter:printer_no
+        End
+        Activehelp SFSPRINTER:REPORT_DEVICE,
+                   SFSPRINTER:USER_ID ;
+601     L_COPIES/checkbox/values="0,1";
+
+Screen Exit
+        If ARSPRINTER:COMPANY_ID <> ""
+            Then G_COMPANY_ID = ARSPRINTER:COMPANY_ID;
+        G_REPORT_DEVICE = ARSPRINTER:PRINTER ;
+        G_COPIES = L_COPIES ;
+        Access ARSPRINTER_ALT,
+           Set ARSPRINTER_ALT:COMPANY_ID = ARSPRINTER:COMPANY_ID
+
+        Delete ARSPRINTER_ALT -- cleans up file for next date entry
+
+End

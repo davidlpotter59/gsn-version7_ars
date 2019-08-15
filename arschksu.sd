@@ -1,0 +1,99 @@
+SCIPS(c) Insurance Systems                             Function [____________]
+Screen 4. ARSCHKSU Update Screen
+ Company Id:       __________
+ Check Reference:        _______
+ Payor Name:       __________________________________________________
+ payor address:    __________________________________________________
+ payor city        ______________________________  state: __
+ Policy Number:        _________
+ Check Number:     ____________________
+ Check Amount:     _____________
+ Agent Number:              ____
+ Master Reference:       _______
+ Bank Number:      _______________
+ Transaction Date: __________
+ Posted Date:      __________
+ Post Dated:       _
+ Check Date:       __________
+ Comments: ____________________________________________________________
+ Disposition :     _________
+ Balance :         ____________
+ Pol year:         ____
+ Trans Eff:        __________
+ status:           _____
+ internal check:   __
+ return date:      __________
+%%
+Screen
+        Name = "Arschksu" ;
+        Type = "Detail" ;
+        padcharacter = space ;
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_CHECK_REFERENCE[7] ;
+
+        Access ARSCHKSU,
+           Set ARSCHKSU:COMPANY_ID = G_COMPANY_ID ,
+               ARSCHKSU:CHECK_REFERENCE = G_CHECK_REFERENCE ;
+
+
+        Include "STDKEYS.INC"
+
+Functions
+        Add/reuse;            /* Add a record */
+        Change;         /* Change an existing record */
+        Delete;         /* Delete an existing record */
+
+        Find ;          /* Select a record using an exact key */
+        Search;         /* Select a record using an approximate key */
+        Next;           /* Display the next record(s) in key sequence */
+        Previous;       /* Display the previous record(s) in key sequence */
+        View;           /* View the contents of freetext fields */
+
+        Page/noreturn;  /* Display a different page - no going back */
+
+"Back"  Return;         /* Back to previous screen */
+"Exit"  Return;
+        Return;
+
+"Bye"   Stop;           /* Terminate this session */
+        Stop;
+
+        Print;          /* Print the screen on the default printer */
+"Cq"    Proc "CQ";      /* Enter Cyberquery */
+"Cli"   Proc ":CLI";    /* Push to the CLI */
+
+Fields
+        FUNCTION ;
+0301     ARSCHKSU:COMPANY_ID                     Mandatory;
+0401     ARSCHKSU:CHECK_REFERENCE                Mandatory;
+0501     ARSCHKSU:PAYOR_NAME                     Mandatory;
+0601     arschksu:payor_address  ;
+0701     arschksu:payor_city ;
+0702     arschksu:payor_str_state ;
+0801     ARSCHKSU:POLICY_NO                      Mandatory;
+0901     ARSCHKSU:CHECK_NO                       Mandatory;
+1001     ARSCHKSU:CHECK_AMOUNT                   Mandatory;
+1101     ARSCHKSU:AGENT_NO                       Mandatory;
+1201    ARSCHKSU:MASTER_REFERENCE               Mandatory;
+1301    ARSCHKSU:BANK_NO;
+1401    ARSCHKSU:TRANS_DATE;
+1501    ARSCHKSU:POSTED_DATE;
+1601    ARSCHKSU:POST_DATED;
+1701    ARSCHKSU:CHECK_DATE;
+1801    ARSCHKSU:COMMENTS;
+1901    arschksu:disposition/upper ;
+2001    arschksu:balance ;
+2101    arschksu:pol_year ;
+2201    arschksu:trans_eff ;
+2301    arschksu:disposition ;
+2401    arschksu:internal_check;
+2501    arschksu:return_date ;
+
+Screen Exit
+        If ARSCHKSU:COMPANY_ID > "" Then G_COMPANY_ID = ARSCHKSU:COMPANY_ID ;
+        If ARSCHKSU:CHECK_REFERENCE > 0
+        Then G_CHECK_REFERENCE = ARSCHKSU:CHECK_REFERENCE ;
+
+
+End

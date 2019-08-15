@@ -1,0 +1,158 @@
+Cyberscreen System                                     Function [____________]
+Screen 1. ARSBILLING Update Screen
+ 1. Company Id:             __________ 25. Installment Amount:   ___________
+ 2. Policy Number:          _________  26. Premium:            _____________
+ 3. Transaction Date:       __________ 27. Status Date:           __________
+ 4. Transaction Effective:  __________ 28. Total Amount Paid:    ___________
+ 5. Transaction Expiration: __________ 29. Billing Plan:                  __
+ 6. Transaction Code:            ____  30. Payment Plan:                ____
+ 7. Line Of Business:            ____  31. Installment Charge:     _________
+ 8. Commission Rate:            _____  32. User Console:            ________
+ 9. Sub Code:                    ____  33. User:             _______________
+10. Billing Ctr:                 ____  34. Printed:                        _
+11. Return Check Ctr:            ____  35. Write Off:                      _
+12. Agent Number:                ____  36. Write Off Amount:     ___________
+13. Status:                 _          37. Write Off Date:     __________
+14. Trans Eff Mm:                  __  38. Check Number: ____________________
+15. Trans Eff Dd:                  __  39. Check Voided:                   _
+16. Trans Eff Yyyy:              ____  40. Prior Status:                   _
+17. Lob Subline:            __         41. Prior Status Date:     __________
+18. Billed Date:            __________ 42. Reinstated:                     _
+19. Due Date:               __________ 43. Prior Trans Code:            ____
+20. Disbursement amount:     _________ 44. Record replaced:                _
+21. Payment offset:          _________ 45. AP subcode :                 ____
+22. auto write off:                 __ 46. consent order:                 __
+23. Pol Year:                     ____ 47. end sequence:                ____
+24. AC net amount due:       _________ 48. reverse updated:                _
+    reversed premium                __
+%%
+Screen
+        Name = "Arsbilling" ;
+        Type = "Detail" ;
+        padcharacter = space ;
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+        Global Wdate G_TRANS_DATE ;
+        Global Wdate G_TRANS_EFF ;
+        Global Wdate G_TRANS_EXP ;
+        Global Unsigned Ascii Number G_TRANS_CODE[4] ;
+        Global Unsigned Ascii Number G_LINE_OF_BUSINESS[4] ;
+        Global Unsigned Ascii Number G_COMM_RATE[4]/decimals=2 ;
+        Global Unsigned Ascii Number G_SUB_CODE[4] ;
+        Global Unsigned Ascii Number G_BILLING_CTR[4] ;
+        Global Unsigned Ascii Number G_RETURN_CHECK_CTR[4] ;
+
+        Access ARSBILLING,
+           Set ARSBILLING:COMPANY_ID = G_COMPANY_ID ,
+               ARSBILLING:POLICY_NO = G_POLICY_NO ,
+               ARSBILLING:TRANS_DATE = G_TRANS_DATE ,
+               ARSBILLING:TRANS_EFF = G_TRANS_EFF ,
+               ARSBILLING:TRANS_EXP = G_TRANS_EXP ,
+               ARSBILLING:TRANS_CODE = G_TRANS_CODE ,
+               ARSBILLING:LINE_OF_BUSINESS = G_LINE_OF_BUSINESS ,
+               ARSBILLING:COMM_RATE = G_COMM_RATE ,
+               ARSBILLING:SUB_CODE = G_SUB_CODE ,
+               ARSBILLING:BILLING_CTR = G_BILLING_CTR ,
+               ARSBILLING:RETURN_CHECK_CTR = G_RETURN_CHECK_CTR ;
+
+
+        Include "STDKEYS.INC"
+
+Functions
+        Add/reuse;            /* Add a record */
+        Change;         /* Change an existing record */
+        Delete;         /* Delete an existing record */
+
+        Find ;          /* Select a record using an exact key */
+        Search;         /* Select a record using an approximate key */
+        Next;           /* Display the next record(s) in key sequence */
+        Previous;       /* Display the previous record(s) in key sequence */
+        View;           /* View the contents of freetext fields */
+
+        Page/noreturn;  /* Display a different page - no going back */
+
+"Back"  Return;         /* Back to previous screen */
+"Exit"  Return;
+        Return;
+
+"Bye"   Stop;           /* Terminate this session */
+        Stop;
+
+        Print;          /* Print the screen on the default printer */
+"Cq"    Proc "CQ";      /* Enter Cyberquery */
+"Cli"   Proc ":CLI";    /* Push to the CLI */
+
+Fields
+        FUNCTION ;
+301     ARSBILLING:COMPANY_ID                   Mandatory;
+401     ARSBILLING:POLICY_NO                    Mandatory;
+501     ARSBILLING:TRANS_DATE                   Mandatory;
+601     ARSBILLING:TRANS_EFF                    Mandatory;
+701     ARSBILLING:TRANS_EXP                    Mandatory;
+801     ARSBILLING:TRANS_CODE                   Mandatory;
+901     ARSBILLING:LINE_OF_BUSINESS             Mandatory;
+1001    ARSBILLING:COMM_RATE                    Mandatory;
+1101    ARSBILLING:SUB_CODE                     Mandatory;
+1201    ARSBILLING:BILLING_CTR                  Mandatory;
+1301    ARSBILLING:RETURN_CHECK_CTR             Mandatory;
+1401    ARSBILLING:AGENT_NO                     Mandatory;
+1501    ARSBILLING:STATUS                       Mandatory;
+1601    ARSBILLING:TRANS_EFF_MM;
+1701    ARSBILLING:TRANS_EFF_DD;
+1801    ARSBILLING:TRANS_EFF_YYYY;
+1901    ARSBILLING:LOB_SUBLINE;
+2001    ARSBILLING:BILLED_DATE;
+2101    ARSBILLING:DUE_DATE;
+2201    arsbilling:disbursement_amount ;
+2301    arsbilling:payment_offset ;
+2401    arsbilling:auto_write_off ;
+2501    arsbilling:pol_year ;
+2601    arsbilling:ac_net_amount_due ;
+302     ARSBILLING:INSTALLMENT_AMOUNT;
+402     ARSBILLING:PREMIUM;
+502     ARSBILLING:STATUS_DATE;
+602     ARSBILLING:TOTAL_AMOUNT_PAID;
+702     ARSBILLING:BILL_PLAN;
+802     ARSBILLING:PAYMENT_PLAN;
+902     ARSBILLING:INSTALLMENT_CHARGE;
+1002    ARSBILLING:USER_CONSOLE;
+1102    ARSBILLING:USER;
+1202    ARSBILLING:PRINTED;
+1302    ARSBILLING:WRITE_OFF;
+1402    ARSBILLING:WRITE_OFF_AMOUNT;
+1502    ARSBILLING:WRITE_OFF_DATE;
+1602    ARSBILLING:CHECK_NO;
+1702    ARSBILLING:CHECK_VOIDED;
+1802    ARSBILLING:PRIOR_STATUS;
+1902    ARSBILLING:PRIOR_STATUS_DATE;
+2002    ARSBILLING:REINSTATED;
+2102    ARSBILLING:PRIOR_TRANS_CODE;
+2202    arsbilling:record_replaced ;
+2302    arsbilling:ap_subcode ;
+2402    arsbilling:consent_order;
+2502    arsbilling:end_sequence ;
+2701    arsbilling:reversed_premium ;
+2602    arsbilling:reversed_updated ;
+
+Screen Exit
+        If ARSBILLING:COMPANY_ID > ""
+        Then G_COMPANY_ID = ARSBILLING:COMPANY_ID ;
+        If ARSBILLING:POLICY_NO > 0 Then G_POLICY_NO = ARSBILLING:POLICY_NO ;
+        If ARSBILLING:TRANS_DATE > 0
+        Then G_TRANS_DATE = ARSBILLING:TRANS_DATE ;
+        If ARSBILLING:TRANS_EFF > 0 Then G_TRANS_EFF = ARSBILLING:TRANS_EFF ;
+        If ARSBILLING:TRANS_EXP > 0 Then G_TRANS_EXP = ARSBILLING:TRANS_EXP ;
+        If ARSBILLING:TRANS_CODE > 0
+        Then G_TRANS_CODE = ARSBILLING:TRANS_CODE ;
+        If ARSBILLING:LINE_OF_BUSINESS > 0
+        Then G_LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS ;
+        If ARSBILLING:COMM_RATE > 0 Then G_COMM_RATE = ARSBILLING:COMM_RATE ;
+        If ARSBILLING:SUB_CODE > 0 Then G_SUB_CODE = ARSBILLING:SUB_CODE ;
+        If ARSBILLING:BILLING_CTR > 0
+        Then G_BILLING_CTR = ARSBILLING:BILLING_CTR ;
+        If ARSBILLING:RETURN_CHECK_CTR > 0
+        Then G_RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR ;
+
+
+End

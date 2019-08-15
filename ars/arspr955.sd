@@ -1,0 +1,83 @@
+%%
+Screen
+        Name = "arspr955" ;
+        Type = "Detail" ;
+        Padcharacter=Space;
+        Highlite=Underscore;
+        Domain="ARSDATES2";
+        Screensize = "dynamic";
+        Windowtitle="%a     %s - A/R Date Entry (As Of) - Version 7.00   %m";
+        iconline = 0;
+
+        Global Wdate G_STARTING_DATE ;
+        Global Wdate G_ENDING_DATE ;
+        Global String G_COMPANY_ID[10];
+
+        Access ARSDATES2, Set ARSDATES2:COMPANY_ID = G_COMPANY_ID, Approximate ;
+
+        Include "STDKEYS7.INC"
+
+Style Definition
+    include "styles.inc"
+
+Functions
+
+        Include "STDFUNC7.INC"
+
+        -- include "SCIPSPRINT.FUN"
+
+Initialization
+   G_STARTING_DATE = 01.01.1900
+   G_ENDING_DATE   = 00.00.0000
+
+Screen
+
+Properties
+    {
+    LayOutType      = Column
+    }
+{
+
+Panel Tagged Header_pl
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = AsNeeded
+    }
+{
+%%
+                                                       ____________
+            *----------------------------------------*
+            |                                        |
+            |        As Of Date:   ___________       |
+            |                                        |
+            *----------------------------------------*
+%%
+
+Components
+
+Fields
+101     FUNCTION/noecho/showasguidetext ;
+401     Begin
+        G_STARTING_DATE = 00.00.0000
+        G_ENDING_DATE = Dateadd(01.01.0000,Month(G_STARTING_DATE),
+                        Year(G_STARTING_DATE) Mod 100) -1
+        End
+        G_ENDING_DATE/mask="MM/DD/YYYY"/default   { Mandatory }
+            Error "Ending Date Can Not be Less Than the Starting Date"
+            If G_ENDING_DATE < G_STARTING_DATE
+        ;
+0401    Begin
+           G_STARTING_DATE = G_ENDING_DATE
+        End
+        G_ENDING_DATE/mask="MM/DD/YYYY"/displayonly ;
+}
+}
+
+Screen Exit
+        If ARSDATES2:COMPANY_ID <> ""
+            Then G_COMPANY_ID = ARSDATES2:COMPANY_ID;
+        Access ARSDATES2_ALT, Set ARSDATES2_ALT:COMPANY_ID = ARSDATES2:COMPANY_ID
+        Delete ARSDATES2_ALT -- cleans up file for next date entry
+
+End

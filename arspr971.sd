@@ -1,0 +1,81 @@
+%%
+Screen
+        Name = "Arspr971" ;
+        Type = "Detail" ;
+        Padcharacter=Space;
+        Highlite=Underscore;
+        Domain="ARSPOLICY";
+        Screensize = "dynamic";
+        Windowtitle="%a     %s - A/R Agent Number Entry  4.00  %m";
+
+        Global Unsigned Ascii Number G_POLICY_NO[9]/decimals=0 ;
+        Global String G_COMPANY_ID[10],
+                      l_continue_1[50];
+        Global Unsigned Ascii Number G_AGENT_NO[4]/decimals=0;
+
+        Access ARSPOLICY, Set ARSPOLICY:COMPANY_ID = G_COMPANY_ID, Approximate ;
+
+        Include "STDKEYS.INC"
+
+Style Definition
+    include "styles.inc"
+
+Functions
+
+        Include "STDFUNC7.INC"
+Menu Definition
+    include "stdmenu7.inc"
+}
+
+ToolBar Definition
+    include "stdtoolbar7.inc"
+}
+
+Screen
+Properties
+    {
+    LayOutType      = Column
+    }
+{
+
+Panel Tagged Header_pl
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = AsNeeded
+    }
+{
+%%
+                                                       ____________
+            *----------------------------------------*
+            |                                        |
+            |        Agent Number: _________         |
+            |                                        |
+            |                                        |
+            |                                        |
+            |                                        |
+            |                                        |
+            |                                        |
+            |                                        |
+            *----------------------------------------*
+%%
+
+Components
+
+Fields
+101     FUNCTION/noecho/showasguidetext ;
+401     Begin
+            Access SFSAGENT, Set SFSAGENT:COMPANY_ID = G_COMPANY_ID, Approximate
+        End
+        G_AGENT_NO
+        Activehelp SFSAGENT:AGENT_NO, SFSAGENT:NAME[1];
+}
+}
+
+Screen Exit
+        If ARSPOLICY:COMPANY_ID <> ""
+            Then G_COMPANY_ID = ARSPOLICY:COMPANY_ID;
+        Access ARSPOLICY_ALT, Set ARSPOLICY_ALT:COMPANY_ID = ARSPOLICY:COMPANY_ID
+        Delete ARSPOLICY_ALT -- cleans up file for next date entry
+
+End

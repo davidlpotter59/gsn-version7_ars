@@ -1,0 +1,189 @@
+%%
+Screen
+        Name = "arsmt035" ;
+        Type = "Detail" ;
+        Highlight=Underscore;
+        Screensize="dynamic" ;
+        Padcharacter = Space;
+        Domain = "ARSPAYPLAN";
+        Windowtitle="%a     %s Payments Plans - Ver. 7.00    %m";
+--      resizeable = yes ;
+        iconline = 0 ;
+
+        Local Unsigned Ascii Number L_TOTAL[4]=0/decimals=3,
+                                    L_CTR[2]=0,
+                                    L_TOTAL_PERCENT[3]=0/decimals=2;
+
+        Include "stdkeys7.inc"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        add/reuse  tagged add_fn;
+
+        Include "stdfunc7.inc"
+
+Menu Definition
+
+        Include "stdmenu7.inc"
+
+}
+
+Toolbar Definition
+
+        Include "stdtoolbar7.inc"
+}
+
+screen
+{
+%%
+                                                        _______________
+*------------------------------------------------------------------------------*
+| Company Id: __________  ____________________________________________________ |
+| LOB:        ____   ________________________________________                  |
+| Pay Plan:   _____  ________________________________________                  |
+*-------------------------------------------*----------------------------------*
+| Number of Payments ___ Min Premium ______ | Months Between __                |
+| Installment Charge     Manual Plan      _ | Days Between  ___                |
+| Type: _____ Time _____ Rate         _____ |                                  |
+*-------------------------------------------*----------------------------------*
+|                      D i s t r i b u t i o n                                 |
+|                                                                              |
+|    [1]      [2]      [3]      [4]      [5]      [6]      [7]                 |
+| ______   ______   ______   ______   ______   ______   ______                 |
+|                                                                              |
+|    [8]      [9]     [10]     [11]     [12]     [13]     TOTAL                |
+| ______   ______   ______   ______   ______   ______   _______                |
+*------------------------------------------------------------------------------*
+
+%%
+
+components
+
+Fields
+        FUNCTION/noecho/showasguidetext;
+0301    ARSPAYPLAN:COMPANY_ID
+        include "companyhlp.inc"
+0302    SFSCOMPANY:NAME[1];
+0401    ARSPAYPLAN:LINE_OF_BUSINESS
+        include "linehlp.inc"
+0402    SFSLINE:DESCRIPTION;
+0501    ARSPAYPLAN:PAYMENT_PLAN                     Mandatory ;
+0502    ARSPAYPLAN:DESCRIPTION;
+0701    ARSPAYPLAN:NUMBER_OF_PAYMENTS;
+0702    ARSPAYPLAN:MINIMUM_PREMIUM ;
+0703    ARSPAYPLAN:INSTALLMENT_MONTHS_BETWEEN
+        Error "Months must be less than 12"
+            If ARSPAYPLAN:INSTALLMENT_MONTHS_BETWEEN > 12
+        Hide If ARSPAYPLAN:INVOICE_DAYS_BETWEEN <> 0;
+0801    ARSPAYPLAN:MANUAL_PAYMENT_PLAN/checkbox/values="0,1";
+0702    Begin
+        If ARSPAYPLAN:MANUAL_PAYMENT_PLAN One Of 1 Then
+            Begin
+            ARSPAYPLAN:MINIMUM_PREMIUM = ARSPAYPLAN:MINIMUM_PREMIUM
+            End
+        End
+        ARSPAYPLAN:MINIMUM_PREMIUM/displayonly ;
+0802    ARSPAYPLAN:INVOICE_DAYS_BETWEEN
+        Hide If ARSPAYPLAN:INSTALLMENT_MONTHS_BETWEEN <> 0;
+0901    ARSPAYPLAN:INSTALLMENT_CHARGE_TYPE/upper
+
+        Activehelp ARSBPTYPE:BILLING_TYPE/returntofield,
+                   ARSBPTYPE:DESCRIPTION ;
+902     ARSPAYPLAN:INSTALLMENT_CHARGE_TIME/upper
+
+        Activehelp ARSBPTIME:BILLING_TIME/returntofield,
+                   ARSBPTIME:DESCRIPTION ;
+903     ARSPAYPLAN:INSTALLMENT_CHARGE_RATE;
+
+        /* begin the actual distribution of buckets */
+1707    Begin
+            Do ACCUMULATE_TOTALS
+        End
+        L_TOTAL/displayonly;
+1401    ARSPAYPLAN:DISTRIBUTION[1]
+        Do ACCUMULATE_TOTALS;
+1707    L_TOTAL/displayonly ;
+1402    ARSPAYPLAN:DISTRIBUTION[2]
+        Do ACCUMULATE_TOTALS
+        Hide If ARSPAYPLAN:NUMBER_OF_PAYMENTS < 2;
+1707    L_TOTAL/displayonly ;
+1403    ARSPAYPLAN:DISTRIBUTION[3]
+        Do ACCUMULATE_TOTALS
+        Hide If ARSPAYPLAN:NUMBER_OF_PAYMENTS < 3;
+1707    L_TOTAL/displayonly ;
+1404    ARSPAYPLAN:DISTRIBUTION[4]
+        Do ACCUMULATE_TOTALS
+        Hide If ARSPAYPLAN:NUMBER_OF_PAYMENTS < 4;
+1707    L_TOTAL/displayonly ;
+1405    ARSPAYPLAN:DISTRIBUTION[5]
+        Do ACCUMULATE_TOTALS
+        Hide If ARSPAYPLAN:NUMBER_OF_PAYMENTS < 5;
+1707    L_TOTAL/displayonly ;
+1406    ARSPAYPLAN:DISTRIBUTION[6]
+        Do ACCUMULATE_TOTALS
+        Hide If ARSPAYPLAN:NUMBER_OF_PAYMENTS < 6;
+1707    L_TOTAL/displayonly ;
+1407    ARSPAYPLAN:DISTRIBUTION[7]
+        Do ACCUMULATE_TOTALS
+        Hide If ARSPAYPLAN:NUMBER_OF_PAYMENTS < 7;
+1707    L_TOTAL/displayonly ;
+1701    ARSPAYPLAN:DISTRIBUTION[8]
+        Do ACCUMULATE_TOTALS
+        Hide If ARSPAYPLAN:NUMBER_OF_PAYMENTS < 8;
+1707    L_TOTAL/displayonly ;
+1702    ARSPAYPLAN:DISTRIBUTION[9]
+        Do ACCUMULATE_TOTALS
+        Hide If ARSPAYPLAN:NUMBER_OF_PAYMENTS < 9;
+1707    L_TOTAL/displayonly ;
+1703    ARSPAYPLAN:DISTRIBUTION[10]
+        Do ACCUMULATE_TOTALS
+        Hide If ARSPAYPLAN:NUMBER_OF_PAYMENTS < 10;
+1707    L_TOTAL/displayonly ;
+1704    ARSPAYPLAN:DISTRIBUTION[11]
+        Do ACCUMULATE_TOTALS
+        Hide If ARSPAYPLAN:NUMBER_OF_PAYMENTS < 11;
+1707    L_TOTAL/displayonly ;
+1705    ARSPAYPLAN:DISTRIBUTION[12]
+        Do ACCUMULATE_TOTALS
+        Hide If ARSPAYPLAN:NUMBER_OF_PAYMENTS < 12;
+1707    L_TOTAL/displayonly ;
+1706    ARSPAYPLAN:DISTRIBUTION[13]
+        Do ACCUMULATE_TOTALS
+        Hide If ARSPAYPLAN:NUMBER_OF_PAYMENTS < 13;
+1707    L_TOTAL/displayonly ;
+1707    ARSPAYPLAN:DISTRIBUTION[14]
+        Do ACCUMULATE_TOTALS
+        Hide If ARSPAYPLAN:NUMBER_OF_PAYMENTS < 14;
+
+}
+
+Preupdate
+L_TOTAL_PERCENT = 0
+L_CTR = 0
+For L_CTR = 1 To 13
+    Begin
+    L_TOTAL_PERCENT = L_TOTAL_PERCENT + ARSPAYPLAN:DISTRIBUTION[L_CTR]
+    End
+If L_TOTAL_PERCENT > 1 Then
+    Begin
+    Warning "Total Percentages entered is greater than 100% "
+    Getfield(ARSPAYPLAN:DISTRIBUTION[13])
+    End
+
+Procedure Definition
+
+Procedure ACCUMULATE_TOTALS
+Begin
+L_TOTAL = 0 /* clear out the accumulator here */
+L_CTR = 0
+For L_CTR = 1 To 13
+    Begin
+    L_TOTAL = L_TOTAL + ARSPAYPLAN:DISTRIBUTION[L_CTR]
+    End
+end
+
+End

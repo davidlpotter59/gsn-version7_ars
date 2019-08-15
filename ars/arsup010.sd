@@ -1,0 +1,724 @@
+%% 
+Program
+        Name = "arsup010" ;
+        Type = "File" ;
+        Domain = "FLAT";
+        Recordlock=Immediate ;
+        Padcharacter = Space ;
+
+/*  first program in the processing payments process
+
+    12/19/2001 - dlp - all dates in the arschkwrk key are now in YYYYDDMM
+                       format.  this will fix the problem with months that
+                       are earlier in a subsequent year than the current year
+                       being paid prior to the current month
+
+*/
+        Number COUNTER = 0 ;
+
+        Signed Ascii Number   L_TOTAL[9]=0/decimals=2,
+                              L_TOTAL_OPEN[9]=0/decimals=2,
+                              L_BALANCE[9]=0/decimals=2;
+
+        Unsigned Ascii Number L_CTR=0/decimals=0,
+                              L_ERR=0/decimals=0,
+                              L_HOLD_BILLING_CTR=0,
+                              L_TRANS_CODE[4]=0/decimals=0;
+
+        Unsigned Ascii Number L_POLICY_NO[9];
+
+        String L_OUTFILE[12]="arsup010.log",
+               L_ENTER[1]="",
+               L_USED_CHECK[1]="N",
+               L_VALID_POLICY[1]="N";
+        String L_COMPANY_ID[10]="";
+        Unsigned Ascii Number L_SUB_CODE[4]=0/decimals=0;
+        Unsigned Ascii Number L_RETURN_CHECK_CTR[4]=0/decimals=0;
+        Wdate L_TRANS_DATE;
+        String L_DISBURSEMENT_CREATED[1]="N";
+        Rwdate L_DUE_DATE;
+        Unsigned Ascii Number L_CHECK_REFERENCE[7]=0/decimals=0;
+        Unsigned Ascii Number L_COMM_RATE[4]=0/decimals=2;
+        String L_DEFAULT_RELEASE[1]="";
+        String L_VALID_CHECK[1]="N";
+
+Initialisation
+--    Lock ARSCHKSU
+COUNTER = 0
+
+-- create the new check work file
+If SYSTEM[1,3]="Win" Then
+Begin
+    Proc("arschkwrk")/noconsole
+End
+Else
+Begin
+    Proc ("arschkwrk.mk")/noconsole
+End
+
+    L_POLICY_NO = Val(COMMANDLINE[1,9])
+    Access SFPCURRENT, Set SFPCURRENT:POLICY_NO = L_POLICY_NO
+    If SFPCURRENT:POLICY_NO = L_POLICY_NO Then
+    { L_VALID_POLICY = "Y" }
+    Else
+    { L_VALID_POLICY = "N" }
+
+COUNTER = COUNTER + 1
+If COUNTER = 1 Then
+Begin
+
+-- delete any previous sessions log file left around
+--    Deletefile (L_OUTFILE)
+
+-- setting up log file for basic information
+    Writefile (L_OUTFILE,"%s%d%s","Run Date: ",TODAYSDATE,"<NL>")
+    Writefile (L_OUTFILE,"%s%t%s","Time :    ",SYSTEMTIME,"<NL>")
+    Writefile (L_OUTFILE,"%s%s%s","User :    ",USERNAME,"<NL>")
+    Writefile (L_OUTFILE,"%s%x%s%s%s","Terminal :",CONSOLE,"/",TERMINAL,"<NL>")
+    Writefile (L_OUTFILE,"%s","|>----------------------------------------------------------<|<NL><NL>")
+
+End
+
+If L_POLICY_NO <> 0 Then
+Begin
+-- process just for one policy
+    Access ARSCHKSU, Set ARSCHKSU:POLICY_NO = L_POLICY_NO, Using Fourth Index, Approximate
+
+    While ARSCHKSU:POLICY_NO = L_POLICY_NO
+    Begin
+
+    If ARSCHKSU:POLICY_NO <> 0 And      -- if an Application dont process
+       ARSCHKSU:DISPOSITION = "OPEN" And  -- only process open checks
+       ARSCHKSU:PAYOR_TYPE <> "C" And       -- credit cards are processed elsewhere
+       ARSCHKSU:CHECK_HOLD <> "1"
+    Then Begin
+
+/* this procedure accumulated the "B" status amounts into l_total and the "O"
+   status amounts into l_total_open */
+
+    Do BALANCE_CHECK
+
+    If L_TOTAL <> 0 Or
+       L_TOTAL_OPEN  <> 0 Then  -- l_ctr is used to count the trans
+    Begin                 -- this is just FYI at this point
+       Do BUILD_WORK_FILE -- this is the 1st pass for "B" status records
+       Do PROCESS_OPEN_RECORDS -- the is the 2nd pass for "O" status records
+       Do UPDATE_WORK_FILE_BALANCES
+
+
+If L_BALANCE > 0 Then   -- check has remaining amount
+   Begin
+-- comment this line while developing this logic
+       Do PROCESS_DISBURSEMENT_RECORDS
+       Do CREATE_ACCOUNTS_PAYABLE
+       L_BALANCE = 0.00
+   End
+
+    /* apply the current check before reading the next record
+       delete the records in the work file
+       then finally reset the accumulator (l_balance) so no
+       Accounts Payable transactions are created in error */
+
+    Proc ("csbatch arsup020")
+
+    Do CLEANUP_ARSCHKWRK
+    L_BALANCE    = 0.00
+    /* even though these are cleared in the procedure balance check
+       it is a good idea to clean them up again */
+--    L_TOTAL      = 0.00
+--    L_TOTAL_OPEN = 0.00
+
+    End
+
+/* new logic April 9, 2003 - if there is check and there happens to be
+   no outstanding balance (P or O) then create:
+        1.  A/P record to return the money
+        2.  Transaction code 30 to reflect this A/P
+
+changes 04/29/2003  - DLP
+1. the new logic added on the date above would create an A/P
+   transaction on any "O" records.  A/R would be adjusted
+   correctly just disbursements would be added.
+
+*/
+
+    If L_BALANCE      = 0.00 And
+       L_VALID_CHECK  = "N"  And
+       L_TOTAL        = 0.00 And
+       L_TOTAL_OPEN   = 0.00 Then
+    Begin
+       L_BALANCE = ARSCHKSU:CHECK_AMOUNT
+       Do PROCESS_DISBURSEMENT_RECORDS
+       Do CREATE_ACCOUNTS_PAYABLE
+    End
+
+    End
+
+    Next ARSCHKSU
+
+    End
+
+End
+
+-- process all records in the arschksu file
+If L_POLICY_NO = 0 Then
+Begin
+-- process just for one policy
+    Access ARSCHKSU, Set ARSCHKSU:COMPANY_ID = L_COMPANY_ID, Approximate
+
+    While ARSCHKSU:ERRORNUMBER = 0 -- until EOF
+    Begin
+
+    If ARSCHKSU:POLICY_NO <> 0 And      -- if an Application dont process
+       ARSCHKSU:DISPOSITION = "OPEN" And  -- only process open checks
+       ARSCHKSU:PAYOR_TYPE <> "C" And       -- credit cards are processed elsewhere
+       ARSCHKSU:CHECK_HOLD <> "1"
+    Then Begin
+    Do BALANCE_CHECK
+    If L_TOTAL <> 0 Or
+       L_TOTAL_OPEN <> 0 Then  -- l_ctr is used to count the trans
+    Begin                 -- this is just FYI at this point
+       Do BUILD_WORK_FILE -- this is the 1st pass for "B" status records
+       Do PROCESS_OPEN_RECORDS -- the is the 2nd pass for "O" status records
+       Do UPDATE_WORK_FILE_BALANCES
+
+If L_BALANCE > 0 Then   -- check has remaining amount
+   Begin
+       Do PROCESS_DISBURSEMENT_RECORDS
+       Do CREATE_ACCOUNTS_PAYABLE
+   End
+
+    /* apply the current check before reading the next record
+       delete the records in the work file
+       then finally reset the accumulator (l_balance) so no
+       Accounts Payable transactions are created in error */
+
+    Proc ("csbatch arsup020")
+    Do CLEANUP_ARSCHKWRK
+    L_BALANCE    = 0.00
+    /* even though these are cleared in the procedure balance check
+       it is a good idea to clean them up again */
+    L_TOTAL      = 0.00
+    L_TOTAL_OPEN = 0.00
+
+    End  -- end of balance check <> 0.00
+
+/* new logic April 9, 2003 - if there is check and there happens to be
+   no outstanding balance (P or O) then create:
+        1.  A/P record to return the money
+        2.  Transaction code 30 to reflect this A/P
+*/
+    If L_BALANCE     = 0.00 And
+       L_VALID_CHECK = "N"  Then
+    Begin
+       L_BALANCE = ARSCHKSU:CHECK_AMOUNT
+       Do PROCESS_DISBURSEMENT_RECORDS
+       Do CREATE_ACCOUNTS_PAYABLE
+    End
+
+    End -- end of valid check type verification
+
+    Next ARSCHKSU
+
+    End
+
+End
+
+Update
+COUNTER = COUNTER + 1
+
+Screen Exit
+
+L_POLICY_NO = Val(COMMANDLINE[1,9])
+
+If L_ERR = 0 Then
+Begin
+    Writefile (L_OUTFILE,"%s","<NL>Update was Completed without ERRORS!!!<NL>")
+End
+Else
+Begin
+   Writefile (L_OUTFILE,"%s%n%s","<NL>Update Had ",L_ERR," number of errors<NL>")
+End
+
+Closefile (L_OUTFILE)
+
+/* call arsup020 here to continune the check updating process */
+
+Access SFSCOMPANY, Set SFSCOMPANY:COMPANY_ID = ARSCHKSU:COMPANY_ID, Approximate
+
+If SFSCOMPANY:DEBUG_MODE = 0 Then
+Begin
+    Proc ("csbatch arsup020")/noconsole
+--    Proc ("csbatch arsup030 %n",L_POLICY_NO)/noconsole
+End
+Else
+Begin
+    Proc ("csbatch arsup020")
+--    Proc ("csbatch arsup030 %n",L_POLICY_NO)
+End
+
+Write ("<014>")
+Write ("%c%s",18020,"ARSUP010 is exiting ")
+
+-- Unlock ARSCHKSU
+
+Errors
+
+L_ERR = L_ERR + 1
+Writefile (L_OUTFILE,"%s%n%s","Policy Number: ",ARSCHKWRK:POLICY_NO,"<NL>")
+
+Procedure Definition
+
+Procedure BALANCE_CHECK
+Begin
+
+/* house cleaning */
+L_CTR         = 0
+L_TOTAL       = 0
+L_TOTAL_OPEN  = 0
+L_VALID_CHECK = "N"
+
+Access ARSBILLING, Set ARSBILLING:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                       ARSBILLING:POLICY_NO  = ARSCHKSU:POLICY_NO, Approximate
+
+While ARSBILLING:COMPANY_ID  = ARSCHKSU:COMPANY_ID  And
+      ARSBILLING:POLICY_NO   = ARSCHKSU:POLICY_NO
+Begin
+    If ARSBILLING:STATUS = "B" Then
+    Begin
+        L_VALID_CHECK = "Y"
+        L_TOTAL = L_TOTAL + ARSBILLING:INSTALLMENT_AMOUNT -
+                            ARSBILLING:TOTAL_AMOUNT_PAID -- subtract any payments
+                            - ARSBILLING:WRITE_OFF_AMOUNT
+        L_CTR = L_CTR + 1
+    End
+    Else -- added 2/05/2004
+    If ARSBILLING:STATUS = "O" Then
+    Begin
+        L_VALID_CHECK = "Y"
+        L_TOTAL_OPEN = L_TOTAL_OPEN + ARSBILLING:INSTALLMENT_AMOUNT -
+                       ARSBILLING:TOTAL_AMOUNT_PAID - ARSBILLING:WRITE_OFF_AMOUNT
+    End
+Next ARSBILLING
+End
+
+End
+
+Procedure BUILD_WORK_FILE
+
+Begin
+    -- need to apply the check amounts to the actual installment
+    -- amounts on the billing file
+
+L_BALANCE = ARSCHKSU:BALANCE
+L_HOLD_BILLING_CTR = 0
+
+Access ARSBILLING, Set ARSBILLING:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                       ARSBILLING:POLICY_NO  = ARSCHKSU:POLICY_NO, Approximate
+
+While ARSBILLING:COMPANY_ID = ARSCHKSU:COMPANY_ID And
+      ARSBILLING:POLICY_NO  = ARSCHKSU:POLICY_NO
+Begin
+If (ARSBILLING:STATUS = "B" And
+    ARSBILLING:TRANS_CODE Not One Of 18,68) Or
+   (ARSBILLING:STATUS = "B" And
+    ARSBILLING:TRANS_CODE One Of 18,68 And
+    ARSCHKSU:CREDIT_INSTALLMENT_CHAGE <> 1) Then
+Begin
+   Do ADD_ARSCHKWRK
+End
+
+Next ARSBILLING
+
+End
+
+End
+
+Procedure PROCESS_OPEN_RECORDS
+Begin
+
+-- L_BALANCE = L_TOTAL_OPEN this should be set by the first pass
+L_HOLD_BILLING_CTR = 0
+
+Access ARSBILLING, Set ARSBILLING:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                       ARSBILLING:POLICY_NO  = ARSCHKSU:POLICY_NO, Generic
+
+While ARSBILLING:COMPANY_ID = ARSCHKSU:COMPANY_ID And
+      ARSBILLING:POLICY_NO  = ARSCHKSU:POLICY_NO
+Begin
+    If ARSBILLING:STATUS = "O" Then -- open records only for this process
+    Begin
+        Do ADD_ARSCHKWRK
+    End
+
+Next ARSBILLING
+
+End
+
+End
+
+Procedure ADD_ARSCHKWRK
+Begin
+
+-- force installment charges to the end of the sort so
+-- the money being applied is applied to installment
+-- charges last
+
+L_CHECK_REFERENCE = ARSCHKSU:CHECK_REFERENCE
+
+Switch(ARSBILLING:TRANS_CODE)
+    Case 12     : L_TRANS_CODE = 2
+    Case 13     : L_TRANS_CODE = 3
+    Case 18     : L_TRANS_CODE = 98
+    Case 68     : L_TRANS_CODE = 99
+    Default     : L_TRANS_CODE = ARSBILLING:TRANS_CODE
+End
+
+        If ARSCHKWRK:TRANS_CODE One Of 18,19,22,23,27,28,29,50,68,69 Then
+        Begin
+            L_COMM_RATE = 0.00
+        End
+        Else
+        Begin
+            L_COMM_RATE = ARSBILLING:COMM_RATE
+        End
+
+Access ARSCHKWRK, Set ARSCHKWRK:COMPANY_ID       = ARSBILLING:COMPANY_ID,
+                      ARSCHKWRK:POLICY_NO        = ARSBILLING:POLICY_NO,
+                      ARSCHKWRK:TRANS_CODE       = L_TRANS_CODE,
+                      ARSCHKWRK:RDUE_DATE        = ARSBILLING:DUE_DATE,
+                      ARSCHKWRK:RTRANS_DATE      = ARSBILLING:TRANS_DATE,
+                      ARSCHKWRK:RTRANS_EFF       = ARSBILLING:TRANS_EFF,
+                      ARSCHKWRK:RTRANS_EXP       = ARSBILLING:TRANS_EXP,
+                      ARSCHKWRK:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS,
+                      ARSCHKWRK:COMM_RATE        = ARSBILLING:COMM_RATE,
+                      ARSCHKWRK:SUB_CODE         = ARSBILLING:SUB_CODE,
+                      ARSCHKWRK:BILLING_CTR      = ARSBILLING:BILLING_CTR,
+                      ARSCHKWRK:RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR,
+                      ARSCHKWRK:CHECK_REFERENCE  = L_CHECK_REFERENCE,Approximate
+
+If ARSCHKWRK:COMPANY_ID    <> ARSBILLING:COMPANY_ID Or
+   ARSCHKWRK:POLICY_NO     <> ARSBILLING:POLICY_NO Or
+   ARSCHKWRK:TRANS_CODE    <> L_TRANS_CODE Or
+   ARSCHKWRK:RDUE_DATE     <> ARSBILLING:DUE_DATE Or
+   ARSCHKWRK:RTRANS_DATE   <> ARSBILLING:TRANS_DATE Or
+   ARSCHKWRK:RTRANS_EFF    <> ARSBILLING:TRANS_EFF Or
+   ARSCHKWRK:RTRANS_EXP    <> ARSBILLING:TRANS_EXP Or
+   ARSCHKWRK:LINE_OF_BUSINESS <> ARSBILLING:LINE_OF_BUSINESS Or
+   ARSCHKWRK:COMM_RATE     <> ARSBILLING:COMM_RATE Or
+   ARSCHKWRK:SUB_CODE      <> ARSBILLING:SUB_CODE Or
+   ARSCHKWRK:BILLING_CTR   <> ARSBILLING:BILLING_CTR Or
+   ARSCHKWRK:RETURN_CHECK_CTR <> ARSBILLING:RETURN_CHECK_CTR Or
+   ARSCHKWRK:CHECK_REFERENCE <> L_CHECK_REFERENCE Then
+   Begin
+    Add ARSCHKWRK
+    Begin
+        ARSCHKWRK:COMPANY_ID                = ARSBILLING:COMPANY_ID
+        ARSCHKWRK:POLICY_NO                 = ARSBILLING:POLICY_NO
+        ARSCHKWRK:TRANS_CODE                = L_TRANS_CODE
+        ARSCHKWRK:RDUE_DATE                 = ARSBILLING:DUE_DATE
+        ARSCHKWRK:RTRANS_DATE               = ARSBILLING:TRANS_DATE
+        ARSCHKWRK:RTRANS_EFF                = ARSBILLING:TRANS_EFF
+        ARSCHKWRK:RTRANS_EXP                = ARSBILLING:TRANS_EXP
+        ARSCHKWRK:LINE_OF_BUSINESS          = ARSBILLING:LINE_OF_BUSINESS
+        ARSCHKWRK:COMM_RATE                 = ARSBILLING:COMM_RATE
+        ARSCHKWRK:SUB_CODE                  = ARSBILLING:SUB_CODE
+        ARSCHKWRK:BILLING_CTR               = ARSBILLING:BILLING_CTR
+        ARSCHKWRK:RETURN_CHECK_CTR          = ARSBILLING:RETURN_CHECK_CTR
+        ARSCHKWRK:CHECK_REFERENCE           = L_CHECK_REFERENCE  -- ARSCHKSU:CHECK_REFERENCE
+        ARSCHKWRK:CREDIT_INSTALLMENT_CHARGE = ARSCHKSU:CREDIT_INSTALLMENT_CHAGE
+        ARSCHKWRK:CHECK_PAYS_TOTAL          = ARSCHKSU:CHECK_PAYS_TOTAL
+        ARSCHKWRK:INSTALLMENT_AMOUNT        = ARSBILLING:INSTALLMENT_AMOUNT -
+                                             (ARSBILLING:TOTAL_AMOUNT_PAID +
+                                              ARSBILLING:WRITE_OFF_AMOUNT)
+        ARSCHKWRK:AGENT_NO                  = ARSBILLING:AGENT_NO
+        ARSCHKWRK:CHECK_NO                  = ARSCHKSU:CHECK_NO/raw
+        ARSCHKWRK:BANK_NO                   = ARSCHKSU:BANK_NO/raw
+        ARSCHKWRK:COMPANY_ID                = ARSCHKSU:COMPANY_ID/raw
+        ARSCHKWRK:AMOUNT                    = 0.00
+
+    End
+    End -- end of checking for record not found
+End
+
+Procedure UPDATE_WORK_FILE_BALANCES
+Begin
+
+Access ARSCHKWRK_ALT, Set ARSCHKWRK_ALT:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                      ARSCHKWRK_ALT:POLICY_NO  = ARSCHKSU:POLICY_NO, Approximate
+
+While ARSCHKWRK_ALT:COMPANY_ID      = ARSCHKSU:COMPANY_ID And
+      ARSCHKWRK_ALT:POLICY_NO       = ARSCHKSU:POLICY_NO And
+      ARSCHKWRK_ALT:CHECK_REFERENCE = ARSCHKSU:CHECK_REFERENCE
+      Begin
+      Change ARSCHKWRK_ALT
+      Begin
+
+      If (L_BALANCE > ARSCHKWRK_ALT:INSTALLMENT_AMOUNT And
+          L_BALANCE > 0) Or
+         (L_BALANCE = 0 And ARSCHKWRK_ALT:INSTALLMENT_AMOUNT < 0 ) Then
+      {
+          ARSCHKWRK_ALT:AMOUNT = ARSCHKWRK_ALT:INSTALLMENT_AMOUNT
+          L_BALANCE = L_BALANCE - ARSCHKWRK_ALT:AMOUNT
+          L_HOLD_BILLING_CTR = ARSBILLING:BILLING_CTR
+      }
+      Else
+      If L_BALANCE <= ARSCHKWRK_ALT:INSTALLMENT_AMOUNT Then
+      {
+          ARSCHKWRK_ALT:AMOUNT = L_BALANCE
+          L_BALANCE = 0.00
+      }
+      Else
+      If L_BALANCE = 0 Then
+      {
+   ARSCHKWRK_ALT:AMOUNT = 0
+         ARSCHKWRK_ALT:INSTALLMENT_AMOUNT = 0
+      }
+      End
+  Next ARSCHKWRK_ALT
+End
+
+End  -- end of update_arschkwrk_balances
+
+-- **************************  New Logic 02/19/2002 - dlp
+
+Procedure CREATE_ACCOUNTS_PAYABLE
+Begin
+
+Do GET_ARSCHECK_SUB_CODE
+
+Access SFSCOMPANY, Set SFSCOMPANY:COMPANY_ID = ARSCHKSU:COMPANY_ID
+
+Access SFQNAME, Set SFQNAME:QUOTE_NO = ARSCHKSU:QUOTE_NO
+
+Access SFPCURRENT, Set SFPCURRENT:POLICY_NO = ARSCHKSU:POLICY_NO
+
+Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = SFSCOMPANY:COMPANY_ID
+
+Access ARSCONTROL, Set ARSCONTROL:COMPANY_ID = SFSCOMPANY:COMPANY_ID
+L_DEFAULT_RELEASE = ARSCONTROL2:DEFAULT_CHECK_RELEASE
+
+Access SFPNAME, Set SFPNAME:POLICY_NO    = SFPCURRENT:POLICY_NO,
+                    SFPNAME:POL_YEAR     = SFPCURRENT:POL_YEAR,
+                    SFPNAME:END_SEQUENCE = SFPCURRENT:END_SEQUENCE
+
+Access ARSCHECK, Set ARSCHECK:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                     ARSCHECK:POLICY_NO  = ARSCHKSU:POLICY_NO,
+                     ARSCHECK:SUB_CODE   = L_SUB_CODE
+If L_BALANCE > ARSCONTROL:WAIVE_AMOUNT_DEBIT Then
+Begin
+Add ARSCHECK
+Begin
+    ARSCHECK:COMPANY_ID          = ARSCHKSU:COMPANY_ID
+    ARSCHECK:POLICY_NO           = ARSCHKSU:POLICY_NO
+    ARSCHECK:SUB_CODE            = L_SUB_CODE
+    ARSCHECK:ACCOUNT             = SFSCOMPANY:CHECKING_ACCOUNT_NO[2]
+    ARSCHECK:APS_TRANS_CODE      = "OVER"
+    ARSCHECK:TEN99               = 0
+    ARSCHECK:LOSS_PAYEE          = 0
+    ARSCHECK:PAYEE_NAME[1]       = ARSCHKSU:PAYOR_NAME/raw
+    ARSCHECK:PAYEE_NAME[2]       = ARSCHKSU:PAYOR_CARE_OF/raw
+    ARSCHECK:PAYEE_NAME[3]       = " "
+    ARSCHECK:PAYEE_NAME[4]       = " "
+    ARSCHECK:PAYEE_NAME[5]       = " "
+    ARSCHECK:PAYEE_NAME[6]       = " "
+    ARSCHECK:MAILTO_NAME[1]      = ARSCHKSU:PAYOR_NAME/raw
+    ARSCHECK:MAILTO_NAME[2]      = " "
+    ARSCHECK:MAILTO_NAME[3]      = " "
+    ARSCHECK:ADDRESS[1]          = ARSCHKSU:PAYOR_ADDRESS/raw
+    ARSCHECK:ADDRESS[2]          = " "
+    ARSCHECK:ADDRESS[3]          = " "
+    ARSCHECK:CITY                = ARSCHKSU:PAYOR_CITY/raw
+    ARSCHECK:STR_STATE           = ARSCHKSU:PAYOR_STR_STATE/raw
+    ARSCHECK:STR_ZIPCODE         = ARSCHKSU:PAYOR_ZIP_CODE_STR/raw
+    ARSCHECK:CHECK_DRAFT         = "C"
+    ARSCHECK:COMMENTS            = "Check Created by arsup010"
+    ARSCHECK:PAYMENT_MESSAGE     = "Return Premium Check for Over Payment"
+    ARSCHECK:CHECK_AMOUNT        = L_BALANCE
+    ARSCHECK:CHECK_NO            = " "
+    ARSCHECK:CHECK_DATE          = 00.00.0000
+    ARSCHECK:RELEASE             = L_DEFAULT_RELEASE
+    ARSCHECK:RELEASE_DATE        = 00.00.0000
+    ARSCHECK:CHECK_CLEARED       = 0
+    ARSCHECK:CHECK_CLEARED_DATE  = 00.00.0000
+    ARSCHECK:ENTERING_USER_NAME  = USERNAME
+    ARSCHECK:CLEARING_USER_NAME  = " "
+    ARSCHECK:RELEASE_USER_NAME   = " "
+    ARSCHECK:PAYEE_TYPE          = "I"
+    ARSCHECK:AGENT_NO            = ARSCHKSU:AGENT_NO
+    ARSCHECK:EFF_DATE            = SFQNAME:EFF_DATE
+    If ARSCHECK:EFF_DATE = 00.00.0000 Then
+    Begin
+        ARSCHECK:EFF_DATE = SFPNAME:EFF_DATE
+    End
+    ARSCHECK:TIN                 = " "
+    ARSCHECK:STATUS_AFTER_CHECK  = " "
+    ARSCHECK:MORTGAGE_SUB_CODE   = 0
+    ARSCHECK:ENTER_DATE          = TODAYSDATE
+End
+
+End
+
+/*  update arschksu to set the balance to 0 */
+
+Access ARSCHKSU_ALT, Set ARSCHKSU_ALT:COMPANY_ID      = ARSCHKSU:COMPANY_ID,
+                         ARSCHKSU_ALT:CHECK_REFERENCE = ARSCHKSU:CHECK_REFERENCE
+
+If ARSCHKSU_ALT:COMPANY_ID      = ARSCHKSU:COMPANY_ID And
+   ARSCHKSU_ALT:CHECK_REFERENCE = ARSCHKSU:CHECK_REFERENCE Then
+   Begin
+       Change ARSCHKSU_ALT
+       Begin
+           ARSCHKSU_ALT:BALANCE = L_TOTAL
+           ARSCHKSU_ALT:COMMENTS = "Overpayment of " + Str(L_BALANCE,"$ZZ,ZZZ.99") + " was returned on " + Str(TODAYSDATE,"MM/DD/YYYY")
+           ARSCHKSU_ALT:DISPOSITION = "CLEAR"
+       End
+   End
+
+End -- end of procedure
+
+Procedure GET_ARSCHECK_SUB_CODE
+Begin
+
+L_SUB_CODE = 0
+
+Access ARSCHECK_ALT, Set ARSCHECK_ALT:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                         ARSCHECK_ALT:POLICY_NO  = ARSCHKSU:POLICY_NO, Approximate
+
+While ARSCHECK_ALT:COMPANY_ID = ARSCHKSU:COMPANY_ID And
+      ARSCHECK_ALT:POLICY_NO  = ARSCHKSU:POLICY_NO
+      Begin
+         L_SUB_CODE = ARSCHECK_ALT:SUB_CODE + 10
+         Next ARSCHECK_ALT
+      End
+
+End -- end of get_arscheck_sub_code
+
+-- ************************** end of new logic
+
+Procedure PROCESS_DISBURSEMENT_RECORDS
+Begin
+
+L_HOLD_BILLING_CTR = 0
+L_DISBURSEMENT_CREATED = "N"
+
+Access ARSBILLING, Set ARSBILLING:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                       ARSBILLING:POLICY_NO  = ARSCHKSU:POLICY_NO, Generic
+
+While ARSBILLING:COMPANY_ID = ARSCHKSU:COMPANY_ID And
+      ARSBILLING:POLICY_NO  = ARSCHKSU:POLICY_NO And
+      L_DISBURSEMENT_CREATED = "N"
+Begin
+
+    If ARSBILLING:STATUS One Of "O","B","P","D" Then -- open or billed for disbursements
+    Begin
+        Do ADD_ARSCHKWRK_DISBURSEMENT
+        L_DISBURSEMENT_CREATED = "Y"
+    End
+
+Next ARSBILLING
+
+End
+
+End
+
+Procedure ADD_ARSCHKWRK_DISBURSEMENT
+Begin
+
+-- force installment charges to the end of the sort so
+-- the money being applied is applied to installment
+-- charges last
+
+L_DUE_DATE = 12.31.9999
+L_SUB_CODE   = 0
+L_TRANS_CODE = 30 -- new transaction code for disbursements of overpayments
+If ARSBILLING:STATUS One Of "C" Then
+Begin
+    L_TRANS_CODE = 35
+End
+
+Access ARSCHKWRK, Set ARSCHKWRK:COMPANY_ID       = ARSBILLING:COMPANY_ID,
+                      ARSCHKWRK:POLICY_NO        = ARSBILLING:POLICY_NO,
+                      ARSCHKWRK:TRANS_CODE       = L_TRANS_CODE,
+--                      ARSCHKWRK:RDUE_DATE        = ARSBILLING:DUE_DATE,
+                      ARSCHKWRK:RDUE_DATE        = L_DUE_DATE,
+                      ARSCHKWRK:RTRANS_DATE      = ARSBILLING:TRANS_DATE,
+                      ARSCHKWRK:RTRANS_EFF       = ARSBILLING:TRANS_EFF,
+                      ARSCHKWRK:RTRANS_EXP       = ARSBILLING:TRANS_EXP,
+                      ARSCHKWRK:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS,
+                      ARSCHKWRK:COMM_RATE        = ARSBILLING:COMM_RATE,
+                      ARSCHKWRK:SUB_CODE         = ARSBILLING:SUB_CODE, Approximate
+
+While ARSCHKWRK:COMPANY_ID = ARSBILLING:COMPANY_ID And
+      ARSCHKWRK:POLICY_NO  = ARSBILLING:POLICY_NO And
+      ARSCHKWRK:TRANS_CODE = L_TRANS_CODE And
+      ARSCHKWRK:RDUE_DATE  = L_DUE_DATE And
+      ARSCHKWRK:RTRANS_DATE = ARSBILLING:TRANS_DATE And
+      ARSCHKWRK:RTRANS_EFF  = ARSBILLING:TRANS_EFF And
+      ARSCHKWRK:RTRANS_EXP  = ARSBILLING:TRANS_EXP And
+      ARSCHKWRK:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS And
+      ARSCHKWRK:COMM_RATE        = ARSBILLING:COMM_RATE And
+      ARSCHKWRK:SUB_CODE         = ARSBILLING:SUB_CODE
+      Begin
+         L_SUB_CODE = ARSCHKWRK:SUB_CODE
+         Next ARSCHKWRK
+      End
+
+L_SUB_CODE = L_SUB_CODE + 11
+
+Access ARSCHKWRK, Set ARSCHKWRK:COMPANY_ID       = ARSBILLING:COMPANY_ID,
+                      ARSCHKWRK:POLICY_NO        = ARSBILLING:POLICY_NO,
+                      ARSCHKWRK:TRANS_CODE       = L_TRANS_CODE,
+--                      ARSCHKWRK:RDUE_DATE        = ARSBILLING:DUE_DATE,
+                      ARSCHKWRK:RDUE_DATE        = L_DUE_DATE,
+                      ARSCHKWRK:RTRANS_DATE      = ARSBILLING:TRANS_DATE,
+                      ARSCHKWRK:RTRANS_EFF       = ARSBILLING:TRANS_EFF,
+                      ARSCHKWRK:RTRANS_EXP       = ARSBILLING:TRANS_EXP,
+                      ARSCHKWRK:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS,
+                      ARSCHKWRK:COMM_RATE        = ARSBILLING:COMM_RATE,
+                      ARSCHKWRK:SUB_CODE         = L_SUB_CODE,
+                      ARSCHKWRK:BILLING_CTR      = ARSBILLING:BILLING_CTR,
+                      ARSCHKWRK:RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR
+
+    Add ARSCHKWRK
+    Begin
+        ARSCHKWRK:COMPANY_ID                = ARSBILLING:COMPANY_ID
+        ARSCHKWRK:POLICY_NO                 = ARSBILLING:POLICY_NO
+        ARSCHKWRK:TRANS_CODE                = L_TRANS_CODE
+--        ARSCHKWRK:RDUE_DATE                 = ARSBILLING:DUE_DATE
+        ARSCHKWRK:RDUE_DATE                 = L_DUE_DATE
+        ARSCHKWRK:RTRANS_DATE               = ARSBILLING:TRANS_DATE
+        ARSCHKWRK:RTRANS_EFF                = ARSBILLING:TRANS_EFF
+        ARSCHKWRK:RTRANS_EXP                = ARSBILLING:TRANS_EXP
+        ARSCHKWRK:LINE_OF_BUSINESS          = ARSBILLING:LINE_OF_BUSINESS
+        ARSCHKWRK:COMM_RATE                 = ARSBILLING:COMM_RATE
+        If ARSCHKWRK:TRANS_CODE One Of 18, 19, 28, 29, 30, 31,35,50,68,69 Then
+           { ARSCHKWRK:COMM_RATE = 0.00 }
+        ARSCHKWRK:SUB_CODE                  = L_SUB_CODE
+        ARSCHKWRK:BILLING_CTR               = ARSBILLING:BILLING_CTR
+        ARSCHKWRK:RETURN_CHECK_CTR          = ARSBILLING:RETURN_CHECK_CTR
+        ARSCHKWRK:CHECK_REFERENCE           = ARSCHKSU:CHECK_REFERENCE
+        ARSCHKWRK:CREDIT_INSTALLMENT_CHARGE = ARSCHKSU:CREDIT_INSTALLMENT_CHAGE
+        ARSCHKWRK:CHECK_PAYS_TOTAL          = ARSCHKSU:CHECK_PAYS_TOTAL
+        ARSCHKWRK:INSTALLMENT_AMOUNT        = L_BALANCE
+        ARSCHKWRK:AGENT_NO                  = ARSBILLING:AGENT_NO
+        ARSCHKWRK:CHECK_NO                  = ARSCHKSU:CHECK_NO/raw
+        ARSCHKWRK:BANK_NO                   = ARSCHKSU:BANK_NO/raw
+        ARSCHKWRK:COMPANY_ID                = ARSCHKSU:COMPANY_ID/raw
+    End
+
+End
+
+Procedure CLEANUP_ARSCHKWRK
+Begin
+L_COMPANY_ID = ""
+    Access ARSCHKWRK_ALT, Set ARSCHKWRK_ALT:COMPANY_ID = L_COMPANY_ID, Approximate
+
+    While ARSCHKWRK_ALT:ERRORNUMBER = 0
+    Begin
+        Delete ARSCHKWRK_ALT
+        Next ARSCHKWRK_ALT
+    End
+End
+
+End

@@ -1,0 +1,284 @@
+%%
+Screen
+     Name = "arsin01sc" ;
+     Type = "Detail" ;
+     Padcharacter = Space ;
+     Highlight = Underscore ;
+     Screensize="dynamic";
+     Domain="ARSCHKSU";
+     resizeable = yes ;
+     iconline = 0 ;
+
+     global string g_lib[10] ;
+
+     Global Unsigned Ascii Number G_CHECK_REFERENCE[7],
+                                  g_policy_no[9];
+
+     Global String G_COMPANY_ID[10];
+
+     Local String l_payor_type[50],
+                  l_enter[1];
+
+     Include "arsmenu.var"
+
+     Access ARSCHKSU,
+            Set ARSCHKSU:COMPANY_ID      = G_COMPANY_ID,
+                ARSCHKSU:CHECK_REFERENCE = G_CHECK_REFERENCE ;
+
+     Include "csexec.var"
+
+     Include "scipsprint.var"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        Include "stdfunc7.inc"
+        reaccess ;
+
+EVENT DEFINITION
+    default eventhandler {
+            "reload" { function ="reaccess" abort() }
+                         }
+
+Toolbar Definition
+
+Screen Entry
+
+if g_policy_no <> arschksu:policy_no then
+begin
+     Access ARSCHKSU,
+            Set ARSCHKSU:COMPANY_ID      = G_COMPANY_ID,
+                ARSCHKSU:CHECK_REFERENCE = G_CHECK_REFERENCE
+end
+
+Screen -- at 2,1 to 15, 100
+{
+Panel
+
+    Properties {
+           backgroundcolor = "white"
+           foregroundcolor = "black"
+           ScrollBarPolicy = asNeeded
+               }
+{
+%%
+
+     Check Reference  ________ Payor Type ___________________________________
+     Policy No.       _________ _______________________________________________________
+     Check No.        ____________________
+     Bank No          _______________    Deposit Date __________
+     Trans Date       __________         Status       ________    __________________________
+     Amount           ___________        Balance      ___________
+     Comments         _________________________________________________________________
+
+%%
+
+components
+
+Fields
+0201    arschksu:check_reference/mask="ZZZZZZZZZ"/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0202    {
+             switch(arschksu:payor_type)
+             case "I"    : l_payor_type = "Insured                   "
+             case "M"    : l_payor_type = "Mortgagee                 "
+             case "B"    : l_payor_type = "Billing Name              "
+             case "A"    : l_payor_type = "Agent                     "
+             case "C"    : l_payor_type = "Credit Card               "
+             default     : l_payor_type = "Unknown Payor Type        "
+             end
+        }
+        l_payor_type
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0301    ARSCHKSU:POLICY_NO/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0302    SFPNAME:NAME[1]/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0401    VAL(ARSCHKSU:CHECK_NO)/MASK="ZZZZZZZZZZZZZZZ"/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0501    ARSCHKSU:BANK_NO/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0502    ARSCHKSU:DEPOSIT_DATE
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0601    ARSCHKSU:TRANS_DATE/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0602    ARSCHKSU:DISPOSITION/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0603    ARSDISP:DESCRIPTION/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0701    ARSCHKSU:CHECK_AMOUNT/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0702    ARSCHKSU:BALANCE/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0801    ARSCHKSU:COMMENTS/default/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+}
+
+CardDialog at 10,5 to 16,80
+{
+
+Panel
+Properties {
+   ScrollBarPolicy = asneeded
+   Text            = "Payor"
+}
+{
+%%
+    __________________________________________________
+    __________________________________________________
+    __________________________________________________
+    ______________________________  ____ _____________
+%%
+
+Components
+
+Fields
+0101    ARSCHKSU:PAYOR_NAME/default/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0201    ARSCHKSU:PAYOR_CARE_OF/default/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0301    ARSCHKSU:PAYOR_ADDRESS/default/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0401    ARSCHKSU:PAYOR_CITY/default/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0402    ARSCHKSU:PAYOR_STR_STATE/default/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0403    ARSCHKSU:PAYOR_ZIP_CODE_STR/default/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+}
+Panel
+Properties {
+   ScrollBarPolicy = asneeded
+   Text            = "Bank"
+}
+{
+%%
+    Bank   __________________________________________________
+    Branch __________________________________________________
+%%
+
+Components
+
+Fields
+        ARSCONTROL:BANK_NAME/default/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+        ARSCONTROL:BANK_BRANCH/default/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+}
+Panel
+Properties {
+   ScrollBarPolicy = asneeded
+   Text            = "Options"
+}
+{
+%%
+     Check is Being Held     __          POST Dated       __
+     Check was a Money Order __          Deposit Premium  __
+     Check was Deposited on  __________
+
+%%
+
+Components
+
+Fields
+0101    ARSCHKSU:CHECK_HOLD/CHECKBOX/VALUES="0,1"/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0102    ARSCHKSU:POST_DATED/CHECKBOX/VALUES="0,1"/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0201    ARSCHKSU:MONEY_ORDER/CHECKBOX/VALUES="0,1"/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0202    ARSCHKSU:DEPOSIT_PREMIUM/CHECKBOX/VALUES="0,1"/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+0301    ARSCHKSU:DEPOSIT_DATE/MASK="mm/dd/yyyy"/displayonly
+        Properties {
+                      BackGroundColor = "White"
+                      ForeGroundColor = "Black"
+                   };
+}
+}
+}
+
+screen exit
+
+--g_check_reference  = 0
+--g_company_id = ""
+
+End

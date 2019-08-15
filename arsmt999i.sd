@@ -1,0 +1,570 @@
+%%
+Screen
+        Name = "arsmt999i" ;
+        Type = "Detail" ;
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize="dynamic";
+        Windowtitle="%a     %s Changing Payment Plan - Ver. 7.20    %m";
+        Domain="SFPNAME" ;
+--      resizeable = yes ;
+        iconline = 0 ;
+
+        Global Unsigned Ascii Number G_POLICY_NO[9],
+                                     G_YEAR[4] ,
+                                     G_END_SEQUENCE[4],
+                                     l_records_added_ctr[5];
+                                     
+       Global Signed Ascii Number G_TOTAL_DUE[9]=0/decimals=2,
+                                   G_TOTAL_PAID[9]=0/decimals=2,
+                                   G_NET_DUE[9]=0/decimals=2,
+                                   G_TOTAL_INSTALLMENT_CHARGE[5]=0/decimals=2,
+                                   G_TOTAL_SURCHARGE[5]=0/decimals=2,
+                                   G_CURRENT_DUE[9]=0/decimals=2,
+                                   G_TOTAL_RECEIVED[9]=0/dec=2,
+                                   G_TOTAL_WRITE_OFF[9]=0/decimals=2,
+                                   G_TOTAL_DISBURSEMENTS[9]=0/decimals=2,
+                                   G_TOTAL_PENDING_DISBURSEMENTS[9]=0/decimals=2;       
+                                   
+        Global String G_COMPANY_ID[10],
+                      l_error_file[20];
+
+        Local String L_USER_ID[15] ;
+
+        Local Unsigned ASCII number l_sub_code[4];
+        
+        Local wdate l_billed_date,
+                    l_due_date;   
+                    
+        Local rwdate l_rev_date ; 
+        
+        string l_sfs[3]="",
+               l_username[15]="",
+               l_system_id[15]="",
+               l_programid[15]="",
+               l_company_id[10]="";
+
+        Access SFPNAME,
+           Set SFPNAME:POLICY_NO = G_POLICY_NO ;
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+"EXIT" return tagged exit_tg;
+       return ;
+
+"SEARCH" search tagged search_tg ;
+         search ;
+
+"ABORT" sequence "abort_seq" tagged abort_tg;
+"abort_seq" continue
+{
+    abort()
+} ;
+
+reaccess ;
+
+"reload" continue
+{
+    function ="reaccess" abort()
+} ;
+
+Previous ;
+Next     ;
+
+"display_search" sequence "display_search_seq" tagged display_search_tg;
+"display_search_seq" continue
+{
+    function = "search"
+
+} ;
+
+"display_return" sequence "display_return_seq" tagged display_return_tg;
+"display_return_seq" continue
+{
+    function = "return"
+} ;
+
+"display_previous" sequence "display_previous_seq" tagged display_previous_tg;
+"display_previous_seq" continue
+{
+    function = "previous"
+} ;
+
+"display_next" sequence "display_next_seq" tagged display_next_tg;
+"display_next_seq" continue
+{
+    function = "next"
+} ;
+
+Toolbar Definition
+
+Screen Entry
+
+--include "csentry.inc"
+proc ("arsbillingwork.mk")/noconsole
+proc ("arsinqwrkpp.mk")/noconsole
+
+Access Validation
+
+L_USER_ID = USERNAME
+Access SFSEMAIL, Set SFSEMAIL:COMPANY_ID = SFSDEFAULT:COMPANY_ID,
+                     SFSEMAIL:USER_ID = L_USER_ID, Generic
+
+Skip If SFSEMAIL:TPA One Of "Y" And
+        SFSLINE:TPA Not One Of "Y" ;
+
+skip if sfsemail:agent_no <> 0 and
+        sfpname:agent_no <> sfsemail:agent_no
+
+screen
+
+Properties
+{
+   LayOutType      = Column
+}
+
+{
+Panel Tagged Header_pl
+Properties
+{
+    BorderStyle     = Raised
+    ScrollBarPolicy = asNeeded
+}
+{
+%%
+                                                        _______________
+ Policy No: _________    __________________________________________________
+ Pol Year:  ____         __________________________________________________
+ End Seq:   ____         __________________________________________________
+                         __________________________________________________
+                         __________________________________________________
+                         __________________________________________________
+                         ______________________________   ____   __________
+
+%%
+
+components
+
+Fields
+101     FUNCTION/noecho/showasguidetext;
+201     SFPNAME:POLICY_NO/displayonly
+        Properties
+        {
+           ForeGroundColor     = "Black"
+           BackGroundColor     = "White"
+        }
+        ;
+201     {
+        If FUNCTION = "SEARCH" Then
+            {
+            SFPNAME:POL_YEAR = SFPCURRENT:POL_YEAR
+            SFPNAME:END_SEQUENCE = SFPCURRENT:END_SEQUENCE
+            }
+        }
+        SFPNAME:POLICY_NO/displayonly
+                Properties
+        {
+           ForeGroundColor     = "Black"
+           BackGroundColor     = "White"
+        }
+        ;
+
+301     SFPNAME:POL_YEAR/displayonly
+        Properties
+        {
+           ForeGroundColor     = "Black"
+           BackGroundColor     = "White"
+        }
+        ;
+
+401     SFPNAME:END_SEQUENCE/displayonly
+        Properties
+        {
+           ForeGroundColor     = "Black"
+           BackGroundColor     = "White"
+        }
+        ;
+
+202     {
+        Access SFPNAME_ALIAS,Set SFPNAME_ALIAS:POLICY_NO = SFPNAME:POLICY_NO,
+                                 SFPNAME_ALIAS:POL_YEAR = SFPNAME:POL_YEAR,
+                                 SFPNAME_ALIAS:END_SEQUENCE = SFPNAME:END_SEQUENCE, Generic
+        }
+        SFPNAME_ALIAS:NAME_KEY_1/displayonly
+                Properties
+        {
+           ForeGroundColor     = "Black"
+           BackGroundColor     = "White"
+        }
+        ;
+
+302     SFPNAME_ALIAS:NAME_KEY_2/displayonly
+        Properties
+        {
+           ForeGroundColor     = "Black"
+           BackGroundColor     = "White"
+        }
+        ;
+
+402     SFPNAME_ALIAS:NAME_KEY_3/displayonly
+        Properties
+        {
+           ForeGroundColor     = "Black"
+           BackGroundColor     = "White"
+        }
+        ;
+
+501     SFPNAME_ALIAS:ADDRESS[1]/displayonly
+        Properties
+        {
+           ForeGroundColor     = "Black"
+           BackGroundColor     = "White"
+        }
+        ;
+
+601     SFPNAME_ALIAS:ADDRESS[2]/displayonly
+        Properties
+        {
+           ForeGroundColor     = "Black"
+           BackGroundColor     = "White"
+        }
+        ;
+
+701     SFPNAME_ALIAS:ADDRESS[3]/displayonly
+        Properties
+        {
+           ForeGroundColor     = "Black"
+           BackGroundColor     = "White"
+        }
+        ;
+
+801     SFPNAME_ALIAS:CITY/displayonly
+        Properties
+        {
+           ForeGroundColor     = "Black"
+           BackGroundColor     = "White"
+        }
+        ;
+
+802     SFPNAME_ALIAS:STR_STATE/displayonly
+        Properties
+        {
+           ForeGroundColor     = "Black"
+           BackGroundColor     = "White"
+        }
+        ;
+
+803     SFPNAME_ALIAS:STR_ZIPCODE/displayonly
+        Properties
+        {
+           ForeGroundColor     = "Black"
+           BackGroundColor     = "White"
+        }
+        ;
+
+}
+}
+Panel tagged icon_line3_tg
+
+Properties
+     {
+         LayoutType = Row
+     }
+{
+Components
+
+
+    Button at 1,1 to 1.0,18 tagged display_search_tg
+    Properties {
+        Text     = "Search for Policy"
+        Iconname = "search.bmp"
+               }
+    Events
+    {
+        Action = display_search_tg
+    }
+
+    Button at 1,1 to 1.0,18 tagged display_return_tg
+    Properties {
+        Text     = "RETURN"
+               }
+        Events
+               {
+                   Action = display_return_tg
+               }
+
+    Button at 1,1 to 1.0,18 tagged display_previous_tg
+    Properties {
+        Text     = " PREVIOUS"
+        Iconname = "previous.bmp"
+               }
+    Events
+    {
+        Action = display_previous_tg
+    }
+
+    Button at 1,1 to 1.0,18 tagged display_next_tg
+    Properties {
+        Text     = "NEXT   "
+        Iconname = "next.bmp"
+               }
+    Events
+    {
+        Action = display_next_tg
+    }
+}
+
+
+Screen Exit
+G_COMPANY_ID   = SFPNAME:COMPANY_ID ;
+G_POLICY_NO    = SFPNAME:POLICY_NO ;
+G_YEAR         = SFPNAME:POL_YEAR ;
+G_END_SEQUENCE = SFPNAME:END_SEQUENCE ;
+
+do Build_arsbilling_work_file
+
+do add_arsinqwrk
+
+Procedure Definition
+
+Procedure build_arsbilling_work_file
+{
+
+--proc ("arsbillingwork.mk")/noconsole 
+
+access arsbilling_alt, set arsbilling_alt:company_id = g_company_id,
+                           arsbilling_alt:policy_no  = g_policy_no, approximate
+
+while arsbilling_alt:company_id = g_company_id and
+      arsbilling_alt:policy_no  = g_policy_no
+{
+
+if arsbilling_alt:pol_year  = g_year then
+{
+access arsbillingwork, set arsbillingwork:company_id = arsbilling_alt:company_id,
+                           arsbillingwork:policy_no  = arsbilling_alt:policy_no,
+                           arsbillingwork:trans_date = arsbilling_alt:trans_date,
+                           arsbillingwork:trans_eff  = arsbilling_alt:trans_eff,
+                           arsbillingwork:trans_exp  = arsbilling_alt:trans_exp,
+                           arsbillingwork:trans_code = arsbilling_alt:trans_code,
+                           arsbillingwork:line_of_business = arsbilling_alt:line_of_business,
+                           arsbillingwork:comm_rate  = arsbilling_alt:comm_rate,
+                           arsbillingwork:sub_code   = arsbilling_alt:sub_code,
+                           arsbillingwork:billing_ctr = arsbilling_alt:billing_ctr,
+                           arsbillingwork:return_check_ctr = arsbilling_alt:return_check_ctr
+   add arsbillingwork
+   {
+       arsbillingwork:record = arsbilling_alt:record/raw
+   }
+}
+
+next arsbilling_alt
+}
+
+} -- end of procedure
+
+Procedure ADD_ARSINQWRK
+{
+
+--proc ("arsinqwrkpp.mk")/noconsole 
+l_records_added_ctr = 0
+
+-- write ("%c%s",06020,"    Building Work Files     ")
+
+L_BILLED_DATE = ARSBILLING_ALIAS:BILLED_DATE
+L_DUE_DATE    = ARSBILLING_ALIAS:DUE_DATE
+
+If L_BILLED_DATE = 00.00.0000 Then
+{
+     L_BILLED_DATE = 12.31.1999
+}
+
+L_DUE_DATE = ARSBILLING_ALIAS:DUE_DATE
+L_REV_DATE = ARSBILLING_ALIAS:DUE_DATE
+
+access arsbillingwork_alias, set arsbillingwork_alias:company_id = g_company_id, 
+                                 arsbillingwork_alias:policy_no  = g_policy_no, approximate 
+                             
+while arsbillingwork_alias:company_id = g_company_id and 
+      arsbillingwork_alias:policy_no  = g_policy_no
+{
+If ARSBILLING_ALIAS:STATUS Not One Of "T","C","E" Then
+{
+
+Do GET_ARSINQWRK_SUB_CODE
+L_SUB_CODE = L_SUB_CODE + 10
+--l_sub_code = arsbillingwork_alias:sub_code + 1
+
+
+/* july 14, 2003 */
+
+--if arsbillingwork_alias:trans_code one of 10,11,12,13,14,16 then
+--begin
+--    l_sub_code = 10
+--end
+Access SFPNAME_ALIAS,Set SFPNAME_ALIAS:POLICY_NO = g_POLICY_NO,
+                                 SFPNAME_ALIAS:POL_YEAR = G_YEAR,
+                                 SFPNAME_ALIAS:END_SEQUENCE = G_END_SEQUENCE, Generic
+                                 
+If ARSBILLING_ALIAS:TRANS_CODE One Of 18 Then
+{
+   L_SUB_CODE = L_SUB_CODE + 111
+}
+
+Access ARSINQWRKPP, Set
+       ARSINQWRKPP:COMPANY_ID  = ARSBILLINGWORK_ALIAS:COMPANY_ID,
+       ARSINQWRKPP:POLICY_NO   = ARSBILLINGWORK_ALIAS:POLICY_NO,
+       ARSINQWRKPP:BILLED_DATE = L_BILLED_DATE,
+       ARSINQWRKPP:RDUE_DATE   = L_REV_DATE,
+       ARSINQWRKPP:STATUS      = ARSBILLINGWORK_ALIAS:STATUS,
+       ARSINQWRKPP:TRANS_CODE  = ARSBILLINGWORK_ALIAS:TRANS_CODE,
+       arsinqwrkpp:comm_rate   = arsbillingwork_ALIAS:comm_rate, 
+       ARSINQWRKPP:SUB_CODE    = L_SUB_CODE
+
+       If ARSINQWRKPP:COMPANY_ID   <> ARSBILLINGWORK_ALIAS:COMPANY_ID Or
+          ARSINQWRKPP:POLICY_NO    <> ARSBILLINGWORK_ALIAS:POLICY_NO Or
+          ARSINQWRKPP:BILLED_DATE  <> L_BILLED_DATE Or
+          ARSINQWRKPP:RDUE_DATE    <> L_REV_DATE Or
+          ARSINQWRKPP:STATUS       <> ARSBILLINGWORK_ALIAS:STATUS Or
+          ARSINQWRKPP:TRANS_CODE   <> ARSBILLINGWORK_ALIAS:TRANS_CODE Or
+          arsinqwrkpp:comm_rate    <> arsbillingwork_ALIAS:comm_rate or 
+          ARSINQWRKPP:SUB_CODE     <> L_SUB_CODE Then
+          Add ARSINQWRKPP
+           {
+l_records_added_ctr = l_records_added_ctr + 1
+           ARSINQWRKPP:COMPANY_ID     = ARSBILLINGWORK_ALIAS:COMPANY_ID
+               ARSINQWRKPP:POLICY_NO      = ARSBILLINGWORK_ALIAS:POLICY_NO
+               ARSINQWRKPP:BILLED_DATE    = L_BILLED_DATE
+               ARSINQWRKPP:RDUE_DATE      = L_REV_DATE
+               arsinqwrkpp:eff_date       = sfpname_alias:eff_date
+               arsinqwrkpp:exp_date       = sfpname_alias:exp_date
+               ARSINQWRKPP:STATUS         = ARSBILLINGWORK_ALIAS:STATUS
+               ARSINQWRKPP:TRANS_CODE     = ARSBILLINGWORK_ALIAS:TRANS_CODE
+               arsinqwrkpp:comm_rate   = arsbillingwork_ALIAS:comm_rate
+               ARSINQWRKPP:SUB_CODE       = L_SUB_CODE
+               ARSINQWRKPP:AMOUNT_DUE     = ARSBILLINGWORK_ALIAS:INSTALLMENT_AMOUNT
+               ARSINQWRKPP:AMOUNT_PAID    = ARSBILLINGWORK_ALIAS:TOTAL_AMOUNT_PAID
+               ARSINQWRKPP:WRITE_OFF_AMOUNT = ARSBILLINGWORK_ALIAS:WRITE_OFF_AMOUNT
+               If ARSBILLINGWORK_ALIAS:DUE_DATE < TODAYSDATE And
+                  ARSBILLINGWORK_ALIAS:STATUS = "B" Then
+                  {
+                  ARSINQWRKPP:PAST_DUE_AMOUNT = ARSBILLINGWORK_ALIAS:INSTALLMENT_AMOUNT -
+                                                  ARSBILLINGWORK_ALIAS:TOTAL_AMOUNT_PAID -
+                                                  ARSBILLINGWORK_ALIAS:WRITE_OFF_AMOUNT
+                  }
+
+               If ARSINQWRKPP:STATUS Not One Of "D","V","T","R" And
+                  ARSINQWRKPP:TRANS_CODE Not One Of 61,65 Then
+               {
+               ARSINQWRKPP:NET_AMOUNT_DUE = ARSBILLINGWORK_ALIAS:INSTALLMENT_AMOUNT -
+                                          (ARSBILLINGWORK_ALIAS:TOTAL_AMOUNT_PAID -
+                                           ARSBILLINGWORK_ALIAS:WRITE_OFF_AMOUNT  +
+                                           ARSBILLINGWORK_ALIAS:DISBURSEMENT_AMOUNT )
+              }
+              Else If ARSINQWRKPP:STATUS One Of "D","V","T" Then
+              {
+              ARSINQWRKPP:DISBURSEMENT_AMOUNT = ARSBILLINGWORK_ALIAS:DISBURSEMENT_AMOUNT
+              If ARSINQWRKPP:TRANS_CODE One Of 30,31,36,35,55 Then
+              {
+                  ARSINQWRKPP:NET_AMOUNT_DUE      = ARSBILLINGWORK_ALIAS:DISBURSEMENT_AMOUNT
+              }
+              Else
+              {
+                  ARSINQWRKPP:NET_AMOUNT_DUE      = arsbillingwork_alias:disbursement_amount - ARSBILLINGWORK_ALIAS:TOTAL_AMOUNT_PAID
+              }
+
+--              ARSINQWRKPP:RDUE_DATE = 12.31.9999
+--              ARSINQWRKPP:BILLED_DATE = 12.31.9999
+
+              }
+
+               If ARSINQWRKPP:STATUS Not One Of "D","V","T" And
+                  ARSINQWRKPP:TRANS_CODE One Of 61 Then
+               {
+               ARSINQWRKPP:NET_AMOUNT_DUE = ARSBILLINGWORK_ALIAS:INSTALLMENT_AMOUNT -
+                                          (ARSBILLINGWORK_ALIAS:TOTAL_AMOUNT_PAID -
+                                           ARSBILLINGWORK_ALIAS:WRITE_OFF_AMOUNT  +
+                                           ARSBILLINGWORK_ALIAS:DISBURSEMENT_AMOUNT )
+              }
+
+               If ARSINQWRKPP:STATUS = "R" And
+                  ARSINQWRKPP:TRANS_CODE not One Of 65 Then
+               {
+                   ARSINQWRKPP:AMOUNT_DUE       = ARSINQWRKPP:AMOUNT_PAID
+                   ARSINQWRKPP:NSF_CHECK_AMOUNT = ARSINQWRKPP:AMOUNT_PAID
+                   ARSINQWRKPP:NET_AMOUNT_DUE   = 0.00
+               }
+
+           }
+           Else
+           Change ARSINQWRKPP
+           {
+               ARSINQWRKPP:AMOUNT_DUE     = ARSINQWRKPP:AMOUNT_DUE +
+                                          ARSBILLINGWORK_ALIAS:INSTALLMENT_AMOUNT
+
+               ARSINQWRKPP:AMOUNT_PAID    = ARSINQWRKPP:AMOUNT_PAID  +
+                                          ARSBILLINGWORK_ALIAS:TOTAL_AMOUNT_PAID
+
+               ARSINQWRKPP:WRITE_OFF_AMOUNT = ARSINQWRKPP:WRITE_OFF_AMOUNT +
+                                            ARSBILLINGWORK_ALIAS:WRITE_OFF_AMOUNT
+               ARSINQWRKPP:NET_AMOUNT_DUE = ARSINQWRKPP:NET_AMOUNT_DUE +
+               (ARSBILLINGWORK_ALIAS:INSTALLMENT_AMOUNT - (ARSBILLINGWORK_ALIAS:TOTAL_AMOUNT_PAID +
+                                                       ARSBILLINGWORK_ALIAS:WRITE_OFF_AMOUNT))
+
+               If ARSBILLINGWORK_ALIAS:DUE_DATE < TODAYSDATE And
+                  ARSBILLINGWORK_ALIAS:STATUS = "B" Then
+                  {
+                      ARSINQWRKPP:PAST_DUE_AMOUNT = ARSINQWRKPP:PAST_DUE_AMOUNT  +
+                      ( ARSBILLINGWORK_ALIAS:INSTALLMENT_AMOUNT - (ARSBILLINGWORK_ALIAS:TOTAL_AMOUNT_PAID - ARSBILLINGWORK_ALIAS:WRITE_OFF_AMOUNT))
+                  }
+
+
+         }
+}
+
+L_ERROR_FILE = ""
+
+/* add records from the arscheck file for Over Payments */
+next arsbillingwork_alias 
+
+} 
+}
+
+Procedure GET_ARSINQWRK_SUB_CODE
+{
+
+L_SUB_CODE = 0000
+L_DUE_DATE = ARSBILLING_ALIAS:DUE_DATE
+
+Access ARSINQWRKPP_ALT, Set
+       ARSINQWRKPP_ALT:COMPANY_ID = ARSBILLING_ALIAS:COMPANY_ID,
+       ARSINQWRKPP_ALT:POLICY_NO  = ARSBILLING_ALIAS:POLICY_NO,
+       ARSINQWRKPP_ALT:BILLED_DATE = L_BILLED_DATE,
+--       ARSINQWRKPP_ALT:RDUE_DATE   = ARSBILLING_ALIAS:DUE_DATE,
+       ARSINQWRKPP_ALT:RDUE_DATE   = L_REV_DATE,
+       ARSINQWRKPP_ALT:STATUS     = ARSBILLING_ALIAS:STATUS,
+       ARSINQWRKPP_ALT:TRANS_CODE = ARSBILLING_ALIAS:TRANS_CODE,
+       arsinqwrkpp_alt:comm_rate  = arsbilling_alias:comm_rate, Approximate
+
+       While ARSINQWRKPP_ALT:COMPANY_ID = ARSBILLING_ALIAS:COMPANY_ID And
+             ARSINQWRKPP_ALT:POLICY_NO  = ARSBILLING_ALIAS:POLICY_NO And
+             ARSINQWRKPP_ALT:BILLED_DATE = L_BILLED_DATE And
+--             ARSINQWRKPP_ALT:RDUE_DATE   = ARSBILLING_ALIAS:DUE_DATE And
+             ARSINQWRKPP_ALT:RDUE_DATE   = L_REV_DATE And
+             ARSINQWRKPP_ALT:STATUS      = ARSBILLING_ALIAS:STATUS And
+             ARSINQWRKPP_ALT:TRANS_CODE  = ARSBILLING_ALIAS:TRANS_CODE and
+             arsinqwrkpp_alt:comm_rate   = arsbilling_alias:comm_rate
+             {
+                L_SUB_CODE = ARSINQWRKPP_ALT:SUB_CODE
+                Next ARSINQWRKPP_ALT
+             }
+
+L_SUB_CODE = L_SUB_CODE + 10
+
+}  -- end of procedures
+
+}

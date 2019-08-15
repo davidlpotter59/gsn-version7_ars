@@ -1,0 +1,75 @@
+%%
+Screen
+        Name = "arsmt038" ;
+        Type = "Detail" ;
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize="dynamic" ;
+        Domain = "ARSCODE";
+        Windowtitle="%a     %s Transaction Code - Ver. 7.00    %m";
+--      resizeable = yes ;
+        iconline = 0 ;
+
+        Include "stdkeys7.inc"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        add/reuse  tagged add_fn;
+
+        Include "stdfunc7.inc"
+
+Menu Definition
+
+        Include "stdmenu7.inc"
+
+}
+
+Toolbar Definition
+
+        Include "stdtoolbar7.inc"
+}
+
+screen
+{
+%%
+                                                        _______________
+*------------------------------------------------------------------------------*
+| Company ID:       __________  _____________________________________________  |
+| Transaction Code: _____                                                      |
+*------------------------------------------------------------------------------*
+| Description:       ______________________________                            |
+| Short Description: __________                                                |
+*------------------------------------------------------------------------------*
+
+
+%%
+
+components
+
+Fields
+        FUNCTION/noecho/showasguidetext;
+301     ARSCODE:COMPANY_ID
+        include "companyhlp.inc"
+302     sfscompany:name[1] ;
+401     ARSCODE:TRANS_CODE                  Mandatory;
+601     ARSCODE:DESCRIPTION;
+701     Begin
+        If FUNCTION = "ADD" Then
+           Begin
+           ARSCODE:SHORT_DESCRIPTION = ARSCODE:DESCRIPTION[1,10]
+           End
+        If FUNCTION = "CHANGE" And
+           ARSCODE:SHORT_DESCRIPTION = "" Then
+            Begin
+            ARSCODE:SHORT_DESCRIPTION = ARSCODE:DESCRIPTION[1,10]
+            End
+        End
+        ARSCODE:SHORT_DESCRIPTION /DEFAULT;
+
+}
+
+End

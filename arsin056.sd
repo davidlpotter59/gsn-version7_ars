@@ -1,0 +1,281 @@
+%%
+Screen
+        Name = "Arsin056" ;
+        Type = "Multiline" ;
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize = "dynamic";
+        Repeat repeat_items_tg, 10 Times Down;
+        Windowtitle = "%s    %a   A/P Summary Inquiry - Version 7.01    %m";
+        Domain = "ARSCHECK" ;
+        iconline = 0;
+        resizable = yes ;
+
+        Global String G_COMPANY_ID[10] ;
+        Global String G_COMPANY[10];
+
+        Global Unsigned Ascii number g_pol_year[4],
+                                     g_year[4],
+                                     g_mort_exists[1];
+
+        Global Unsigned Ascii Number G_POLICY_NO[9],
+                                     g_policy_no2[9];
+
+        Global Unsigned ascii number g_sub_code[4] ;
+
+        Global Unsigned Ascii Number G_CHECK_REFERENCE[7] ;
+
+        Global Wdate G_EFF_DATE;
+
+        Global String g_lib[10],
+                      g_lib_2[10];
+
+        String L_ENTER[1],
+               l_server_url[100],
+               l_image_name[100],
+               l_url[250];
+        String l_programid[20]="";
+        string l_system_id[15]="",
+               l_sfs[3]="",
+               l_username[15]="";
+
+        Access arscheck, Set arscheck:company_id = g_company_id,
+                             arscheck:policy_no  = g_policy_no, generic
+
+--        Include "inqKEYS.INC"
+
+Style Definition
+    include "styles.inc"
+
+Functions
+   "redisplay" display/noreturn "arsin045" ;
+   "Display_Image" sequence "display_image_seq" tagged display_image_tg ;
+   "display_image_seq" continue {
+                               do set_browser
+                               if l_image_name <> "" then
+                               begin
+                                   showdocument (l_url)
+                               end
+
+    g_company_id      = arscheck:company_id
+    g_policy_no       = arscheck:policy_no
+                               raisecard (check_info_tg)
+                               do get_checking
+
+                            };
+
+"Exit"  Return  tagged exit_tg ;
+        Return ;
+
+/*        "Next" sequence "next_seq" tagged next_tg;
+        "next_seq" continue
+        begin
+            function = "Next"
+        end ;
+
+        "Prev" sequence "Previous_seq" tagged Previous_tg;
+        "Previous_seq" continue
+        begin
+            function = "Previous"
+        end ;
+*/
+
+Next ;
+
+Previous ;
+
+        "display_Next" sequence "next_seq" tagged display_next_tg;
+        "next_seq" continue
+        begin
+            function = "Next"
+        end ;
+
+        "Display_Previous" sequence "Previous_seq" tagged display_Previous_tg;
+        "Previous_seq" continue
+        begin
+            function = "Previous"
+        end ;
+
+include "csfunctions2.inc"
+
+include "csfunctions.inc"
+
+ToolBar Definition
+
+Screen Entry
+
+include "pssmort.inc"
+
+include "csentry.inc"
+include "csentry2.inc"
+
+if arscheck:policy_no <> g_policy_no then
+{
+    abort ()
+}
+
+access arscontrol2, set arscontrol2:company_id = arscheck:company_id
+
+Access Validation
+
+g_policy_no2 = g_policy_no
+
+if arscheck:policy_no <> g_policy_no then
+begin
+    abort ()
+end
+
+skip if arscheck:release one of "V" or
+       year(arscheck:eff_date) <> g_year
+
+Screen
+
+include "csbuttons.inc"
+
+include "csnextprev.inc"
+
+Listbox
+{ Heading
+   Properties {
+       LayoutType        = Row
+       LayoutConstraints = "North"
+       }
+       {Components
+       Button to 1,5.0
+           Properties {
+                  Text = "Release"
+          }
+       Button to 1, 10.0
+           Properties {
+                  Text = "Check Date"
+          }
+       Button to 1, 10.0
+           Properties {
+                  Text = "Year"
+          }
+       Button to 1, 10.0
+           Properties {
+                  Text = "Reason"
+          }
+       Button to 1, 30.0
+           Properties {
+                  Text = "Payee"
+          }
+       Button to 1,10.0
+           Properties {
+                  Text = "Check Number"
+          }
+       Button to 1, 10.0
+           Properties {
+                  Text = "Amount"
+          }
+    }
+Panel
+    Properties {
+         LayoutType        = Row
+         LayoutConstraints = Stretch
+         ScrollBarPolicy   = asNeeded
+    }
+{
+
+Fields
+{ function = "display_image" }
+arscheck:release to 1.0, 5.0 tagged repeat_items_tg ;
+arscheck:check_date  to 1.0, 10.0 tagged repeat_items_tg
+    properties {
+                 cursorshape     = hand
+                 foregroundcolor = "blue"
+               }
+    events     {
+    MouseClicked {
+                  Currentrecord = EVENT.LINE
+                  function = "Display_Image"
+                  Abort()
+                  }
+                } ;
+year(arscheck:eff_date) to 1.0, 10.0 tagged repeat_items_tg
+properties {
+              backgroundcolor = "white"
+              foregroundcolor = "black"
+           };
+arscheck:aps_trans_code to 1.0, 10.0 tagged repeat_items_tg ;
+
+arscheck:payee_name[1] to 1.0, 30.0 tagged repeat_items_tg ;
+
+val(arscheck:CHECK_NO)/mask="ZZZZZZZZ"  to 1.0, 10.0 tagged repeat_items_tg
+Properties {
+              backgroundcolor = "white"
+              foregroundcolor = "black"
+            };
+arscheck:CHECK_AMOUNT  to 1.0, 10.0 tagged repeat_items_tg ;
+
+}
+
+}
+}
+
+Panel tagged check_total_tg
+Properties {
+        ScrollBarPolicy = asNeeded
+           }
+
+{
+
+%%
+
+%%
+
+Components subscreen at 1,1 to 1, 100
+   Properties {
+        screen   = "arsin056asc"
+              }
+
+}
+
+Panel tagged check_info_tg
+Properties {
+        ScrollBarPolicy = asNeeded
+        Text            = "Check Information"
+           }
+
+{
+
+%%
+
+%%
+
+Components subscreen at 1,1 to 15, 81
+   Properties {
+        screen   = "arsin056sc"
+              }
+
+}
+
+Screen Exit
+        If arscheck:COMPANY_ID > "" Then G_COMPANY_ID = arscheck:COMPANY_ID ;
+        If arscheck:POLICY_NO > 0
+        Then G_POLICY_NO  = arscheck:POLICY_NO ;
+
+g_sub_code = 9999
+g_policy_no2 = 0
+
+Procedure Definition
+
+
+Procedure get_checking
+begin
+     g_policy_no2 = arscheck:policy_no
+
+     postevent("arsin056sc","reload")
+
+End
+
+Procedure Set_Browser
+begin
+
+    g_company_id      = arscheck:company_id
+    g_policy_no       = arscheck:policy_no
+    g_sub_code        = arscheck:sub_code
+
+end -- end of procedure
+End

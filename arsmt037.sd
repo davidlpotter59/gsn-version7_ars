@@ -1,0 +1,62 @@
+%%
+Screen
+        Name = "arsmt037" ;
+        Type = "Detail" ;
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize="dynamic" ;
+        domain = "arsbptime" ;
+        Windowtitle = "%a    %s Billing Time Element - Ver. 7.00    %m";
+--      resizeable = yes ;
+        iconline = 0 ;
+
+        Include "stdkeys7.inc"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        add/reuse  tagged add_fn;
+
+        Include "stdfunc7.inc"
+
+Menu Definition
+
+        Include "stdmenu7.inc"
+
+}
+
+Toolbar Definition
+
+        Include "stdtoolbar7.inc"
+}
+
+screen
+{
+%%
+                                                        _______________
+*------------------------------------------------------------------------------*
+| Company ID:   __________  __________________________________________________ |
+| Billing Time: _____                                                          |
+*------------------------------------------------------------------------------*
+| Description:  ______________________________                                 |
+*------------------------------------------------------------------------------*
+
+
+%%
+
+components
+
+Fields
+        FUNCTION/noecho/showasguidetext;
+301     ARSBPTIME:COMPANY_ID                    Mandatory
+        include "companyhlp.inc"
+302     sfscompany:name[1] ;
+401     ARSBPTIME:BILLING_TIME                  Mandatory;
+601     ARSBPTIME:DESCRIPTION;
+
+}
+
+End

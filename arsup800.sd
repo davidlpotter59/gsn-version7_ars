@@ -1,0 +1,197 @@
+%%
+Program
+/*  arsup800
+
+    december 17, 2002
+
+    SCIPS.com
+
+    program to clear the arsmaster:commissions_applied date for rerunning
+    of the commission statements
+*/
+        Name = "arsup800" ;
+        Type = "File" ;
+        Domain = "FLAT" ;
+
+        Number L_COUNTER = 0;
+        String L_COMPANY_ID[10]="";
+        Wdate G_DATE;
+        String L_ENTER[1];
+        String L_SFS[3]="SFS";
+        Unsigned Ascii Number L_RUN_YEAR[4],
+                              L_RUN_MONTH[2];
+
+Screen Entry
+
+    G_DATE = Date(COMMANDLINE[1,8])
+--    Write ("%c%s%d",05001,"g date = ",G_DATE)
+--    Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+
+L_RUN_YEAR  = Year(G_DATE)
+L_RUN_MONTH = Month(G_DATE)
+
+Write ("<014>")
+
+Access SFSDEFAULT, Set SFSDEFAULT:SFS_CODE = L_SFS
+
+Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = SFSDEFAULT:COMPANY_ID
+
+If ARSCONTROL2:COMMISSIONS_ON_CASH One Of 0 Then
+Begin
+    Do UPDATE_ARSMASTER
+    Do UPDATE_ARSPAYMENT
+    Do UPDATE_ARSCHECK
+    Do UPDATE_APSAGTCK
+End
+Else
+Begin
+    Do UPDATE_ARSMASTER
+    Do UPDATE_ARSPAYMENT
+    Do UPDATE_ARSCHECK
+    Do UPDATE_APSAGTCK
+End
+
+If L_COUNTER = 1 Then
+Begin
+    Write ("<014>")
+End
+
+If L_COUNTER Mod 100 = 0 Then Begin
+    Write ("%c%s%n",02001,"l_counter = ",L_COUNTER)
+End
+
+Update
+
+Screen Exit
+
+Procedure Definition
+
+Procedure UPDATE_ARSMASTER
+Begin
+
+L_COMPANY_ID = ""
+L_COUNTER = 0
+
+Access ARSMASTER, Set ARSMASTER:COMPANY_ID = L_COMPANY_ID, Approximate
+
+While ARSMASTER:ERRORNUMBER = 0
+Begin
+
+    L_COUNTER = L_COUNTER + 1
+    If L_COUNTER Mod 100 = 0 Then Begin
+        Write ("%c%s%n",01001,"Arsmaster counter = ",L_COUNTER)
+    End
+
+If ARSMASTER:COMMISSIONS_APPLIED = G_DATE Then
+Begin
+Change ARSMASTER
+Begin
+    ARSMASTER:COMMISSIONS_APPLIED = 00.00.0000
+    ARSMASTER:COMMISSION_RUN_DATE = 00.00.0000
+End
+End
+Next ARSMASTER
+End
+
+End
+
+Procedure UPDATE_ARSPAYMENT
+Begin
+
+L_COMPANY_ID = ""
+L_COUNTER = 0
+
+Access ARSPAYMENT, Set ARSPAYMENT:COMPANY_ID = L_COMPANY_ID, Approximate
+
+While ARSPAYMENT:ERRORNUMBER = 0
+Begin
+
+    L_COUNTER = L_COUNTER + 1
+    If L_COUNTER Mod 100 = 0 Then Begin
+        Write ("%c%s%n",02001,"Arspayment counter = ",L_COUNTER)
+    End
+
+If ARSPAYMENT:COMMISSIONS_APPLIED = G_DATE Then
+Begin
+Change ARSPAYMENT
+Begin
+    ARSPAYMENT:COMMISSIONS_APPLIED  = 00.00.0000
+    ARSPAYMENT:COMMISSIONS_RUN_DATE = 00.00.0000
+End
+End
+Next ARSPAYMENT
+End
+
+End
+
+Procedure UPDATE_ARSCHECK
+Begin
+
+L_COMPANY_ID = ""
+L_COUNTER = 0
+
+Access ARSCHECK, Set ARSCHECK:COMPANY_ID = L_COMPANY_ID, Approximate
+
+While ARSCHECK:ERRORNUMBER = 0
+Begin
+
+    L_COUNTER = L_COUNTER + 1
+    If L_COUNTER Mod 100 = 0 Then Begin
+        Write ("%c%s%n",03001,"Arscheck counter = ",L_COUNTER)
+    End
+
+If ARSCHECK:COMMISSIONS_RUN_DATE  = G_DATE Then
+Begin
+Change ARSCHECK
+Begin
+    ARSCHECK:COMMISSIONS_RUN_DATE = 00.00.0000
+End
+End
+Next ARSCHECK
+End
+
+End
+
+Procedure UPDATE_APSAGTCK
+Begin
+
+L_COUNTER = 0
+
+Access APSAGTCK, Set APSAGTCK:COMPANY_ID = L_COMPANY_ID, Approximate
+
+While APSAGTCK:COMPANY_ID <> ""
+Begin
+
+    L_COUNTER = L_COUNTER + 1
+
+    If L_COUNTER Mod 100 = 0 Then
+    Begin
+        Write ("%c%s%n",04001,"Apsagtck counter = ",L_COUNTER)
+    End
+
+     If APSAGTCK:PROCESS_YEAR  = L_RUN_YEAR And
+        APSAGTCK:PROCESS_MONTH = L_RUN_MONTH Then
+        Begin
+            Access APSAGTCK_ALIAS, Set APSAGTCK_ALIAS:COMPANY_ID    = APSAGTCK:COMPANY_ID,
+                                       APSAGTCK_ALIAS:AGENT_NO      = APSAGTCK:AGENT_NO,
+                                       APSAGTCK_ALIAS:PROCESS_YEAR  = APSAGTCK:PROCESS_YEAR,
+                                       APSAGTCK_ALIAS:PROCESS_MONTH = APSAGTCK:PROCESS_MONTH
+
+            If APSAGTCK_ALIAS:COMPANY_ID    = APSAGTCK:COMPANY_ID And
+               APSAGTCK_ALIAS:AGENT_NO      = APSAGTCK:AGENT_NO And
+               APSAGTCK_ALIAS:PROCESS_YEAR  = APSAGTCK:PROCESS_YEAR And
+               APSAGTCK_ALIAS:PROCESS_MONTH = APSAGTCK:PROCESS_MONTH And
+               APSAGTCK_ALIAS:RELEASE One Of "" Then
+               Begin
+                   Delete APSAGTCK_ALIAS
+               End
+
+        End -- end of month and year checking
+
+        Next APSAGTCK
+
+End -- end of while
+
+End -- end of procedure
+
+End

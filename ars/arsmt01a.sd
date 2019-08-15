@@ -1,0 +1,101 @@
+%%
+Screen
+        Name = "arsmt01a" ;
+        Type = "Multiline" ;
+        Repeat LINE_ITEMS, 8 Times Down;
+        Highlite = Underscore;
+        Padcharacter = Space;
+        Errortype=Lock;
+        Screensize="dynamic";
+        Windowtitle="%s      %a  Check Setup - Payor Selection - Ver. 7.00    %m";
+        Domain = "SFPSUPP";
+        resizeable = yes ;
+        iconline = 0 ;
+
+        Global Unsigned Ascii Number G_POLICY_NO[9]/decimals=0 ;
+        Global Unsigned Ascii Number G_SUB_CODE[4] ;
+
+        Global String G_SUPP_NAME[30],
+                      G_CARE_OF[30],
+                      G_STREET[20],
+                      G_CITY_STATE[20];
+
+        Global Unsigned Ascii Number G_ZIP_CODE[9] ;
+
+        Access SFPSUPP, Set SFPSUPP:POLICY_NO = G_POLICY_NO,Approximate  ;
+
+        Include "stdkeys7.inc"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        Include "stdfunc7m.inc"
+
+Menu Definition
+
+        Include "stdmenu7.inc"
+
+}
+
+Toolbar Definition
+
+        Include "stdtoolbar7m.inc"
+}
+
+Access Validation
+If SFPSUPP:POLICY_NO <> G_POLICY_NO Then
+    Abort()
+
+Error 1000 If SFPSUPP:POLICY_NO <> G_POLICY_NO
+
+screen at 2,1 to 18,81
+{
+%%
+                                                        _______________
+*------------------------------------------------------------------------------*
+| Policy Number: _________ ______________________________                      |
+*------------------------------------------------------------------------------*
+| Type             Name                              In Care of                |
+*------------------------------------------------------------------------------*
+|  _  ___________________________________ ___________________________________  |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+*------------------------------------------------------------------------------*
+
+
+%%
+
+components
+
+Fields
+      FUNCTION/noecho/showasguidetext ;
+0301  G_POLICY_NO;
+0302  SFPNAME:NAME[1]/displayonly ;
+0701  SFPSUPP:MORTGAGE_TYPE_1/displayonly   tagged LINE_ITEMS;
+0702  SFPSUPP:NAME[1]/displayonly           tagged LINE_ITEMS;
+0703  SFPSUPP:NAME[2]                       tagged LINE_ITEMS;
+
+}
+
+Screen Exit
+If SFPSUPP:POLICY_NO > 0 Then G_POLICY_NO = SFPSUPP:POLICY_NO ;
+If SFPSUPP:SUB_CODE > 0 Then G_SUB_CODE = SFPSUPP:SUB_CODE ;
+If SFPSUPP:POLICY_NO > 0 Then
+Begin
+    G_SUPP_NAME  = SFPSUPP:NAME[1]
+    G_CARE_OF    = SFPSUPP:NAME[2]
+    G_STREET     = SFPSUPP:ADDRESS[1]
+    G_CITY_STATE = SFPSUPP:CITY
+    G_ZIP_CODE   = SFPSUPP:ZIPCODE
+End ;
+
+End

@@ -1,0 +1,117 @@
+SCIPS(c) Insurance Systems                             Function [____________]
+Screen 4. ARSMASTER Update Screen
+ 1. Company Id:             __________
+ 2. Policy Number:          _________
+ 3. Transaction Date:       __________
+ 4. Transaction Effective:  __________
+ 5. Transaction Expiration: __________
+ 6. Transaction Code:            ____  20. County:                         ___
+ 7. Line Of Business:            ____  21. Term:                            __
+ 8. Commission Rate:            _____  22. Premium:              _____________
+ 9. Trans Eff Mm:                  __  23. Commissions Applied:  __________
+10. Trans Eff Dd:                  __  24. Commission Run Date:  __________
+11. Trans Eff Yyyy:              ____  25. Consent Order:                   __
+12. Trans Code Filler 1:           __  26. Policy Year:          ____
+13. Trans Code Sort:                _  27. Endorsement Sequence:          ____
+14. Trans Code Type:                _  28. Ac Net Amount Due:      ___________
+15. Lob Subline:            __
+16. Agent Number:                ____
+17. Billing Plan:           __
+18. Payment Plan:               _____
+19. State Code:                    __
+%%
+Screen
+        Name = "Arsmaster" ;
+        Type = "Detail" ;
+        padcharacter = space ;
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+        Global Wdate G_TRANS_DATE ;
+        Global Wdate G_TRANS_EFF ;
+        Global Wdate G_TRANS_EXP ;
+        Global Unsigned Ascii Number G_TRANS_CODE[4] ;
+        Global Unsigned Ascii Number G_LINE_OF_BUSINESS[4] ;
+        Global Unsigned Ascii Number G_COMM_RATE[4]/decimals=2 ;
+
+        Access ARSMASTER,
+           Set ARSMASTER:COMPANY_ID = G_COMPANY_ID ,
+               ARSMASTER:POLICY_NO = G_POLICY_NO ,
+               ARSMASTER:TRANS_DATE = G_TRANS_DATE ,
+               ARSMASTER:TRANS_EFF = G_TRANS_EFF ,
+               ARSMASTER:TRANS_EXP = G_TRANS_EXP ,
+               ARSMASTER:TRANS_CODE = G_TRANS_CODE ,
+               ARSMASTER:LINE_OF_BUSINESS = G_LINE_OF_BUSINESS ,
+               ARSMASTER:COMM_RATE = G_COMM_RATE ;
+
+
+        Include "STDKEYS.INC"
+
+Functions
+        Add/reuse;            /* Add a record */
+        Change;         /* Change an existing record */
+        Delete;         /* Delete an existing record */
+
+        Find ;          /* Select a record using an exact key */
+        Search;         /* Select a record using an approximate key */
+        Next;           /* Display the next record(s) in key sequence */
+        Previous;       /* Display the previous record(s) in key sequence */
+        View;           /* View the contents of freetext fields */
+
+        Page/noreturn;  /* Display a different page - no going back */
+
+"Back"  Return;         /* Back to previous screen */
+"Exit"  Return;
+        Return;
+
+"Bye"   Stop;           /* Terminate this session */
+        Stop;
+
+        Print;          /* Print the screen on the default printer */
+"Cq"    Proc "CQ";      /* Enter Cyberquery */
+"Cli"   Proc ":CLI";    /* Push to the CLI */
+
+Fields
+        FUNCTION ;
+301     ARSMASTER:COMPANY_ID                    Mandatory;
+401     ARSMASTER:POLICY_NO                     Mandatory;
+501     ARSMASTER:TRANS_DATE                    Mandatory;
+601     ARSMASTER:TRANS_EFF                     Mandatory;
+701     ARSMASTER:TRANS_EXP                     Mandatory;
+801     ARSMASTER:TRANS_CODE                    Mandatory;
+901     ARSMASTER:LINE_OF_BUSINESS              Mandatory;
+1001    ARSMASTER:COMM_RATE                     Mandatory;
+1101    ARSMASTER:TRANS_EFF_MM;
+1201    ARSMASTER:TRANS_EFF_DD;
+1301    ARSMASTER:TRANS_EFF_YYYY;
+1401    ARSMASTER:TRANS_CODE_FILLER_1;
+1501    ARSMASTER:TRANS_CODE_SORT;
+1601    ARSMASTER:TRANS_CODE_TYPE;
+1701    ARSMASTER:LOB_SUBLINE;
+1801    ARSMASTER:AGENT_NO;
+1901    ARSMASTER:BILL_PLAN;
+2001    ARSMASTER:PAYMENT_PLAN;
+2101    ARSMASTER:STATE;
+802     ARSMASTER:COUNTY;
+902     ARSMASTER:TERM;
+1002    ARSMASTER:PREMIUM;
+1102    ARSMASTER:COMMISSIONS_APPLIED;
+1202    ARSMASTER:COMMISSION_RUN_DATE;
+1302    ARSMASTER:CONSENT_ORDER;
+1402    ARSMASTER:POL_YEAR;
+1502    ARSMASTER:END_SEQUENCE;
+1602    ARSMASTER:AC_NET_AMOUNT_DUE;
+
+Screen Exit
+        If ARSMASTER:COMPANY_ID > "" Then G_COMPANY_ID = ARSMASTER:COMPANY_ID ;
+        If ARSMASTER:POLICY_NO > 0 Then G_POLICY_NO = ARSMASTER:POLICY_NO ;
+        If ARSMASTER:TRANS_DATE > 0 Then G_TRANS_DATE = ARSMASTER:TRANS_DATE ;
+        If ARSMASTER:TRANS_EFF > 0 Then G_TRANS_EFF = ARSMASTER:TRANS_EFF ;
+        If ARSMASTER:TRANS_EXP > 0 Then G_TRANS_EXP = ARSMASTER:TRANS_EXP ;
+        If ARSMASTER:TRANS_CODE > 0 Then G_TRANS_CODE = ARSMASTER:TRANS_CODE ;
+        If ARSMASTER:LINE_OF_BUSINESS > 0
+        Then G_LINE_OF_BUSINESS = ARSMASTER:LINE_OF_BUSINESS ;
+        If ARSMASTER:COMM_RATE > 0 Then G_COMM_RATE = ARSMASTER:COMM_RATE ;
+
+
+End

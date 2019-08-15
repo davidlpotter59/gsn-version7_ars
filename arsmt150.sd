@@ -1,0 +1,223 @@
+%%
+Screen
+        Name = "arsmt150" ;
+        Type = "Multiline" ;
+        Padcharacter=Space;
+        Highlite = Underscore;
+        Screensize="dynamic";
+        Repeat line_item_tg, 20 Times Down;
+        Windowtitle = "%s      %a D/B NSF checks clearing the bank - Version 7.20    %m";
+        iconline = 0;
+        Domain = "arschksu" ;
+
+        Global String G_COMPANY_ID[10];
+
+        String l_check_no[20]="",
+               l_company_id[10]="DELOS",
+               l_continue_1[100]="",
+               l_enter[1];
+
+        unsigned ascii number l_chk_ref[7];
+
+        wdate l_statement_date,
+              l_cleared_date ;
+
+        Access arschksu, Set arschksu:company_id = l_company_id,
+                             arschksu:check_reference = l_chk_ref, Approximate
+
+        Include "STDKEYS7.INC"
+
+style definition
+    include "styles.inc"
+
+Functions
+
+--        Include "STDFUNC7.INC"
+Add                                     Tagged Add_fn;
+Change/auto                                  Tagged Change_fn;
+Delete                                  Tagged Delete_fn;
+Search                                  Tagged Search_fn;
+Find                                    Tagged Find_fn;
+Next                                    Tagged Next_fn;
+Previous                                Tagged Previous_fn;
+Page/noreturn                           Tagged Page_fn;
+"BACK"  Sequence "EXIT"         Tagged Back_fn;
+"EXIT"  return                  Tagged Exit_fn;
+Return                                  Tagged Return_fn;
+Print                                   Tagged Print_fn;
+"Check"   Sequence "FIND"     Tagged Check_fn;
+
+
+
+Menu Definition
+    include "stdmenu7.inc"
+}
+
+Toolbar Definition
+    include "stdtoolbar7.inc"
+}
+
+screen entry
+
+--access sfscompany, set sfscompany:company_id = l_company_id, generic
+--l_company_id = sfscompany:company_id
+
+access arsnsfcleared, set arsnsfcleared:company_id = arschksu:company_id,
+                          arsnsfcleared:check_reference = arschksu:check_reference,
+                          arsnsfcleared:policy_no  = arschksu:policy_no, exact
+disable (add_fn)
+--disable (change_fn)
+disable (delete_fn)
+
+read (5,35,"Enter Cleared Date ",l_statement_date,8)
+write ("%c%s",05015,"                                                                         ")
+
+Access Validation
+skip if (arschksu:nsf_check_cleared <> 0)
+skip if arschksu:trans_date < 01.01.2011
+
+screen
+properties
+    {
+    Layouttype = column
+    }
+{
+
+Panel Tagged header_pl
+properties
+    {
+    borderstyle = raised
+    scrollbarpolicy = asneeded
+    }
+{
+%%
+                                                         ____________
+*---------------------------------------------------------------------*
+| Company Id: __________  ________________________________________    |
+|                                                                     |
+| Bank Statement Date: __________                                     |
+*---------------------------------------------------------------------*
+| Clear  Policy     Check Ref            Stmt Date        Amount      |
+*---------------------------------------------------------------------*
+|   _  _________ ____________________    __________     _____________ |
+|                                                                     |
+|                                                                     |
+|                                                                     |
+|                                                                     |
+|                                                                     |
+|                                                                     |
+|                                                                     |
+|                                                                     |
+|                                                                     |
+|                                                                     |
+|                                                                     |
+|                                                                     |
+|                                                                     |
+|                                                                     |
+|                                                                     |
+|                                                                     |
+|                                                                     |
+|                                                                     |
+|                                                                     |
+*---------------------------------------------------------------------*
+%%
+
+components
+
+Fields
+0101     FUNCTION/noecho/showasguidetext ;
+0301     arschksu:COMPANY_ID/displayonly       Mandatory
+         Error 1223 If SFSCOMPANY:NAME[1] = ""
+         Activehelp If SFSCOMPANY:USE <> "1" Then NULL Else SFSCOMPANY:COMPANY_ID/width=12,
+                    If SFSCOMPANY:USE <> "1" Then NULL Else SFSCOMPANY:NAME[1]/width=45;
+
+0302     SFSCOMPANY:NAME[1]
+         properties {
+                    ForeGroundcolor = "Black"
+                    BackGroundcolor = "White"
+                    };
+0501     {
+         if l_statement_date = 00.00.0000 then
+         {
+             l_statement_date = todaysdate
+         }
+         }
+         l_statement_date /default
+         properties {
+                    ForeGroundcolor = "Red"
+                    BackGroundcolor = "White"
+                    };
+0901     arschksu:nsf_check_cleared tagged line_item_tg
+         properties {
+                    ForeGroundcolor = "Red"
+                    BackGroundcolor = "White"
+                    };
+0902     arschksu:policy_no/displayonly tagged line_item_tg
+         properties {
+                    ForeGroundcolor = "Black"
+                    BackGroundcolor = "White"
+                    };
+0903     arschksu:check_reference/displayonly tagged line_item_tg
+         properties {
+                    ForeGroundcolor = "Black"
+                    BackGroundcolor = "White"
+                    };
+0904     {
+         if arschksu:nsf_check_cleared one of 1 then
+         {
+             do add_arsnsfcleared
+             l_cleared_date = l_statement_date
+         }
+         }
+         l_cleared_date/default  tagged line_item_tg
+         properties {
+                    ForeGroundcolor = "Red"
+                    BackGroundcolor = "White"
+                    };
+0905     arschksu:CHECK_AMOUNT/displayonly tagged line_item_tg
+         properties {
+                    ForeGroundcolor = "Black"
+                    BackGroundcolor = "White"
+                    };
+
+
+}
+}
+
+screen exit
+
+procedure definition
+
+procedure add_arsnsfcleared
+begin
+
+access arsnsfcleared, set arsnsfcleared:company_id      = arschksu:company_id,
+                          arsnsfcleared:check_reference = arschksu:check_reference,
+                          arsnsfcleared:policy_no       = arschksu:policy_no, exact
+
+
+   if  arsnsfcleared:company_id <> arschksu:company_id and
+       arsnsfcleared:check_reference <> arschksu:check_reference and
+       arsnsfcleared:policy_no <> arschksu:policy_no then
+       {
+       add arsnsfcleared
+        {
+          arsnsfcleared:company_id      = arschksu:company_id
+          arsnsfcleared:check_reference = arschksu:check_reference
+          arsnsfcleared:policy_no       = arschksu:policy_no
+          arsnsfcleared:disposition      = arschksu:disposition
+          arsnsfcleared:trans_date      = todaysdate
+          arsnsfcleared:cleared_date    = l_statement_date
+          arsnsfcleared:return_date     = arschksu:return_date
+          arsnsfcleared:return_reason   = "NSF"
+          arsnsfcleared:check_amount    = arschksu:check_amount
+          arsnsfcleared:check_cleared   = 1
+          arsnsfcleared:clearing_username = username
+          l_cleared_date = l_statement_date
+        }
+       }
+
+end
+
+
+}

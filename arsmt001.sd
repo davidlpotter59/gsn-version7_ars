@@ -1,0 +1,1294 @@
+%%
+Screen
+     Name         = "arsmt001" ;
+     Type         = "Detail" ;
+     Padcharacter = Space ;
+     Highlight    = Underscore ;
+     Screensize   = "dynamic";
+     Domain       = "ARSCHKSU";
+     Windowtitle  = "%a     %s   Check Processing - Entry - Version 7.01b    %m";
+     Recordlock   = Immediate ;
+     iconline     = 0;
+     punctuation = "" ;
+
+     Global Unsigned Ascii Number G_CHECK_REFERENCE[7],
+                                  G_POLICY_NO[9],
+                                  G_QUOTE_NO[8] ,
+                                  g_run_mode[2],
+                                  G_AGENT_NO[4] ;
+
+     Global String G_SUPP_NAME[50],
+                   G_CARE_OF[50],
+                   G_STREET[30],
+                   G_CITY_STATE[30],
+                   G_COMPANY_ID[10],
+                   G_CHECK_NUMBER[20],
+                   g_lib[10],
+                   g_lib_1[10],
+                   g_return[5];
+
+     global unsigned ascii number g_image_array_position[1] ;
+
+
+     Global Signed Ascii Number G_TOTAL_DUE[9]/decimals=2,
+                                G_CHECK_AMOUNT[9]/decimals=2;
+
+     Global Unsigned Ascii Number G_ZIP_CODE[9] ;
+
+     Include "arsmenu.var"
+
+     string l_continue_1[100]="",
+            l_status_due_date_1[10],
+            l_cash ;
+     Signed Ascii Number L_TOTAL[9]=0/dec=2,
+                         L_TOTAL_1[9]=0/dec=2,
+                         L_TOTAL_DUE[9]=0/decimals=2,
+                         L_BATCH[11]=0/decimals=2 ;
+
+     String L_APPLICATION_STR[30]="Application ";
+     String L_ENTER[1];
+     String L_SFS[3]="SFS";
+
+     Wdate L_TRANS_DATE=00.00.0000;
+     /* these globals are needed for arsmt01d */
+     Global Signed Ascii Number G_TOTAL_DUE_NET[9]/decimals=2,
+                                G_INSTALLMENT_AMT[9]/decimals=2,
+                                G_TOTAL_PREMIUM[9]/decimals=2,
+                                G_TOTAL_SURCHARGE[9]/decimals=2,
+                                G_TOTAL_INSTALLMENT_CHARGE[9]/decimals=2;
+
+     Global String G_BANK_NO[15];
+     Global Unsigned Ascii Number G_APPLY_INSTALLMENT_CREDIT[1];
+
+
+     String L_CANCELLATION_EXISTS[1]="N";
+     String L_no_cash_CANCELLATION_EXISTS[1]="N";
+     Unsigned Ascii Number L_BUILDING_NO[4]=0;
+     Unsigned Ascii Number L_PREM_NO[4]=0;
+     Unsigned Ascii Number L_SUB_CODE[4]=0;
+     Unsigned Ascii Number L_BUILD_NO[4]=0;
+     Unsigned Ascii Number L_HOLD_POLICY_NO[9]=0;
+     Unsigned Ascii Number L_HOLD_POL_YEAR[4]=0;
+     Unsigned Ascii Number L_HOLD_END_SEQUENCE[4]=0;
+     Wdate L_HOLD_CX_EFF_DATE,
+           l_total_due_date_2,
+           l_total_due_date_1,
+           l_total_exp_date_1,
+           l_hold_due_date_2,
+           l_total_exp_date_2;
+
+     string l_total_due_date_first[1]="Y" ;
+     unsigned ascii number l_total_due_1[9]=0/decimals=2,
+                           l_total_due_2[9]=0/decimals=2,
+                           l_hold_total_due_2[9]=0/decimals=2;
+
+          String L_POLICY_CX[1]="N";
+     String L_STR_ZIPCODE[9]="";
+     String L_UNPOSTED_CHECK[1]="N";
+     Unsigned Ascii Number L_PRIOR_POLICY_NO[9]=0;
+     Unsigned Ascii Number L_HOLD_BILLING_CTR[2]=0/decimals=0;
+     Signed Ascii Number L_TOTAL_OUTSTANDING[9]=0/decimals=2;
+
+     --  defining variables for the security setup
+     Unsigned Ascii number l_abort_program[1]=0;
+
+     String l_username[15],
+            l_system_id[15],
+            l_continue[50];
+
+     Access ARSCHKSU,
+            Set ARSCHKSU:COMPANY_ID      = G_COMPANY_ID,
+                ARSCHKSU:CHECK_REFERENCE = G_CHECK_REFERENCE ;
+
+     Include "csexec.var"
+
+     Include "scipsprint.var"
+
+     Include "stdkeys7.inc"
+     !F9="CHECK"/function/icon="Post" ;
+     !F10="External"/function/icon="Clock" ;
+
+style definition
+
+    include "styles.inc"
+
+Functions
+
+     "redisplay" Display/noreturn PROGRAMID;
+
+     "CHECK" sequence "check_seq" tagged check_post_fn;
+     "CHECK_seq" Continue
+            Begin
+                If ARSCHKSU:POLICY_NO <> 0 And
+                   ARSCHKSU:DISPOSITION One Of "OPEN","" Then  -- "" is for forcing posting on entry of second check
+                   Begin
+                   If SFSCOMPANY:DEBUG_MODE = 1 Then
+                   Begin
+                      Proc ("csbatch arsup010 %n",ARSCHKSU:POLICY_NO)
+                   End
+                   Else
+                   Begin
+                      Proc ("csbatch arsup010 %n",ARSCHKSU:POLICY_NO)/noconsole
+                   End
+                   proc ("cli cp arschkwrk.dat %s",currentdir)/noconsole
+                   proc ("cli cp arschkwrk.idx %s",currentdir)/noconsole
+                      FUNCTION = "redisplay"
+                   End
+            End ;
+
+-- begin Creditron update
+     "External" sequence "External_seq" tagged External_fn;
+     "External_seq" Continue
+            Begin
+             l_continue_1 = dialog("Import External Data","warning.bmp","You are about to Import<NL>External Data into SCIPS.<NL>Are you sure that you wish to do this?",
+                          "No","Yes")
+             switch (l_continue_1)
+             case "Yes" : begin
+             l_sfs = "SFS"
+             access sfsdefault, set sfsdefault:sfs_code = l_sfs
+             access arscontrol2, set arscontrol2:company_id = sfsdefault:company_id
+             proc (":cli %s",trun(arscontrol2:checks_input_location))/noconsole
+             if sfscompany:debug_mode one of 1 then
+             begin
+                 proc (":cli csbatch arsup500")
+             end
+             else
+             begin
+                 proc (":cli csbatch arsup500")/noconsole
+             end
+             l_continue_1 = dialog("Import External Data","warning.bmp","Data has been imported.<NL>Confirm by running checks log!","Continue")
+             end
+             case "No"  : begin
+                          l_continue_1 = dialog("Import External Data","warning.bmp","Data has NOT been imported.<NL>Confirm by running checks log!","Continue")
+                          end
+             end
+             FUNCTION = "redisplay"
+
+             End ;
+-- End Creditron Update
+
+     Include "stdfunc7a.inc"
+--     include "stdfunc7.inc"
+
+     include "arsfunc7.inc"
+     include "arsfunc7p.inc"
+--     include "arsfunc7r.inc"
+
+menu definition
+
+     include "stdmenu7.inc"
+     include "arsmenu7.inc"
+Separator
+     include "arsmenu7p.inc"
+--Separator
+--     include "arsmenu7r.inc"
+}
+
+toolbar Definition
+
+     include "stdtoolbar7.inc"
+     Separator
+     Toolbarbutton
+        Properties
+                {
+                Iconname = "detail.bmp"
+                tooltip  = "Press this ICON to POST the [CURRENT] check immediately"
+                }
+        Event
+                {
+                Action   = check_post_fn
+                }
+     Separator
+     Toolbarbutton
+        Properties
+                {
+                Iconname = "vcq.bmp"
+                tooltip  = "Press this ICON to Import External Data"
+                }
+        Event
+                {
+                Action   = External_fn
+                }
+}
+
+Screen Entry
+
+include "arssecurity.inc"
+
+L_TRANS_DATE = SYSTEMDATE -- default this on entry
+
+l_sfs = "SFS"
+
+disable(cash_db_commissions_fn)
+
+if g_company_id = "LEBINS" then
+  {
+   enable(cash_db_commissions_fn)
+  }
+
+Access SFSDEFAULT, Set SFSDEFAULT:SFS_CODE = L_SFS
+If G_COMPANY_ID <> SFSDEFAULT:COMPANY_ID Then
+Begin
+    G_COMPANY_ID = SFSDEFAULT:COMPANY_ID
+End
+access arscontrol2, set arscontrol2:company_id = g_company_id, generic
+
+if arscontrol2:no_access_correct_billing_rec = 1 then
+ {
+   disable(billing_change_fn)
+ }
+
+Access Validation
+     If FUNCTION One Of "CHANGE" And
+        ARSCHKSU:DISPOSITION One Of "CLEAR" Then
+        Begin
+            Error "Can not Change a POSTED Check"
+            Abort()
+        End
+
+
+IF ARSCHKSU:CHECK_HOLD ONE OF "1" THEN
+BEGIN
+    l_continue_1 = dialog("SCIPS A/R Posting Message","warning.bmp","This check has been held.<NL>You must unclick the HOLD on this check<NL>in order to post!<NL>.","CONTINUE")
+END
+
+screen at 1,1 to 20,100
+Properties
+        {
+        LayoutType = Column
+--        backgroundcolor = "white"
+--        transparent = false
+        }
+{
+Panel
+Properties
+        {
+        Borderstyle     = Raised
+        ScrollBarPolicy = asneeded
+        }
+{
+%%
+                                                        _______________
+ *-------------------------------------------------------------------------------------------*
+ |   Company:     __________ _________________________________________________               |
+ *-------------------------------------------------------------------------------------------*
+ | Payor Type:[R __~Insured __~Mortgagee~__~Agent~ __~Billing __~Acct Current __~Credit R]   |
+ *-------------------------------------------------------------------------------------------*
+ |   Policy No.: _________ ______________________________  Money Order: _                    |
+ |   Check No.:  ____________________                                                        |
+ |   Bank No:    _______________                                                             |
+ |   Trans Date: __________   Status:  _____ ________________________________                |
+ |   Amount:     ___________  Balance: ___________                                           |
+ |   Comments:   ___________________________________________________________                 |
+ |   Total Due Net: _________ Installment Charges: _________ Surcharge: _________            |
+ |   Current Term due date: ___________  Amount Due: _________                               |
+ |   Prior Term due date:   ___________              _________                               |
+ *--------------------------------------------------*----------------------------------------*
+ |  Current Total Due    _________                  | Check Reference  _______               |
+ *--------------------------------------------------*----------------------------------------*
+%%
+
+Components
+
+Fields
+0101 FUNCTION/noecho/showasguidetext;
+
+0301 begin
+     if arschksu:disposition = "CLEAR" then
+         disable (delete_fn)
+     else
+         enable (delete_fn)
+
+     If FUNCTION = "ADD" Then
+     Begin
+             l_total_due_1 = 0.00
+             l_total_due_2 = 0.00
+             l_total_due_date_2 = 00.00.0000
+             l_total_due_date_1 = 00.00.0000
+
+             l_sfs = "SFS"
+             g_total_due = 0
+             g_agent_no = 0
+             access sfsdefault, set sfsdefault:sfs_code = l_sfs
+             ARSCHKSU:COMPANY_ID = sfsdefault:company_id
+             If G_COMPANY_ID <> "" Then
+             begin
+                 ARSCHKSU:COMPANY_ID = G_COMPANY_ID
+             end
+             else
+             begin
+                 g_company_id        = sfsdefault:company_id
+                 arschksu:company_id = g_company_id
+             end
+     End
+     End
+
+     ARSCHKSU:COMPANY_ID/default/displayonly
+
+     Begin
+         If ARSCHKSU:COMPANY_ID <> "" And
+            G_COMPANY_ID = "" Then
+            { G_COMPANY_ID = ARSCHKSU:COMPANY_ID }
+     End
+     Activehelp
+               If ARSCONTROL:USE = 1 Then ARSCONTROL:COMPANY_ID  Else NULL,
+               If ARSCONTROL:USE = 1 Then ARSCONTROL:BANK_ACCOUNT_NO Else NULL
+                 ;
+
+0301 ARSCHKSU:COMPANY_ID/displayonly
+     Error "Company ID is Not Valid" If SFSCOMPANY:NAME[1]="";
+
+0302 Begin
+         G_COMPANY_ID  = ARSCHKSU:COMPANY_ID
+         access sfscompany, set sfscompany:company_id = arschksu:company_id
+     End
+     SFSCOMPANY:NAME[1]/displayonly/default/mask="X(40)"   ;
+
+0501 Begin
+     If FUNCTION = "ADD" Then
+     Begin
+         ARSCHKSU:PAYOR_TYPE = "I"
+         ARSCHKSU:USER       = USERNAME
+     End
+     End
+     ARSCHKSU:PAYOR_TYPE/button/values="I,M,G,B,A,C"/default
+     Begin
+     If FUNCTION = "ADD" Then
+     Begin
+     If ARSCHKSU:PAYOR_TYPE = "M" Then
+     Begin
+          Display Modal Screen "arsmt02a"  -- mortgagee paying multiples
+          At Line 1, Column 1
+          With Initial Function "ADD"
+          If G_POLICY_NO <> 0 Then ARSCHKSU:POLICY_NO = G_POLICY_NO
+     End
+
+     Else If ARSCHKSU:PAYOR_TYPE = "B" Then
+          Display Modal Screen "arsmt01a"  --  billing name information
+          At Line 1, Column 1
+          With Initial Function "ADD"
+
+     Else If ARSCHKSU:PAYOR_TYPE = "A" Then
+          Display Modal Screen "arsmt03a"  -- account current paying
+          At Line 1, Column 1
+          With Initial Function "ADD"
+
+     Else If ARSCHKSU:PAYOR_TYPE = "C" Then
+          begin
+          Display Modal Screen "arsmt04a"  -- insured using a credit card
+          At Line 1, Column 1
+          With Initial Function "ADD"
+          ABORT()
+          end
+
+     End
+
+/*     If ARSCHKSU:PAYOR_TYPE one of "I", "C" then
+     begin
+         function="ABORT" -- take the user back to the function
+                       -- no need to complete this screen since
+                       -- the information was entered in another
+     End
+*/
+     End
+      ;
+
+0701 Begin
+     If FUNCTION = "ADD" Then
+         Begin
+         ARSCHKSU:QUOTE_NO = G_QUOTE_NO
+         ARSCHKSU:POLICY_NO = 0
+         End
+     End
+     ARSCHKSU:POLICY_NO/default/tabstop
+     if sfpname:no_cash_id = 1 then
+       {
+        do check_for_cancel
+        if l_no_cash_cancellation_exists = "Y" then
+        {
+         l_cash = dialog("NO CASH INDICATOR","warning.bmp","The No Cash Indicator has been set.<NL>","OK","Cancel")
+         switch(l_cash)
+         case "Cancel"  : abort()
+         end
+        }
+       } ;
+
+1701 Begin
+     If ARSCHKSU:POLICY_NO <> 0 Then
+     Begin
+        l_total_due_1 = 0.00
+        l_total_due_2 = 0.00
+        l_total_due_date_2 = 00.00.0000
+        l_total_due_date_1 = 00.00.0000
+
+        Do GET_AMOUNT_DUE
+
+        if l_total_due < 0.00 then
+        begin
+            l_total_due = 0.00
+        end
+        If FUNCTION = "ADD" Then
+        Begin
+        If ARSCHKSU:POLICY_NO <> 0 Then
+        Begin
+
+            access sfpcurrent, set sfpcurrent:policy_no = arschksu:policy_no
+
+            access sfpname, set sfpname:policy_no    = sfpcurrent:policy_no,
+                                sfpname:pol_year     = sfpcurrent:pol_year,
+                                sfpname:end_sequence = sfpcurrent:end_sequence
+
+            if sfpcurrent:policy_no = 0 then
+            {
+             l_continue_1 = "CANCEL"
+             Warning "No Policy Number On File.  Please verify your Policy Number."
+            }
+            else
+             {
+               l_continue_1 = ""
+             }
+
+
+         switch (l_continue_1)
+         case "CANCEL" : { Abort() }
+         end
+
+
+         if sfpname:policy_no = 0  then
+           {
+            ARSCHKSU:TRANS_EFF = SFQNAME:EFF_DATE
+            arschksu:pol_year  = year(sfqname:eff_date)
+           }
+         else
+           {
+            ARSCHKSU:TRANS_EFF = SFPNAME:EFF_DATE
+            arschksu:pol_year  = sfpname:pol_year
+           }
+
+            Do CHECK_FOR_CANCELLATION
+            Warning 3040 If L_CANCELLATION_EXISTS = "Y"
+            If L_POLICY_CX = "Y" Then
+            Begin
+                 Error 3041
+            End
+            If L_TOTAL_OUTSTANDING = 0 Then
+            Begin
+                Warning "Policy is PAID in full.  Press cancel to continue or ABORT to exit entry"
+            End
+
+-- this logic forces only one active check at a time to be entered
+-- reason - if more than one check is unposted it wont know when to write off
+-- items like the installment charges when the sum of the checks >= total amount due
+
+            Do CHECK_FOR_UNPOSTED
+            If L_UNPOSTED_CHECK = "Y" Then
+            Begin
+                Warning "Prior Check for Same Policy Exists.  Please Post Prior Check.  Aborting current entry"
+                Warning "Press Cancel to post prior check"
+                If Abort Not One Of "YES" Then
+                Begin
+                      Proc ("csbatch arsup010 %n",L_PRIOR_POLICY_NO)/noconsole
+                End
+                Else
+                Begin
+                    Abort()
+                End
+            End
+        End
+        End
+     End
+     End
+     L_TOTAL_DUE/displayonly
+     If L_POLICY_CX = "Y" Then
+     { Abort () };
+
+1301 G_TOTAL_DUE_NET/displayonly;
+
+1302 G_TOTAL_INSTALLMENT_CHARGE/displayonly;
+
+1303 G_TOTAL_SURCHARGE/displayonly;
+
+1401  begin
+        if l_total_exp_date_2 > l_total_exp_date_1 then
+         {
+          l_hold_total_due_2 = l_total_due_1
+          l_hold_due_date_2  = l_total_due_date_1
+          l_total_due_date_1 = l_total_due_date_2
+          l_total_due_1      = l_total_due_2
+          l_total_due_date_2 = l_hold_due_date_2
+          l_total_due_2      = l_hold_total_due_2
+         }
+        else
+         if l_total_exp_date_2 = 00.00.0000 and
+            l_status_due_date_1 = "EXPIRED" then
+            {
+             l_total_due_date_2 = l_total_due_date_1
+             l_total_due_2      = l_total_due_1
+             l_total_due_date_1 = 00.00.0000
+             l_total_due_1      = 0
+            }
+        else
+         if l_total_due_date_1 = 00.00.0000 and
+            l_total_due_date_2 > 00.00.0000 and
+            l_status_due_date_1 = "CURRENT" then
+            {
+             l_total_due_date_1 = l_total_due_date_2
+             l_total_due_1      = l_total_due_2
+             l_total_due_date_1 = 00.00.0000
+             l_total_due_1      = 0
+            }
+      end
+      l_total_due_date_1/displayonly ;
+1402  l_total_due_1/displayonly ;
+1501  l_total_due_date_2/displayonly ;
+1502  l_total_due_2/displayonly ;
+
+0701 begin
+            access sfpname, set sfpname:policy_no    = sfpcurrent:policy_no,
+                                sfpname:pol_year     = sfpcurrent:pol_year,
+                                sfpname:end_sequence = sfpcurrent:end_sequence
+     end
+     ARSCHKSU:POLICY_NO/displayonly
+     If FUNCTION = "ADD" And
+        (SFPNAME:NAME[1] = "" And
+         FLEN <> 0) Then
+     Begin
+         Warning "No Policy Number On File.  Please verify your Policy Number."
+         arschksu:policy_no = 0
+         ARSCHKSU:APPLICATION = 1
+         ARSCHKSU:TRANS_EFF = SFQNAME:EFF_DATE
+         arschksu:pol_year  = year(sfqname:eff_date)
+
+
+     End
+     Else If FLEN = 0 Then
+     Begin
+         Warning "No Policy Number On File, Assuming Application - Press Cancel to Continue"
+         ARSCHKSU:APPLICATION = 1
+         ARSCHKSU:TRANS_EFF = SFQNAME:EFF_DATE
+         arschksu:pol_year  = year(sfqname:eff_date)
+
+     End
+     ;
+0702 L_APPLICATION_STR[1,3]/displayonly
+     Hide If SFPNAME:NAME[1] <> "";
+
+0702 SFPNAME:NAME[1]/default/mask="X(30)"
+     If ARSCHKSU:POLICY_NO <> 0 And
+        SFPNAME:POLICY_NO  <> ARSCHKSU:POLICY_NO Then
+     Error 1212
+     if arschksu:policy_no > 0 then
+     {
+         arschksu:application = 0
+     };
+
+0702 SFQNAME:NAME[1]
+     Hide If ARSCHKSU:POLICY_NO <> 0 ;
+
+0702 L_APPLICATION_STR/displayonly
+     Hide If SFPNAME:NAME[1] <> "" ;
+
+0703 ARSCHKSU:MONEY_ORDER/checkbox/values="0,1";
+
+0801 Begin
+     If FUNCTION = "ADD" And
+        ARSCHKSU:PAYOR_TYPE = "C" Then
+        Begin
+            ARSCHKSU:CHECK_NO = "CreditCard"
+        End
+     End
+     ARSCHKSU:CHECK_NO/default  {Mandatory} ;
+
+0801 ARSCHKSU:CHECK_NO/displayonly;
+
+0801 Begin
+     If FUNCTION = "ADD" And
+        ARSCHKSU:MONEY_ORDER = "1" Then
+     Begin
+         ARSCHKSU:CHECK_NO = "MO-" + ARSCHKSU:CHECK_NO
+     End
+     End
+     ARSCHKSU:CHECK_NO/displayonly;
+
+0901 Begin
+     If FUNCTION = "ADD" Then
+     Begin
+         If ARSCHKSU:PAYOR_TYPE One Of "C" Then
+         Begin
+             ARSCHKSU:BANK_NO = "CreditCard"
+         End
+     End
+     End
+     ARSCHKSU:BANK_NO/default ;
+
+1001 Begin
+     If FUNCTION = "ADD" Then
+         ARSCHKSU:TRANS_DATE = L_TRANS_DATE
+         if l_trans_date = 00.00.0000 then
+         {
+             l_trans_date = todaysdate
+             arschksu:trans_date = l_trans_date
+         }  -- was todaysdate 2/25/2001
+     End
+     ARSCHKSU:TRANS_DATE/default ;  -- allow changing but default
+
+1002 Begin
+     If FUNCTION = "ADD" Then
+     Begin
+         ARSCHKSU:DISPOSITION = "OPEN"
+     End
+     End
+     ARSCHKSU:DISPOSITION/default
+     Error "Transaction Description Not on File" If
+     ARSDISP:DISPOSITION = ""
+     Hide If FUNCTION = "ADD"
+     Activehelp ARSDISP:DISPOSITION,
+                ARSDISP:DESCRIPTION ;
+
+1101 Begin
+     If FUNCTION = "ADD" Then
+         ARSCHKSU:CHECK_AMOUNT = L_TOTAL_DUE
+     End
+     ARSCHKSU:CHECK_AMOUNT/default ;
+
+1101 Begin
+     If (FUNCTION = "ADD" Or
+         FUNCTION = "CHANGE") And
+        G_TOTAL_DUE_NET <> L_TOTAL_DUE And
+        ARSCHKSU:CHECK_AMOUNT >= G_TOTAL_DUE_NET And
+        (SFPNAME:PAYMENT_PLAN  <> 1 Or
+         G_TOTAL_INSTALLMENT_CHARGE  <> 0.00) And
+        L_HOLD_BILLING_CTR  = 1 Then
+        {
+            G_COMPANY_ID               = ARSCHKSU:COMPANY_ID
+            G_POLICY_NO                = ARSCHKSU:POLICY_NO
+            G_CHECK_NUMBER             = ARSCHKSU:CHECK_NO
+            G_CHECK_AMOUNT             = ARSCHKSU:CHECK_AMOUNT
+            G_CHECK_REFERENCE          = ARSCHKSU:CHECK_REFERENCE
+            G_AGENT_NO                 = SFPNAME:AGENT_NO
+            G_BANK_NO                  = ARSCHKSU:BANK_NO
+            G_INSTALLMENT_AMT          = L_TOTAL_DUE
+            G_APPLY_INSTALLMENT_CREDIT = 0
+            ARSCHKSU:CHECK_PAYS_TOTAL  = 1
+            Display Modal Screen "arsmt01d"
+            At Line 5, Column 10
+            With Initial Function "SEARCH|CHANGE"
+            If G_APPLY_INSTALLMENT_CREDIT = 1 Then
+            { Message "Installment Charges will be removed"
+              ARSCHKSU:COMMENTS = "Transaction Paid Policy In Full"
+              ARSCHKSU:CREDIT_INSTALLMENT_CHAGE = G_APPLY_INSTALLMENT_CREDIT }
+
+            Else
+            { Warning "You have selected NOT to remove the Installment Charges"
+              ARSCHKSU:COMMENTS = "Operator " + USERNAME + " Did not remove installment charges"
+              ARSCHKSU:CREDIT_INSTALLMENT_CHAGE = G_APPLY_INSTALLMENT_CREDIT }
+        }
+        Else
+        { ARSCHKSU:CHECK_PAYS_TOTAL = 0 }
+     End
+     ARSCHKSU:CHECK_AMOUNT/displayonly;
+
+1201 ARSCHKSU:COMMENTS/default/displayonly  ;
+
+1102 Begin
+     If FUNCTION One Of "ADD", "CHANGE" Then
+     Begin
+         L_BATCH = L_BATCH + ARSCHKSU:CHECK_AMOUNT
+         ARSCHKSU:BALANCE = ARSCHKSU:CHECK_AMOUNT
+     End
+     End
+     ARSCHKSU:BALANCE/displayonly
+     Error "Check has been deposited, No changes are allowed" If
+     FUNCTION One Of "ADD","CHANGE" And ARSCHKSU:DEPOSIT_DATE <> 00.00.0000;
+
+1003 Begin
+     If FUNCTION = "ADD" Then
+        ARSCHKSU:DISPOSITION = "OPEN"--/spacefill
+     End
+     ARSDISP:DESCRIPTION ;
+
+1201 ARSCHKSU:COMMENTS/default
+     Hide
+     If (FUNCTION = "ADD" Or
+         FUNCTION = "CHANGE") And
+        ARSCHKSU:CHECK_AMOUNT = G_TOTAL_DUE_NET And
+        SFPNAME:PAYMENT_PLAN  <> 1 ;
+
+1702 ARSCHKSU:CHECK_REFERENCE/displayonly
+     If FUNCTION = "ADD" and
+     arschksu:payor_type not one of "C" Then
+     Begin
+         ARSCHKSU:USER_CONSOLE    = CONSOLE
+         ARSCHKSU:ENTER_TIME      = SYSTEMTIME
+         ARSCHKSU:ENTER_DATE      = SYSTEMDATE
+         I_CSEXEC_APPLICATION     = "CHECK_REFERENCE"/spacefill
+         Include "sfscsexec.pro"
+         ARSCHKSU:CHECK_REFERENCE = I_CSEXEC_NUMBER
+         ARSCHKSU:USER            = USERNAME
+     End ;
+
+1702 ARSCHKSU:CHECK_REFERENCE/displayonly;
+
+} -- end of Header
+
+CardDialog GUI at 1,80
+--Properties
+--    {
+--        Layoutcontraints   = Stretch
+--    }
+{
+
+Panel
+Properties
+    {
+        ScrollBarPolicy   = AsNeeded
+        Text              = "Payor"
+    }
+{
+%%
+
+  Name:       _______________________________________
+  Care of:    _______________________________________
+  Address:    _______________________________________
+  City/State: ____________________________ ___ __________
+
+
+%%
+
+Components
+
+Fields
+0201 Begin
+     If FUNCTION = "ADD" And
+        ARSCHKSU:PAYOR_TYPE not one of "G", "I" Then
+        Begin
+        G_POLICY_NO = ARSCHKSU:POLICY_NO
+            Display Modal Screen "arsmt01a"
+            At Line 1, Column 1
+        End
+     End
+     ARSCHKSU:PAYOR_NAME/displayonly ;
+
+0201 Begin
+     If FUNCTION = "ADD" And
+        ARSCHKSU:PAYOR_TYPE not one of "G","I"  -- Insured
+        Then Begin
+            ARSCHKSU:PAYOR_NAME       = G_SUPP_NAME
+            ARSCHKSU:PAYOR_CARE_OF    = G_CARE_OF
+            ARSCHKSU:PAYOR_ADDRESS    = G_STREET
+            ARSCHKSU:PAYOR_CITY       = G_CITY_STATE
+            ARSCHKSU:PAYOR_ZIPCODE    = G_ZIP_CODE
+        End
+        Else If FUNCTION = "ADD" And
+                ARSCHKSU:PAYOR_TYPE = "I" And
+                G_QUOTE_NO = 0 Then
+                Begin -- setup insureds information
+
+                Access SFPCURRENT, Set SFPCURRENT:POLICY_NO = ARSCHKSU:POLICY_NO
+
+                Access SFPNAME, Set SFPNAME:POLICY_NO    = SFPCURRENT:POLICY_NO,
+                                    SFPNAME:POL_YEAR     = SFPCURRENT:POL_YEAR,
+                                    SFPNAME:END_SEQUENCE = SFPCURRENT:END_SEQUENCE
+
+                    ARSCHKSU:PAYOR_NAME       = SFPNAME:NAME[1]
+                    ARSCHKSU:PAYOR_CARE_OF    = SFPNAME:NAME[2]
+                    ARSCHKSU:PAYOR_ADDRESS    = SFPNAME:ADDRESS[1]
+                    ARSCHKSU:PAYOR_CITY       = SFPNAME:CITY
+                    ARSCHKSU:PAYOR_STR_STATE  = SFPNAME:STR_STATE
+                    ARSCHKSU:PAYOR_ZIPCODE    = SFPNAME:ZIPCODE
+        End
+        Else If FUNCTION = "ADD" And
+                ARSCHKSU:PAYOR_TYPE = "G" And
+                G_QUOTE_NO = 0 Then
+                Begin -- setup insureds information
+
+      --          Access SFPCURRENT, Set SFPCURRENT:POLICY_NO = ARSCHKSU:POLICY_NO
+
+--                Access SFPNAME, Set SFPNAME:POLICY_NO    = SFPCURRENT:POLICY_NO,
+  --                                  SFPNAME:POL_YEAR     = SFPCURRENT:POL_YEAR,
+    --                                SFPNAME:END_SEQUENCE = SFPCURRENT:END_SEQUENCE
+
+
+                  access sfsagent, set sfsagent:company_id = arschksu:company_id,
+                                       sfsagent:agent_no   = sfpname:agent_no, generic
+
+                    ARSCHKSU:PAYOR_NAME       = SFsagent:NAME[1]
+                    ARSCHKSU:PAYOR_CARE_OF    = SFsagent:NAME[2]
+                    ARSCHKSU:PAYOR_ADDRESS    = SFsagent:ADDRESS[1]
+                    ARSCHKSU:PAYOR_CITY       = SFsagent:CITY
+                    ARSCHKSU:PAYOR_STR_STATE  = SFsagent:STR_STATE
+                    ARSCHKSU:PAYOR_ZIPCODE    = SFsagent:ZIPCODE
+        End
+        Else If FUNCTION = "ADD" And
+                G_QUOTE_NO <> 0 Then
+                 Begin
+                 Access SFQNAME, Set SFQNAME:QUOTE_NO = G_QUOTE_NO, Exact
+
+                 ARSCHKSU:PAYOR_NAME          = SFQNAME:NAME[1]
+                 ARSCHKSU:PAYOR_CARE_OF       = SFQNAME:NAME[2]
+                 ARSCHKSU:PAYOR_ADDRESS       = SFQNAME:ADDRESS[1]
+                 ARSCHKSU:PAYOR_CITY          = SFQNAME:CITY
+                 ARSCHKSU:PAYOR_STR_STATE     = SFQNAME:STR_STATE
+                 ARSCHKSU:PAYOR_ZIPCODE       = SFQNAME:ZIPCODE
+        End
+        End
+     ARSCHKSU:PAYOR_NAME/default/uppercase
+     If ARSCHKSU:PAYOR_NAME = "" Then
+     Begin
+         Error "Payor Name Can Not Be Blank"
+     End ;
+
+0301 ARSCHKSU:PAYOR_CARE_OF/default/uppercase;
+
+0401 ARSCHKSU:PAYOR_ADDRESS/default/uppercase
+     If ARSCHKSU:PAYOR_ADDRESS = "" Then
+     Begin
+        Error "Payor Address Can Not Be Blank"
+     End ;
+
+0501 ARSCHKSU:PAYOR_CITY/default/uppercase
+     If ARSCHKSU:PAYOR_CITY = "" Then
+     Begin
+         Error "Payor City Can Not Be Blank"
+     End ;
+
+0502 ARSCHKSU:PAYOR_STR_STATE/uppercase/default
+     If ARSCHKSU:PAYOR_STR_STATE = "" Then
+     Begin
+         Error "Payor State Can Not Be Blank"
+     End ;
+
+0503 ARSCHKSU:PAYOR_ZIPCODE/mask="999999999"/default
+     If ARSCHKSU:PAYOR_ZIPCODE = 0 Then
+     Begin
+         Error "Payor Zipcode Can Not Be Zero"
+     End ;
+
+0503 Begin
+     L_STR_ZIPCODE = Str(ARSCHKSU:PAYOR_ZIPCODE)
+     If L_STR_ZIPCODE[1,4]="0000" Or
+        L_STR_ZIPCODE[1,4]="" Then
+     Begin
+           L_STR_ZIPCODE[1,5]=L_STR_ZIPCODE[5,9]
+           L_STR_ZIPCODE[6,9]="0000"
+     End
+     ARSCHKSU:PAYOR_ZIPCODE = Val(L_STR_ZIPCODE)
+     End
+     ARSCHKSU:PAYOR_ZIPCODE/mask="99999-9999"/displayonly;
+
+0503 Begin
+     L_STR_ZIPCODE = Str(ARSCHKSU:PAYOR_ZIPCODE,"999999999")
+     If L_STR_ZIPCODE[1,4]="0000" Or
+        L_STR_ZIPCODE[1,4]="" Then
+        Begin
+            L_STR_ZIPCODE[1,5]=L_STR_ZIPCODE[5,9]
+            L_STR_ZIPCODE[6,9]="0000"
+            ARSCHKSU:PAYOR_ZIPCODE = Val(L_STR_ZIPCODE)
+        End
+     End
+     ARSCHKSU:PAYOR_ZIPCODE/displayonly/mask="99999-9999" ;
+
+} -- end of Payor Panel
+
+Panel
+Properties
+    {
+        ScrollBarPolicy   = AsNeeded
+        Text              = "Bank"
+    }
+{
+%%
+
+        Bank:   _____________________________
+
+        Branch: ___________________________
+
+%%
+Components
+
+Fields
+
+ARSCONTROL:BANK_NAME/displayonly
+     Error 3001 If ARSCONTROL:BANK_NAME = "";
+ARSCONTROL:BANK_BRANCH/displayonly ;
+
+} -- end of Bank Panel
+
+Panel
+Properties
+    {
+        ScrollBarPolicy   = AsNeeded
+        Text              = "Options"
+    }
+{
+%%
+
+        Post Dated:            _          Hold Check: _
+        Check Date:   __________
+        Deposit Premium:       _
+        Deposit Date: __________
+
+%%
+Components
+
+Fields
+
+0201 ARSCHKSU:POST_DATED/checkbox/values="0,1";
+
+0202 Begin
+     If FUNCTION  = "ADD" then
+      {
+       if ARSCONTROL:HOLD_CX_CHECKS  One Of 1 and
+          L_CANCELLATION_EXISTS  = "Y" or
+          l_policy_cx = "Y" then
+          Begin
+           ARSCHKSU:CHECK_HOLD = "1"
+           ARSCHKSU:COMMENTS = "Check Was received after C/X Eff Date"
+          End
+       }
+     End
+     ARSCHKSU:CHECK_HOLD/default ;
+
+0301 Begin
+     If FUNCTION = "ADD" Then
+     Begin
+        ARSCHKSU:CHECK_DATE = TODAYSDATE
+     End
+     end
+     ARSCHKSU:CHECK_DATE
+     Hide If ARSCHKSU:POST_DATED <> "Y";
+
+0401 ARSCHKSU:DEPOSIT_PREMIUM/checkbox/values="0,1";
+
+0501 ARSCHKSU:DEPOSIT_DATE/displayonly ;
+
+
+} -- end of Options Panel
+
+}
+
+}
+
+Postupdate
+
+/* this is here incase the user aborts the check because the policy number
+   was not the right one.  there should be no invalid notes created because
+   this logic is here.
+*/
+  If UPDATEOK = "YES" And
+   Abort = "NO" And
+   FUNCTION = "ADD" And
+   L_CANCELLATION_EXISTS = "Y" Then
+   Begin
+       Do CREATE_NOTES
+   End
+
+Screen Exit
+        If ARSCHKSU:COMPANY_ID <> ""
+        Then G_COMPANY_id = ARSCHKSU:COMPANY_ID
+
+        If ARSCHKSU:CHECK_REFERENCE > 0
+        Then G_CHECK_REFERENCE = ARSCHKSU:CHECK_REFERENCE ;
+
+        If ARSCHKSU:POLICY_NO > 0
+        Then G_POLICY_NO = ARSCHKSU:POLICY_NO;
+
+        If L_TOTAL_DUE <> 0
+        Then G_TOTAL_DUE = L_TOTAL_DUE;
+
+        If ARSCHKSU:CHECK_NO <> ""
+        Then G_CHECK_NUMBER = ARSCHKSU:CHECK_NO;
+
+        If ARSCHKSU:CHECK_AMOUNT <> 0
+        Then G_CHECK_AMOUNT = ARSCHKSU:CHECK_AMOUNT;
+
+Procedure Definition
+
+Procedure GET_BALANCE
+Begin
+     L_TOTAL = 0
+     L_TOTAL_1 = 0
+     Access ARSCHKSU_ALT, Set ARSCHKSU_ALT:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                              ARSCHKSU_ALT:CHECK_REFERENCE  = ARSCHKSU:CHECK_REFERENCE
+     While ARSCHKSU_ALT:COMPANY_ID      = ARSCHKSU:COMPANY_ID And
+           ARSCHKSU_ALT:CHECK_REFERENCE = ARSCHKSU:CHECK_REFERENCE
+     Begin
+     L_TOTAL = L_TOTAL + ARSCHKSU_ALT:CHECK_AMOUNT
+     Next ARSCHKSU_ALT
+     End
+     L_TOTAL_1 = ARSCHKSU:CHECK_AMOUNT - L_TOTAL
+     End
+
+Procedure GET_AMOUNT_DUE
+Begin
+    l_total_due_date_first     = "Y"
+    L_TOTAL_DUE                = 0
+    G_TOTAL_DUE_NET            = 0
+    G_TOTAL_INSTALLMENT_CHARGE = 0
+    G_TOTAL_SURCHARGE          = 0
+    L_HOLD_BILLING_CTR         = 0
+
+    Access ARSBILLING, Set ARSBILLING:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                           ARSBILLING:POLICY_NO = ARSCHKSU:POLICY_NO, Approximate
+
+/* put the company check here, arsbilling:company_id must = arschksu:company_id */
+
+    While ARSBILLING:COMPANY_ID = ARSCHKSU:COMPANY_ID And
+          ARSBILLING:POLICY_NO  = ARSCHKSU:POLICY_NO
+    Begin
+
+
+access arscontrol, set arscontrol:company_id = arschksu:company_id
+
+    If ARSBILLING:STATUS = "B" Then
+    Begin
+        L_TOTAL_DUE        = L_TOTAL_DUE + (ARSBILLING:INSTALLMENT_AMOUNT -
+                                            ARSBILLING:TOTAL_AMOUNT_PAID + arsbilling:write_off_amount)
+        L_HOLD_BILLING_CTR = ARSBILLING:BILLING_CTR
+
+    End
+
+    If ARSBILLING:STATUS One Of "O", "B" Then
+    Begin
+       L_TOTAL_OUTSTANDING = L_TOTAL_OUTSTANDING + (ARSBILLING:INSTALLMENT_AMOUNT -
+                                                    ARSBILLING:TOTAL_AMOUNT_PAID -
+                                                    ARSBILLING:WRITE_OFF_AMOUNT )
+    End
+
+    if arsbilling:status = "B" then
+     {
+      if l_total_due_date_first = "Y" then
+      {
+       l_total_due_date_first = "N"
+       l_total_exp_date_1 = arsbilling:trans_exp
+      }
+      if l_total_exp_date_1 =  arsbilling:trans_exp then
+       {
+        l_total_due_1 = l_total_due_1 + (ARSBILLING:INSTALLMENT_AMOUNT -
+                                         ARSBILLING:TOTAL_AMOUNT_PAID -
+                                         ARSBILLING:WRITE_OFF_AMOUNT )
+
+        l_total_due_date_1 = arsbilling:due_date
+
+        access sfpname, set sfpname:policy_no = arsbilling:policy_no,
+                            sfpname:pol_year = arsbilling:pol_year,
+                            sfpname:end_sequence = arsbilling:end_sequence, exact
+
+        l_status_due_date_1 = sfpname:status
+       }
+      else
+       if l_total_exp_date_1 <> arsbilling:trans_exp then
+          {
+           l_total_exp_date_2 = arsbilling:trans_exp
+           l_total_due_date_2 = arsbilling:due_date
+           l_total_due_2 = l_total_due_2 + (ARSBILLING:INSTALLMENT_AMOUNT -
+                                            ARSBILLING:TOTAL_AMOUNT_PAID -
+                                            ARSBILLING:WRITE_OFF_AMOUNT )
+          }
+     }
+
+    If (ARSBILLING:STATUS = "B" Or
+        ARSBILLING:STATUS = "O") And
+       ARSBILLING:TRANS_CODE <> ARSCONTROL:INSTALLMENT_CHARGE_TRANS_CODE Then
+       { G_TOTAL_DUE_NET = G_TOTAL_DUE_NET + (ARSBILLING:INSTALLMENT_AMOUNT -
+                                              (ARSBILLING:TOTAL_AMOUNT_PAID +
+                                               ARSBILLING:WRITE_OFF_AMOUNT))
+         G_TOTAL_PREMIUM    = G_TOTAL_DUE_NET
+       }
+
+    If (ARSBILLING:STATUS = "B" Or
+        ARSBILLING:STATUS = "O") And
+       ARSBILLING:TRANS_CODE = ARSCONTROL:INSTALLMENT_CHARGE_TRANS_CODE Then
+       { G_TOTAL_INSTALLMENT_CHARGE  = G_TOTAL_INSTALLMENT_CHARGE
+        + (ARSBILLING:INSTALLMENT_AMOUNT - ARSBILLING:TOTAL_AMOUNT_PAID) }
+
+    If (ARSBILLING:STATUS = "B" Or
+        ARSBILLING:STATUS = "O") And
+       ARSBILLING:TRANS_CODE = ARSCONTROL:SURCHARGE_TRANS_CODE Then
+       { G_TOTAL_SURCHARGE = G_TOTAL_SURCHARGE
+        + (ARSBILLING:INSTALLMENT_AMOUNT - ARSBILLING:TOTAL_AMOUNT_PAID) }
+
+/*    If (ARSBILLING:STATUS = "B" Or
+        ARSBILLING:STATUS = "O") And
+       (ARSBILLING:TRANS_CODE <> ARSCONTROL:INSTALLMENT_CHARGE_TRANS_CODE And
+        ARSBILLING:TRANS_CODE <> ARSCONTROL:SURCHARGE_TRANS_CODE) Then
+       { G_TOTAL_PREMIUM = G_TOTAL_PREMIUM
+        + (ARSBILLING:INSTALLMENT_AMOUNT - ARSBILLING:TOTAL_AMOUNT_PAID) }
+*/
+    Next ARSBILLING
+
+    End
+
+End
+
+Procedure CHECK_FOR_CANCEL
+Begin
+
+L_no_cash_CANCELLATION_EXISTS = "N"
+
+    Access ARSCANCEL, Set ARSCANCEL:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                          ARSCANCEL:POLICY_NO  = ARSCHKSU:POLICY_NO, Approximate
+
+    While ARSCANCEL:COMPANY_ID = ARSCHKSU:COMPANY_ID And
+          ARSCANCEL:POLICY_NO  = ARSCHKSU:POLICY_NO
+          Begin
+              if arscancel:billing_ctr = 1 then
+               {
+                If ARSCANCEL:trans_eff <= todaysdate And
+                   ARSCANCEL:CX_STATUS <> "R" And
+                   L_no_cash_CANCELLATION_EXISTS <> "Y" Then
+                   Begin
+                     if arscancel:trans_code one of 10,14,12 then
+                       {
+                        L_no_cash_CANCELLATION_EXISTS = "Y"
+                       }
+                   end
+               }
+              else
+               If ARSCANCEL:CX_EFF_DATE <= TODAYSDATE - ARSCONTROL:NON_PAY_GRACE_DAYS And
+                  ARSCANCEL:CX_STATUS <> "R" And
+                  L_no_cash_CANCELLATION_EXISTS <> "Y" Then
+                  Begin
+                   if arscancel:trans_code one of 10,14,12 then
+                    {
+                     L_no_cash_CANCELLATION_EXISTS = "Y"
+                    }
+                  End
+
+          Next ARSCANCEL
+          End
+end
+
+Procedure CHECK_FOR_CANCELLATION
+Begin
+
+L_CANCELLATION_EXISTS = "N"
+L_HOLD_CX_EFF_DATE = 00.00.0000
+
+    Access ARSCANCEL, Set ARSCANCEL:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                          ARSCANCEL:POLICY_NO  = ARSCHKSU:POLICY_NO, Approximate
+
+    While ARSCANCEL:COMPANY_ID = ARSCHKSU:COMPANY_ID And
+          ARSCANCEL:POLICY_NO  = ARSCHKSU:POLICY_NO
+          Begin
+              If ARSCANCEL:CX_EFF_DATE <= TODAYSDATE - ARSCONTROL:NON_PAY_GRACE_DAYS And
+                 ARSCANCEL:CX_STATUS <> "R" And
+                 L_CANCELLATION_EXISTS <> "Y" Then
+                 Begin
+                    L_CANCELLATION_EXISTS = "Y"
+                    L_HOLD_CX_EFF_DATE = ARSCANCEL:CX_EFF_DATE
+-- do not add notes here, this is done later so that check info can be added too
+              --      Do CREATE_NOTES
+                 End
+          Next ARSCANCEL
+          End
+-- checking for cancellations from sfpname
+
+L_POLICY_CX = "N"
+
+Access SFPNAME, Set SFPNAME:POLICY_NO = ARSCHKSU:POLICY_NO, Approximate
+
+While SFPNAME:POLICY_NO = ARSCHKSU:POLICY_NO
+Begin
+      If L_POLICY_CX = "N" And
+         SFPNAME:STATUS = "CANCELLED" Then
+         Begin
+             L_POLICY_CX = "Y"
+         End
+      Else
+      If L_POLICY_CX = "Y" And
+         SFPNAME:STATUS = "CURRENT" Then
+         Begin
+             L_POLICY_CX = "N"
+         End
+
+         Next SFPNAME
+End
+
+End
+
+Procedure CREATE_NOTES
+Begin
+
+L_SUB_CODE          = 0
+L_HOLD_POLICY_NO    = 0
+L_HOLD_POL_YEAR     = 0
+L_HOLD_END_SEQUENCE = 0
+
+access sfppoint, set sfppoint:policy_no = arschksu:policy_no, generic
+
+Access SFPNAME, Set SFPNAME:POLICY_NO    = sfppoint:policy_no,
+                    sfpname:pol_year     = sfppoint:pol_year,
+                    sfpname:end_sequence = sfppoint:end_sequence
+
+L_HOLD_POLICY_NO    = SFPNAME:POLICY_NO
+L_HOLD_POL_YEAR     = SFPNAME:POL_YEAR
+L_HOLD_END_SEQUENCE = SFPNAME:END_SEQUENCE
+
+Access SFPNOTES, Set SFPNOTES:POLICY_NO    = L_HOLD_POLICY_NO,
+                     SFPNOTES:POL_YEAR     = L_HOLD_POL_YEAR,
+                     SFPNOTES:END_SEQUENCE = L_HOLD_END_SEQUENCE, Approximate
+
+While SFPNOTES:POLICY_NO    = L_HOLD_POLICY_NO And
+      SFPNOTES:POL_YEAR     = L_HOLD_POL_YEAR And
+      SFPNOTES:END_SEQUENCE = L_HOLD_END_SEQUENCE
+      Begin
+          L_SUB_CODE = L_SUB_CODE + 10
+          Next SFPNOTES
+      End
+      L_SUB_CODE = L_SUB_CODE + 10
+
+Add SFPNOTES
+Begin
+    SFPNOTES:POLICY_NO      = L_HOLD_POLICY_NO
+    SFPNOTES:POL_YEAR       = L_HOLD_POL_YEAR
+    SFPNOTES:END_SEQUENCE   = L_HOLD_END_SEQUENCE
+--    SFPNOTES:BUILD_NO     = 0
+--    SFPNOTES:PREM_NO      = 0
+    SFPNOTES:TRANS_DATE     = TODAYSDATE
+    SFPNOTES:SUB_CODE       = L_SUB_CODE
+    SFPNOTES:NOTES = "Check Was Processed by " + USERNAME +" on " +
+    Str(TODAYSDATE,"MM/DD/YYYY") + " but was not applied since the  Cancellation"
+    + " date was outside of the Grace Period Allowed.  <NL><NL>" +
+    "Cancellation Effective Date was " + Str(L_HOLD_CX_EFF_DATE,"MM/DD/YYYY") +
+    "<NL>Grace period days is currently " + Str(ARSCONTROL:NON_PAY_GRACE_DAYS) +
+    "<NL>Check Number: " + ARSCHKSU:CHECK_NO  +
+    "<NL>Check Amount: " + Str(ARSCHKSU:CHECK_AMOUNT,"$$$,$$$,$$$.99-") +
+    "<NL><NL>" + Str (SYSTEMTIME,"HH:MM:SS") + "<NL><NL>"
+End
+
+End
+
+Procedure SCIPS_MACRO
+Begin
+
+    I_SCIPS_SELECT = "Y"
+
+    If I_SCIPS_SELECT = "Y" Then
+    Begin
+        I_SCIPS_PARAM_NAME = Lowercase(Trun(PROGRAMID))+Trun(Str(PID))+".par"
+        Writefile (I_SCIPS_PARAM_NAME,"%n<NL>",ARSCHKSU:CHECK_REFERENCE)
+    End
+
+    Include "scipsprint.pro"
+Procedure CHECK_FOR_UNPOSTED
+Begin
+
+L_UNPOSTED_CHECK = "N"
+L_PRIOR_POLICY_NO = 0
+
+Access ARSCHKSU_ALT, Set ARSCHKSU_ALT:POLICY_NO = ARSCHKSU:POLICY_NO, Using Fourth Index, Approximate
+
+While ARSCHKSU_ALT:POLICY_NO = ARSCHKSU:POLICY_NO
+Begin
+    If ARSCHKSU_ALT:DISPOSITION = "OPEN" Then
+    Begin
+        L_UNPOSTED_CHECK = "Y"
+        L_PRIOR_POLICY_NO = ARSCHKSU_ALT:POLICY_NO
+    End
+    Next ARSCHKSU_ALT
+End
+
+End -- end of procedure
+
+End

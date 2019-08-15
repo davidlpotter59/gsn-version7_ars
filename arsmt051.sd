@@ -1,0 +1,98 @@
+%%
+Screen
+        Name = "Arsmt051" ;
+        Type = "Multiline" ;
+        Padcharacter = Space ;
+        Highlite = Underscore ;
+        Errortype = Nolock ;
+        Screensize = "dynamic" ;
+        Windowtitle = "%a    %s Manual Override of Pending Non-Pay - Version 7.10    %m";
+        repeat line_items_tg, 12 times down;
+        iconline=0;
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+
+        string l_continue_1[50]="";
+
+        Access ARSCANCEL,
+           Set ARSCANCEL:COMPANY_ID = G_COMPANY_ID ,
+               ARSCANCEL:POLICY_NO = G_POLICY_NO, generic
+
+        Include "STDKEYS7.INC"
+Style Definition
+    include "styles.inc"
+
+functions
+    include "stdfunc7.inc"
+
+Menu Definition
+    include "stdmenu7.inc"
+}
+
+ToolBar Definition
+    include "stdtoolbar7.inc"
+}
+
+Screen
+Properties
+    {
+    LayOutType      = Column
+    }
+{
+
+Panel Tagged Header_pl
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = AsNeeded
+    }
+{
+%%
+                                                      __________
+*-----------------------------------------------------------------------------*
+|Company Id:    __________ __________________________________________________ |
+|Policy Number:  _________ __________________________________________________ |
+*-----------------------------------------------------------------------------*
+|   Transaction     Due      Cancel Eff   Status  Cancelled       Past Due    |
+|      Date         Date        Date                Date           Amount     |
+|    __________  __________  __________     _    __________      __________   |
+|    __________  __________  __________     _    __________      __________   |
+|    __________  __________  __________     _    __________      __________   |
+|    __________  __________  __________     _    __________      __________   |
+|    __________  __________  __________     _    __________      __________   |
+|    __________  __________  __________     _    __________      __________   |
+|    __________  __________  __________     _    __________      __________   |
+|    __________  __________  __________     _    __________      __________   |
+|    __________  __________  __________     _    __________      __________   |
+|    __________  __________  __________     _    __________      __________   |
+|    __________  __________  __________     _    __________      __________   |
+|    __________  __________  __________     _    __________      __________   |
+*-----------------------------------------------------------------------------*
+|         Status P = Pending, C = Cancelled, R = Reinstated/Rescinded         |
+*-----------------------------------------------------------------------------*
+%%
+
+Components
+
+Fields
+0101    FUNCTION/noecho/showasguidetext ;
+0301    ARSCANCEL:COMPANY_ID
+        include "companyhlp.inc"
+0302    sfscompany:name[1];
+0401    ARSCANCEL:POLICY_NO;
+0402    sfpname:name[1];
+0801    arscancel:trans_date tagged line_items_tg;
+0802    arscancel:due_date /displayonly tagged line_items_tg;
+0803    arscancel:cx_eff_date tagged line_items_tg;
+0804    arscancel:cx_status tagged line_items_tg;
+0805    arscancel:cx_date/displayonly tagged line_items_tg;
+0806    arscancel:amount_past_due tagged line_items_tg;
+}
+}
+
+Screen Exit
+        If ARSCANCEL:COMPANY_ID > "" Then G_COMPANY_ID = ARSCANCEL:COMPANY_ID ;
+        If ARSCANCEL:POLICY_NO > 0 Then G_POLICY_NO = ARSCANCEL:POLICY_NO ;
+
+End

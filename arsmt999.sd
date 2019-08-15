@@ -1,0 +1,1452 @@
+%%
+        Screen
+        Name = "Arsmt999" ;
+        Type = "Multiline" ;
+        Repeat repeat_items_tg, 15 Times Down;
+        Padcharacter = Space ;
+        Highlite = Underscore;
+        Windowtitle="%s     %a Create New Payment Plan - Version 7.30c    %m";
+        iconline=0;
+        screensize = "dynamic" ;
+        resizeable = yes ;
+        domain = "arsbillingwork" ;
+
+        Global String G_COMPANY_ID[10],
+                      G_Company[10],
+                      g_lib_1[10];
+
+        Global Unsigned ascii number g_year[4],
+                                     G_POLICY_NO[9],
+                                     g_end_sequence[4],
+                                     g_payment_plan[4];
+
+        Global Signed Ascii Number G_TOTAL_DUE[9]=0/decimals=2,
+                                   G_TOTAL_PAID[9]=0/decimals=2,
+                                   G_NET_DUE[9]=0/decimals=2,
+                                   G_TOTAL_INSTALLMENT_CHARGE[5]=0/decimals=2,
+                                   G_TOTAL_SURCHARGE[5]=0/decimals=2,
+                                   G_CURRENT_DUE[9]=0/decimals=2,
+                                   G_TOTAL_RECEIVED[9]=0/dec=2,
+                                   G_TOTAL_WRITE_OFF[9]=0/decimals=2,
+                                   G_TOTAL_DISBURSEMENTS[9]=0/decimals=2,
+                                   G_TOTAL_PENDING_DISBURSEMENTS[9]=0/decimals=2;
+
+        Array [20] Of Signed Ascii Number L_INSTALLMENT[9]/decimals=2;
+        Array [20] Of Wdate L_DUE_DATE ;
+        Array [20] Of Signed Ascii Number L_INSTALLMENT_NO_CENTS[9]/decimals=0;
+        Array [20] Of Wdate L_13_DUE_DATE ;
+
+        UNSIGNED ASCII NUMBER L_SUB_CODE[4]=0/DECIMALS=0,
+                              l_build_no[4]=0/decimals=0,
+                              l_prem_no[4]=0/decimals=0,
+                              l_end_sequence[4]=0/decimals=0,
+                              l_old_payment_plan[4]=0/decimals=0,
+                              l_number_of_payments[4]=0/decimals=0,
+                              l_trans_code[4]=0/decimals=0,
+                              l_start_billing_ctr[4]=0/decimals=0,
+                              l_total_remaining_periods[4]=0/decimals=0,
+                              l_bucket_ctr[4]=0/decimals=0,
+                              l_return_check_ctr[4]=0/decimals=0,
+                              l_ctr[4]=0/decimals=0,
+                              L_MAX_CTR[2]=20,
+                              L_CTR_2[2]=0/decimals=0,
+                              L_CTR_3[2]=0/decimals=0;
+
+        Signed Ascii Number L_INSTALLMENT_AMOUNT[9]=0/decimals=2,
+                            L_TOTAL_AMOUNT_PAID[9]=0/decimals=2,
+                            L_TOTAL_FEE[9]=0/decimals=2,
+                            L_WRITE_OFF_AMOUNT[9]=0/decimals=2,
+                            L_DISBURSEMENT_AMOUNT[9]=0/decimals=2,
+                            L_TEMP_PREMIUM[9]=0/decimals=2,
+                            L_COMMISSION_AMOUNT[9]=0/decimals=2,
+                            L_COMMISSION_RATE[5]=0/decimals=4,
+                            L_TOTAL_INSTALLMENT_NO_CENTS[9]/decimals=0,
+                            L_DIFF_INSTALLMENT_NO_CENTS[9]/decimals=0,
+                            L_AMOUNT[9]=0.00/DECIMALS=2,
+                            L_hold_comm_rate[4]=0/decimals=2;
+        Wdate L_TRANS_DATE,
+              L_BILLED_DATE,
+              l_due_date_change,
+              L_TRANS_EFF;
+
+        String L_SPECIAL_BILLS[11]="arsbills.mf",
+               L_SPECIAL_MACRO[14]="specbills1.par",
+               L_ENTER[1],
+               L_OUTFILE[15]="arschgbll.out",
+               L_STATUS[1],
+               l_continue_1[50],
+               L_RECORD_CREATED[1]="N",
+               l_company_id[10],
+               L_FOUND[1]="N",
+               l_filename[10]="billing",
+               L_VALUE[10]="",
+               L_Record_Updated[1]="N",
+               l_first_time[1]="Y";
+
+-- passing amounts through writefile and readfile statements
+        lOCAL Signed Ascii Number  L_TOTAL_DUE[9]=0/decimals=2,
+                                   L_TOTAL_PAID[9]=0/decimals=2,
+                                   L_NET_DUE[9]=0/decimals=2,
+                                   L_TOTAL_INSTALLMENT_CHARGE[5]=0/decimals=2,
+                                   L_TOTAL_SURCHARGE[5]=0/decimals=2,
+                                   L_CURRENT_DUE[9]=0/decimals=2,
+                                   L_TOTAL_RECEIVED[9]=0/dec=2,
+                                   L_TOTAL_WRITE_OFF[9]=0/decimals=2,
+                                   L_TOTAL_DISBURSEMENTS[9]=0/decimals=2,
+                                   L_TOTAL_PENDING_DISBURSEMENTS[9]=0/decimals=2;
+
+access arsbillingwork, set arsbillingwork:company_id = g_company_id,
+                       arsbillingwork:policy_no  = g_policy_no, generic
+
+!F4=Forwardtab/fields/icon="OK"/edit ;
+
+Style Definition
+
+        include "styles.inc"
+
+Functions
+
+"Exit"  sequence "popup" tagged exit_fn ;
+
+"popup"  Continue {
+if g_lib_1 = "" then
+{
+l_continue_1 = Dialog("EXITING SCIPS","warning.bmp","You are About to Leave SCIPS","Yes","No")
+switch (l_continue_1)
+Case "Yes" :
+{
+proc (":cli arsbillingwork.mk")/noconsole
+proc (":cli arsinqwrkpp.mk")/noconsole
+proc (":cli cat > billing")/noconsole
+function =  "out"
+}
+}
+}
+else
+{
+function = "return_lib"
+           }
+} ;
+"out" stop;
+
+"return_lib" screenlib g_lib_1 ;
+
+"ChangePP" sequence "changePP_seq" Tagged Change_pp_fn;
+
+"ChangePP_seq" continue
+{
+        l_continue_1 = dialog("Update Policy","warning.bmp","You are about to change the payment plan for this policy<NL>Are you sure that you wish to do this?",
+                       "No","Yes")
+        switch (l_continue_1)
+        case "Yes" :
+        {
+           -- g_lib_1 = "fixdue"
+           g_lib_1 = ""
+            do update_totals
+
+            if g_total_paid <> 0 then
+            {
+               error "You can not change this policy's payment plan.<NL>There is an amount paid of " + str(g_total_paid)
+            }
+
+            if g_total_write_off <> 0 then
+            {
+               error "You can not change this policy's payment plan.<NL>There is a write off amount of " + str(g_total_write_off)
+            }
+
+            if g_total_disbursements <> 0 then
+            {
+               error "You can not change this policy's payment plan.<NL>There is a disbursement amount of " + str(g_total_disbursements)
+            }
+
+            display Modal screen "arsmt999pp"
+ -- arsinqwrkpp is ok to this point
+
+
+            do change_payment_plan
+            proc (":cli arsbillingwork.mk")/noconsole
+            proc (":cli arsinqwrkpp.mk")/noconsole
+            g_payment_plan = 0
+            function = "reaccess"
+            function = "redisplay"
+        }
+        default    :
+        l_continue_1 = dialog("No Update","warning.bmp","No Payment Plan Update for this policy was processed","Continue")
+        }
+} ;
+Delete                                     Tagged Delete_fn;
+--Search                                   Tagged Search_fn;
+Find                                       Tagged Find_fn;
+Next                                       Tagged Next_fn;
+Previous                                   Tagged Previous_fn;
+Page/noreturn                              Tagged Page_fn;
+"BACK"  Sequence "EXIT"                    Tagged Back_fn;
+--"EXIT"  return                           Tagged Exit_fn;
+Return                                     Tagged Return_fn;
+--Print                                    Tagged Print_fn;
+"print_policy" sequence "print_policy_seq" tagged print_policy_tg;
+"print_policy_seq" continue
+ {
+     do build_parameter_file
+
+     proc ("cli cq -enhanced %s",l_special_bills)/noconsole
+     proc ("cqview /reportdir %s /reportname arsin047.cqe",currentdir)
+ } ;
+
+
+--"Check"   Sequence "FIND"                Tagged Check_fn;
+reaccess ;
+"reload" continue
+    {
+ --       function = "reaccess" abort()
+        function = "redisplay"
+    };
+"Search" sequence "search_seq"             tagged search_fn;
+"search_seq" continue
+{
+
+    display Modal screen "arsmt999i" with initial function "search"
+    function = "redisplay"
+};
+
+"redisplay" display/noreturn "arsmt999";
+
+Menu Definition
+
+Toolbar Definition
+
+Screen Entry
+disable (do_nothing_tg)
+
+if g_end_sequence > 0 then
+ disable (Change_pp_fn)
+
+g_lib_1 = ""
+
+Access Validation
+
+access arsbilling, set arsbilling:company_id = g_company_id,
+                       arsbilling:policy_no  = g_policy_no, approximate
+
+--access arsbillingwork, set arsbillingwork:company_id = g_company_id,
+--                           arsbillingwork:policy_no  = g_policy_no, generic
+
+Screen at 1,1 --to 1,80
+
+Properties
+    {
+    LayOutType      = Column
+    }
+{
+
+Panel tagged icon_line_tg
+
+Properties
+     {
+         LayoutType = Row
+         backgroundcolor = "white"
+         layoutgap = 5
+     }
+{
+Components
+
+    Button at 1,1 to 1.0,18 tagged do_nothing_tg
+    Properties {
+    }
+
+    Button at 1,1 to 1.0,18 tagged do_nothing_tg
+    Properties {
+    }
+
+    Button at 1,1 to 1.0,18 tagged do_nothing_tg
+    Properties {
+    }
+
+    Button at 1,1 to 1.0,18 tagged Change_payplan_tg
+    Properties {
+        Text     = "Pay Plan Change"
+        Iconname = "change.bmp"
+        TextAlignment = Right
+               }
+    Events
+    {
+        Action = change_pp_fn
+    }
+
+    Button at 1,1 to 1.0,18 tagged Search_tg
+    Properties {
+        Text     = "Search"
+        Iconname = "search.bmp"
+        TextAlignment = Right
+               }
+    Events
+    {
+        Action = Search_fn
+    }
+
+    Button at 1,1 to 1.0,18 tagged previous_tg
+    Properties {
+        Text     = "Previous"
+        Iconname = "previous.bmp"
+        TextAlignment = Left
+               }
+    Events
+    {
+        Action = previous_fn
+    }
+
+    Button at 1,1 to 1.0,18 tagged next_tg
+    Properties {
+        Text     = "Next"
+        Iconname = "next.bmp"
+        TextAlignment = Left
+               }
+    Events
+    {
+        Action = next_fn
+    }
+
+
+}
+
+Panel tagged icon_line2_tg
+
+Properties
+     {
+         LayoutType = Row
+         backgroundcolor = "white"
+     }
+{
+Components
+
+    Button at 1,1 to 1.0,18 tagged do_nothing_tg
+    Properties {
+       }
+
+    Button at 1,1 to 1.0,18 tagged do_nothing_tg
+    Properties {
+    }
+
+    Button at 1,1 to 1.0,18 tagged do_nothing_tg
+    Properties {
+    }
+
+    Button at 1,1 to 1.0,18 tagged print_tg
+    Properties {
+                 Text = "Print"
+                 Iconname = "printer.bmp"
+                 TextAlignment = Left
+    }
+    Events
+    {
+        Action = print_policy_tg
+    }
+
+    Button at 1,1 to 1.0,18 tagged do_nothing_tg
+    Properties {
+    }
+
+    Button at 1,1 to 1.0,18 tagged do_nothing_tg
+    Properties {
+    }
+
+    Button at 1,1 to 1.0,18 tagged exit_tg
+    Properties {
+        Text     = "EXIT Screen"
+        Iconname = "exit.bmp"
+               }
+    Events
+    {
+        Action = exit_fn
+    }
+}
+
+Panel
+Properties
+         {
+            BorderStyle = Raised
+            ScrollBarPolicy = asNeeded
+         }
+{
+%%
+                                                       ____________
+*------------------------------------------------------------------------------*-----------------------------*
+|  Company Id: __________ __________________________________________________   | Payment Plan: ____  ____    |
+|  Policy No.:  _________ __________________________________________________   | ___________________________ |
+*-------------------------------------------------------*----------------------*-----------------------------*
+|   Trans    Billed       Due        Trans    Trans  B  | S   Amount      Amount      Write     Amount       |
+|   Date      Date       Date         Eff      Code  P  | T   Billed       Paid      Off Amt    Disbursed    |
+|__________ __________ __________  __________  ____ __  | _ ___________ ___________ ___________ ___________  |
+|                                                       |                                                    |
+|                                                       |                                                    |
+|                                                       |                                                    |
+|                                                       |                                                    |
+|                                                       |                                                    |
+|                                                       |                                                    |
+|                                                       |                                                    |
+|                                                       |                                                    |
+|                                                       |                                                    |
+|                                                       |                                                    |
+|                                                       |                                                    |
+|                                                       |                                                    |
+|                                                       |                                                    |
+|                                                       |                                                    |
+*-------------------------------------------------------*----------------------------------------------------*
+%%
+
+Components
+
+Fields
+0101    FUNCTION/noecho/showasguidetext ;
+0301    {
+
+If FUNCTION = "CHANGE" Then
+        {
+            L_STATUS              = ""
+            L_INSTALLMENT_AMOUNT  = 0.00
+            L_TOTAL_AMOUNT_PAID   = 0.00
+            L_WRITE_OFF_AMOUNT    = 0.00
+            L_DISBURSEMENT_AMOUNT = 0.00
+            L_TRANS_DATE          = 00.00.0000
+            L_BILLED_DATE         = 00.00.0000
+            L_TRANS_EFF           = 00.00.0000
+            L_TRANS_CODE          = 00
+            for l_ctr = 1 to 20
+            {
+                l_due_date[l_ctr] = 00.00.0000
+            }
+        }
+        }
+        ARSBILLINGWORK:COMPANY_ID/displayonly
+       Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+                   }
+        Access SFSCOMPANY, Set SFSCOMPANY:COMPANY_ID = ARSBILLINGWORK:COMPANY_ID
+        Activehelp SFSCOMPANY:COMPANY_ID,
+                   SFSCOMPANY:NAME[1] ;
+
+
+0302    SFSCOMPANY:NAME[1]/displayonly
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           };
+
+0303    sfpname:payment_plan/displayonly
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           };
+
+0304    g_payment_plan/displayonly
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           };
+
+0401    ARSBILLINGWORK:POLICY_NO/displayonly
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+        ;
+
+0402    SFPNAME:NAME[1]
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0403   arspayplan:description/displayonly
+       Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           };
+
+0801    ARSBILLINGWORK:TRANS_DATE/displayonly tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0802    ARSBILLINGWORK:BILLED_DATE/displayonly tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0803    ARSBILLINGWORK:DUE_DATE/displayonly tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0804    ARSBILLINGWORK:TRANS_EFF/displayonly tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0805    ARSBILLINGWORK:TRANS_CODE/displayonly tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0806    arsbillingWORK:bill_plan/displayonly tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0807    ARSBILLINGWORK:STATUS/upper/displayonly tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0808    ARSBILLINGWORK:INSTALLMENT_AMOUNT/displayonly tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0809    ARSBILLINGWORK:TOTAL_AMOUNT_PAID/displayonly tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0810    ARSBILLINGWORK:WRITE_OFF_AMOUNT/displayonly tagged repeat_items_tg
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+0811    ARSBILLINGWORK:DISBURSEMENT_AMOUNT/displayonly tagged repeat_items_tg
+
+        Properties {
+             Foregroundcolor = "Black"
+             BackGroundcolor = "White"
+           }
+;
+
+}
+}
+Panel Tagged Totals_tg
+Properties {
+        ScrollBarPolicy    = asNeeded
+        Text               = "TOTALS"
+           }
+
+{
+
+%%
+
+%%
+
+Components subscreen at 1,1 to 20,115
+Properties {
+        Screen   = "arsmt999sc"
+        backgroundcolor = "White"
+        foregroundcolor = "black"
+           }
+}
+Screen Exit
+    Closefile (L_OUTFILE)
+
+Procedure Definition
+
+Procedure Update_totals
+{
+
+        readfile (l_filename,L_VALUE)
+        readfile (l_filename,L_VALUE)
+        g_total_paid = val(l_value)
+        readfile (l_filename,L_VALUE)
+        readfile (l_filename,L_VALUE)
+        readfile (l_filename,L_VALUE)
+        g_total_surcharge = val(L_VALUE)
+        readfile (l_filename,L_VALUE)
+        readfile (l_filename,L_VALUE)
+        readfile (l_filename,L_VALUE)
+        g_total_write_off = val(l_value)
+        readfile (l_filename,L_VALUE)
+        g_total_disbursements = val(l_value)
+        readfile (l_filename,L_VALUE)
+        closefile (l_filename)
+
+}
+
+Procedure build_parameter_file
+{
+
+-- added the proc to create a new finder2 file Nov 1, 2001
+
+-- buidling paramter file to user  in arspr01a
+Deletefile(L_SPECIAL_MACRO)
+Closefile (L_SPECIAL_MACRO)
+deletefile ("specbills1.par")
+writefile ("specbills1.par","%s",str(g_policy_no))
+closefile ("specbills1.par")
+--  building macro file now to print the selected invoice
+Deletefile(L_SPECIAL_BILLS)
+Deletefile("arsin047.cqe")
+Deletefile("arsin047.cq")
+Writefile (L_SPECIAL_BILLS,"/* special bills macro */<NL>")
+Writefile (L_SPECIAL_BILLS,"Clear List<NL>")
+Writefile (L_SPECIAL_BILLS,"Clear Find<NL>")
+Writefile (L_SPECIAL_BILLS,"Clear sum<NL>")
+Writefile (L_SPECIAL_BILLS,"run/parameter=specbills1 arsin047<NL>")
+Writefile (L_SPECIAL_BILLS,"rsave arsin047<NL>")
+Closefile (L_SPECIAL_BILLS)
+
+}
+
+-- this is where the new records are created
+
+Procedure Change_Payment_plan
+{
+   do Update_arsmaster
+
+   do Update_sfpname
+
+   do create_notes
+
+   Do Delete_current_records
+
+   l_company_id = ""
+   l_hold_comm_rate = 00.0
+   l_first_time     = "Y"
+   g_total_due      = 0.00
+
+   access arsinqwrkpp, set arsinqwrkpp:company_id = g_company_id,
+                           arsinqwrkpp:policy_no  = g_policy_no, approximate
+
+   while arsinqwrkpp:company_id = g_company_id and
+         arsinqwrkpp:policy_no  = g_policy_no
+    {
+     if arsinqwrkpp:trans_code < 17 then
+     {
+      l_trans_code = arsinqwrkpp:trans_code
+      g_total_due = arsinqwrkpp:amount_due
+      l_hold_comm_rate = arsinqwrkpp:comm_rate
+      do create_billing_records
+     }
+
+    next arsinqwrkpp
+    }
+
+   access arsinqwrkpp_alias, set arsinqwrkpp_alias:company_id = g_company_id,
+                                arsinqwrkpp_alias:policy_no  = g_policy_no, approximate
+
+   while arsinqwrkpp_alias:company_id = g_company_id and
+         arsinqwrkpp_alias:policy_no  = g_policy_no
+    {
+     if arsinqwrkpp_alias:trans_code = 19 then
+     {
+      g_total_surcharge = arsinqwrkpp_alias:amount_due
+     }
+
+    next arsinqwrkpp_alias
+    }
+
+    l_trans_code = 19
+    l_hold_comm_rate = 0
+    l_amount = g_total_surcharge
+    Do Create_surcharges_record
+
+    Do get_installment_fee
+    if l_amount <> 0 then
+     {
+       l_hold_comm_rate = 0.00
+       l_trans_code = 18
+       Do create_charges_record
+     }
+
+}
+
+Procedure Create_notes
+{
+
+l_sub_code     = 0
+
+l_end_sequence = 0
+l_prem_no      = 0
+l_build_no     = 0
+l_trans_date   = todaysdate
+
+access sfpnotes, set sfpnotes:policy_no     = g_policy_no,
+                     sfpnotes:pol_year      = g_year,
+                     sfpnotes:end_sequence  = l_end_sequence,
+                     sfpnotes:prem_no       = l_prem_no,
+                     sfpnotes:build_no      = l_build_no,
+                     sfpnotes:trans_date    = l_trans_date, approximate
+
+while sfpnotes:policy_no     = g_policy_no and
+      sfpnotes:pol_year      = g_year and
+      sfpnotes:end_sequence  = l_end_sequence and
+      sfpnotes:prem_no       = l_prem_no and
+      sfpnotes:build_no      = l_build_no and
+      sfpnotes:trans_date    = l_trans_date
+      {
+         l_sub_code = sfpnotes:sub_code
+         next sfpnotes
+      }
+
+l_sub_code = l_sub_code + 10
+
+access sfpnotes, set sfpnotes:policy_no     = g_policy_no,
+                     sfpnotes:pol_year      = g_year,
+                     sfpnotes:end_sequence  = l_end_sequence,
+                     sfpnotes:prem_no       = l_prem_no,
+                     sfpnotes:build_no      = l_build_no,
+                     sfpnotes:trans_date    = l_trans_date,
+                     sfpnotes:sub_code      = l_sub_code
+
+if sfpnotes:policy_no    <> g_policy_no or -- record does not exist
+   sfpnotes:pol_year     <> g_year or
+   sfpnotes:end_sequence <> l_end_sequence or
+   sfpnotes:prem_no      <> l_prem_no or
+   sfpnotes:build_no     <> l_build_no or
+   sfpnotes:trans_date   <> l_trans_date or
+   sfpnotes:sub_code     <> l_sub_code then
+{
+    add sfpnotes
+    {
+        sfpnotes:policy_no     = g_policy_no
+        sfpnotes:pol_year      = g_year
+        sfpnotes:end_sequence  = l_end_sequence
+        sfpnotes:prem_no       = l_prem_no
+        sfpnotes:build_no      = l_build_no
+        sfpnotes:trans_date    = l_trans_date
+        sfpnotes:sub_code      = l_sub_code
+        sfpnotes:notes         =
+        "Payment Plan Changed on " +str(l_trans_date) + " by " + username + "<NL>"
+        + " at " + str(systemtime) + " from " + str(terminal) + "<NL><NL>"
+        + "Original Payment Plan Code was " + str(l_old_payment_plan) + "<NL>"
+        + "New Payment Plan Code is       " + str(g_payment_plan) + "<NL>"
+        sfpnotes:user_id       = username
+    }
+}
+
+}
+
+Procedure Update_ARSMASTER
+{
+
+access arsmaster, set arsmaster:company_id   = g_company_id,
+                      arsmaster:policy_no    = arsbillingwork:policy_no, generic
+--                      arsmaster:policy_no    = g_policy_no, generic
+
+while arsmaster:company_id  = g_company_id and
+      arsmaster:policy_no   = g_policy_no
+{
+--    if year(arsmaster:trans_eff) = g_year then
+    if year(arsmaster:trans_eff) = arsbillingwork:pol_year then
+    {
+        do update_arsmaster_payment_plan
+    }
+    next arsmaster
+}
+
+} -- end of procedure
+
+Procedure Update_arsmaster_payment_plan
+{
+
+l_old_Payment_plan =0
+
+access arsmaster_alt, set arsmaster_alt:company_id = arsmaster:company_id,
+                          arsmaster_alt:policy_no  = arsmaster:policy_no,
+                          arsmaster_alt:trans_date = arsmaster:trans_date,
+                          arsmaster_alt:trans_eff  = arsmaster:trans_eff,
+                          arsmaster_alt:trans_exp  = arsmaster:trans_exp,
+                          arsmaster_alt:trans_code = arsmaster:trans_code,
+                          arsmaster_alt:line_of_business = arsmaster:line_of_business,
+                          arsmaster_alt:comm_rate  = arsmaster:comm_rate, generic
+
+if arsmaster_alt:errornumber = 0 then -- record found
+{
+   change arsmaster_alt
+   {
+       if l_old_payment_Plan = 0 then
+       {
+           l_old_payment_plan         = arsmaster_alt:payment_plan
+       }
+       arsmaster_alt:payment_plan = g_payment_plan
+   }
+}
+
+} -- end of changing payment plan on arsmaster
+
+Procedure Update_sfpname
+{
+
+access sfpname, set sfpname:policy_no = g_policy_no,
+                    sfpname:pol_year  = g_year,
+                    sfpname:end_sequence = g_end_sequence
+
+if sfpname:policy_no = g_policy_no and
+   sfpname:pol_year  = g_year and
+   sfpname:end_sequence = g_end_sequence then
+   {
+   change sfpname
+   {
+       sfpname:payment_plan = g_payment_plan
+   }
+   }
+} -- end of procedure
+
+Procedure CREATE_BILLING_RECORDS
+{
+
+/* access arspayplan here since all of the conditions below
+   will require the pay_plan information */
+
+Access arscontrol, set arscontrol:company_id       = arsbillingwork:company_id
+
+Access ARSPAYPLAN, Set ARSPAYPLAN:COMPANY_ID       = ARSBILLINGWORK:COMPANY_ID,
+                       ARSPAYPLAN:LINE_OF_BUSINESS = ARSBILLINGWORK:LINE_OF_BUSINESS,
+                       ARSPAYPLAN:PAYMENT_PLAN     = g_payment_plan
+
+/* Create billing records for new and renewal business */
+
+L_NUMBER_OF_PAYMENTS = ARSPAYPLAN:NUMBER_OF_PAYMENTS
+
+
+Switch(L_TRANS_CODE)
+  Case ARSCONTROL:ANNUAL_TRANS_CODE,
+       ARSCONTROL:RENEWAL_TRANS_CODE,
+       ARSCONTROL:INSTALLMENT_CHARGE_TRANS_CODE,
+       ARSCONTROL:SURCHARGE_TRANS_CODE : {
+                                        Do CALCULATE_NEW_RENEWAL_PERIODS
+                                        Do CALCULATE_INSTALLMENT_AMOUNTS
+                                         }
+}
+
+L_SUB_CODE = 10 -- current records will always be 10
+
+Do GET_BILLING_SUBCODE
+
+L_START_BILLING_CTR = 1 -- this sets this for annual, renewal and reinstatements
+
+L_BUCKET_CTR = 0
+
+For L_CTR = 1 To L_TOTAL_REMAINING_PERIODS
+  {
+    L_BUCKET_CTR = L_BUCKET_CTR + 1
+
+    Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID     = arsbillingwork:COMPANY_ID
+
+    Access ARSBILLING, Set ARSBILLING:COMPANY_ID       = arsbillingwork:COMPANY_ID,
+                           ARSBILLING:POLICY_NO        = ARSBILLINGWORK:POLICY_NO,
+                           ARSBILLING:TRANS_DATE       = ARSBILLINGWORK:TRANS_DATE,
+                           ARSBILLING:TRANS_EFF        = ARSBILLINGWORK:TRANS_EFF,
+                           ARSBILLING:TRANS_EXP        = ARSBILLINGWORK:TRANS_EXP,
+                           ARSBILLING:TRANS_CODE       = L_TRANS_CODE,
+                           ARSBILLING:LINE_OF_BUSINESS = ARSBILLINGWORK:LINE_OF_BUSINESS,
+                           ARSBILLING:COMM_RATE        = l_hold_COMM_RATE,
+                           ARSBILLING:SUB_CODE         = L_SUB_CODE,
+                           ARSBILLING:BILLING_CTR      = L_START_BILLING_CTR,
+                           ARSBILLING:RETURN_CHECK_CTR = L_RETURN_CHECK_CTR, Approximate
+
+      If (ARSBILLING:COMPANY_ID       <> ARSBILLINGWORK:COMPANY_ID Or
+         ARSBILLING:POLICY_NO        <> ARSBILLINGWORK:POLICY_NO Or
+         ARSBILLING:TRANS_DATE       <> ARSBILLINGWORK:TRANS_DATE Or
+         ARSBILLING:TRANS_EFF        <> ARSBILLINGWORK:TRANS_EFF Or
+         ARSBILLING:TRANS_EXP        <> ARSBILLINGWORK:TRANS_EXP Or
+         ARSBILLING:TRANS_CODE       <> l_TRANS_CODE Or
+         ARSBILLING:LINE_OF_BUSINESS <> ARSBILLINGWORK:LINE_OF_BUSINESS Or
+         ARSBILLING:COMM_RATE        <> l_hold_COMM_RATE Or
+         ARSBILLING:SUB_CODE         <> L_SUB_CODE Or
+         ARSBILLING:BILLING_CTR      <> L_START_BILLING_CTR Or
+         ARSBILLING:RETURN_CHECK_CTR <> L_RETURN_CHECK_CTR)  And -- record does not exist
+         L_INSTALLMENT[L_CTR] <> 0 Then -- record value is not $0.00
+          {
+          Add ARSBILLING
+              {
+              ARSBILLING:COMPANY_ID           = ARSBILLINGWORK:COMPANY_ID
+              ARSBILLING:POLICY_NO            = ARSBILLINGWORK:POLICY_NO
+              ARSBILLING:TRANS_DATE           = ARSBILLINGWORK:TRANS_DATE
+              ARSBILLING:TRANS_EFF            = ARSBILLINGWORK:TRANS_EFF
+              ARSBILLING:TRANS_EXP            = ARSBILLINGWORK:TRANS_EXP
+              ARSBILLING:TRANS_CODE           = L_TRANS_CODE
+              ARSBILLING:LINE_OF_BUSINESS     = ARSBILLINGWORK:LINE_OF_BUSINESS
+              ARSBILLING:AGENT_NO             = ARSBILLINGWORK:AGENT_NO
+              ARSBILLING:COMM_RATE            = L_HOLD_COMM_RATE
+              ARSBILLING:SUB_CODE             = L_SUB_CODE
+              ARSBILLING:BILLING_CTR          = L_START_BILLING_CTR
+              ARSBILLING:RETURN_CHECK_CTR     = L_RETURN_CHECK_CTR
+              ARSBILLING:LOB_SUBLINE          = ARSBILLINGWORK:LOB_SUBLINE
+              ARSBILLING:BILL_PLAN            = ARSBILLINGWORK:BILL_PLAN
+              ARSBILLING:PAYMENT_PLAN         = g_PAYMENT_PLAN
+              ARSBILLING:POL_YEAR             = ARSBILLINGWORK:POL_YEAR
+              ARSBILLING:END_SEQUENCE         = ARSBILLINGWORK:END_SEQUENCE
+
+              arsbilling:due_date             = l_due_date[l_ctr]
+              if l_ctr = 1 then
+              {
+                  arsbilling:status           = "B"
+                  arsbilling:billed_date      = todaysdate
+                  arsbilling:status_date      = todaysdate
+              }
+
+              If (L_CTR > 1 And
+                 L_DUE_DATE[L_CTR] <= L_DUE_DATE[1]) Then
+                  {
+                  ARSBILLING:STATUS           = "B"
+                  ARSBILLING:STATUS_DATE      = ARSBILLINGWORK:TRANS_DATE
+                  ARSBILLING:BILLED_DATE      = ARSBILLINGWORK:TRANS_DATE
+                  }
+              else
+              If (L_CTR > 1 And
+                 L_DUE_DATE[L_CTR] > L_DUE_DATE[1]) then
+                  {
+                  ARSBILLING:STATUS           = "O" -- not billed
+                  ARSBILLING:STATUS_DATE      = ARSBILLINGWORK:TRANS_DATE
+                  ARSBILLING:BILLED_DATE      = 00.00.0000
+                  }
+
+              ARSBILLING:INSTALLMENT_AMOUNT   = L_INSTALLMENT[L_CTR]
+              ARSBILLING:AC_NET_AMOUNT_DUE    = ARSBILLINGWORK:AC_NET_AMOUNT_DUE
+              ARSBILLING:TOTAL_AMOUNT_PAID    = 0.00
+              ARSBILLING:WRITE_OFF            = 0
+              ARSBILLING:WRITE_OFF_AMOUNT     = 0.00
+              ARSBILLING:WRITE_OFF_DATE       = 00.00.0000
+              ARSBILLING:PRIOR_STATUS         = ARSBILLING:STATUS
+              ARSBILLING:PRIOR_STATUS_DATE    = ARSBILLING:STATUS_DATE
+              ARSBILLING:REINSTATED           = "N"
+              arsbilling:consent_order        = 9 -- to indicate a payment plan change record
+              }
+          }
+      Else
+          {
+          Change ARSBILLING
+            {
+              ARSBILLING:INSTALLMENT_AMOUNT   = ARSBILLING:INSTALLMENT_AMOUNT +
+                                                L_INSTALLMENT[L_CTR]
+              ARSBILLING:AC_NET_AMOUNT_DUE    = ARSBILLING:AC_NET_AMOUNT_DUE  +
+                                                ARSBILLINGWORK:AC_NET_AMOUNT_DUE
+            }
+          }
+
+      L_START_BILLING_CTR = L_START_BILLING_CTR + 1
+
+  } -- for loop
+} -- end of Create_billing_records
+
+Procedure CALCULATE_NEW_RENEWAL_PERIODS
+{
+
+/* house cleaning */
+
+Do CLEANUP_DUE_DATE_ARRAY
+L_TOTAL_REMAINING_PERIODS = L_NUMBER_OF_PAYMENTS
+
+/* calculate due dates, use eff date */
+access sfpcurrent, set sfpcurrent:policy_no = arsbillingwork:policy_no
+
+access sfpname, set sfpname:policy_no = sfpcurrent:policy_no,
+                    sfpname:pol_year  = sfpcurrent:pol_year,
+                    sfpname:end_sequence = sfpcurrent:end_sequence
+
+For L_CTR = 1 To L_NUMBER_OF_PAYMENTS
+    {
+    If L_CTR = 1 Then
+        {
+        Do CALCULATE_FIRST_PERIOD
+        l_due_date[1] = arsbillingwork:due_date -- temp to see if this is correct
+        }
+    Else
+        If L_CTR > 1 Then
+            {
+            Do CALCULATE_PERIOD_2_ON
+            }
+    }
+
+}
+
+Procedure CALCULATE_INSTALLMENT_AMOUNTS
+{
+
+Do CLEANUP_INSTALLMENT_AMOUNT_ARRAY
+
+l_temp_premium = g_total_due -- g_total_surcharge
+
+For L_CTR = 1 To 20
+{
+   L_INSTALLMENT_NO_CENTS[L_CTR] = 0.00
+   L_INSTALLMENT[L_CTR]          = 0.00
+}
+
+For L_CTR = 1 To L_NUMBER_OF_PAYMENTS
+    {
+        L_INSTALLMENT[L_CTR] =
+        (L_TEMP_PREMIUM * ARSPAYPLAN:DISTRIBUTION[L_CTR])
+        L_INSTALLMENT_NO_CENTS[L_CTR] =
+        (L_TEMP_PREMIUM * ARSPAYPLAN:DISTRIBUTION[L_CTR])
+
+}
+
+/* make sure that the total of the no cents installment buckets equal
+   the total premium, if not apply the difference to the first bucket */
+
+For L_CTR = 1 To L_NUMBER_OF_PAYMENTS
+{
+    L_TOTAL_INSTALLMENT_NO_CENTS = L_TOTAL_INSTALLMENT_NO_CENTS +
+                                   L_INSTALLMENT_NO_CENTS[L_CTR]
+}
+
+L_DIFF_INSTALLMENT_NO_CENTS = L_TEMP_PREMIUM - L_TOTAL_INSTALLMENT_NO_CENTS
+L_INSTALLMENT_NO_CENTS[1] = L_INSTALLMENT_NO_CENTS[1] + L_DIFF_INSTALLMENT_NO_CENTS
+
+L_DIFF_INSTALLMENT_NO_CENTS  = 0.00
+L_TOTAL_INSTALLMENT_NO_CENTS = 0.00
+
+If ARSCONTROL2:WHOLE_DOLLAR_INSTALLMENTS One Of 1 Then  -- put the control file check here
+{
+For L_CTR = 1 To L_NUMBER_OF_PAYMENTS
+{
+    L_INSTALLMENT[L_CTR] = L_INSTALLMENT_NO_CENTS[L_CTR]
+}
+}
+
+Access ARSCONTROL, Set ARSCONTROL:COMPANY_ID = L_COMPANY_ID, Exact
+If ARSCONTROL:COMPANY_ID <> "" Then
+{
+    If ARSMASTER:TRANS_EFF < ARSCONTROL:INVOICE_APPLY_END_EFF Then
+    {
+        L_INSTALLMENT[L_CTR] = L_TEMP_PREMIUM
+    }
+}
+
+}
+Procedure CLEANUP_INSTALLMENT_AMOUNT_ARRAY
+{
+
+For L_CTR = 1 To L_MAX_CTR
+    {
+    L_INSTALLMENT[L_CTR] = 0.00
+    }
+
+}
+Procedure CLEANUP_DUE_DATE_ARRAY
+{
+
+For L_CTR = 1 To L_MAX_CTR
+    {
+    L_DUE_DATE[L_CTR] = 00.00.0000
+    }
+}
+
+Procedure CALCULATE_FIRST_PERIOD
+{
+access arsmaster_alias, set arsmaster_alias:company_id   = g_company_id,
+                      arsmaster_alias:policy_no    = arsbillingwork:policy_no, generic
+
+If ARSMASTER_alias:TRANS_EFF > Dateadd(ARSMASTER_alias:TRANS_DATE,1) Then
+--    L_DUE_DATE[L_CTR] = ARSMASTER_alias:TRANS_EFF
+    L_DUE_DATE[1] = ARSMASTER_alias:TRANS_EFF
+Else
+--    L_DUE_DATE[L_CTR] = Dateadd(ARSMASTER_alias:TRANS_DATE,1)
+    L_DUE_DATE[1] = Dateadd(ARSMASTER_alias:TRANS_DATE,1)
+
+If ARSMASTER_alias:BILL_PLAN One Of "AC" Then
+{
+    Access ARSCONTROL, Set ARSCONTROL2:COMPANY_ID = ARSMASTER_alias:COMPANY_ID
+    If ARSMASTER_alias:TRANS_EFF > ARSMASTER_alias:TRANS_DATE + ARSCONTROL2:AC_DAYS_DUE Then
+    {
+        L_DUE_DATE[L_CTR] = ARSMASTER_alias:TRANS_EFF
+    }
+    Else
+    {
+        L_DUE_DATE[L_CTR] = ARSMASTER_alias:TRANS_DATE + ARSCONTROL2:AC_DAYS_DUE
+    }
+
+}
+
+}
+
+Procedure CALCULATE_PERIOD_2_ON
+{
+
+/* calculate the subsequent due dates using the policy effective date
+   changed 10/13/2001
+*/
+access sfpcurrent, set sfpcurrent:policy_no = arsbillingwork:policy_no
+
+access sfpname, set sfpname:policy_no = sfpcurrent:policy_no,
+                    sfpname:pol_year  = sfpcurrent:pol_year,
+                    sfpname:end_sequence = sfpcurrent:end_sequence
+
+If ARSPAYPLAN:INSTALLMENT_MONTHS_BETWEEN <> 0 Then
+{
+L_DUE_DATE[L_CTR] = Dateadd(sfpname:eff_date,
+                      ARSPAYPLAN:INSTALLMENT_MONTHS_BETWEEN * (L_CTR -1))
+
+               /* if other installment due dates are prior
+                  to the first installment then change
+                  the installment due dates to be due the
+                  same as the first installment so they
+                  are billed
+               */
+
+If L_DUE_DATE[L_CTR] < L_DUE_DATE[1] Then
+    L_DUE_DATE[L_CTR] = L_DUE_DATE[1]
+
+}
+
+/* payplan uses days betweeen each due date to calculate the
+   next due date -- this was changed 10/13/2001
+*/
+
+If ARSPAYPLAN:INVOICE_DAYS_BETWEEN <> 0 Then
+{
+
+    L_DUE_DATE[L_CTR] = (L_DUE_DATE[L_CTR - 1] + ARSPAYPLAN:INVOICE_DAYS_BETWEEN)
+    If L_DUE_DATE[L_CTR] > SFPNAME:EXP_DATE Then
+    { L_DUE_DATE[L_CTR] = L_DUE_DATE[L_CTR -1] }
+
+}
+
+If ARSMASTER:TRANS_CODE = 13  Then -- decrease in premium
+{
+L_CTR_2 = 0
+
+While L_CTR_2 < L_MAX_CTR
+{
+    L_CTR_2 = L_CTR_2 + 1
+    L_13_DUE_DATE[L_CTR_2] = 00.00.0000
+}
+
+L_CTR_2 = 0
+While L_CTR_2 < L_NUMBER_OF_PAYMENTS
+{
+    L_CTR_2 = L_CTR_2 + 1
+    If L_CTR_2 = 1 Then
+    {
+        L_13_DUE_DATE[L_CTR_2] = sfpname:eff_date
+    }
+    Else
+    If L_CTR_2 > 1 Then
+    {
+       L_13_DUE_DATE[L_CTR_2] = Dateadd(sfpname:eff_date,
+        ARSPAYPLAN:INSTALLMENT_MONTHS_BETWEEN * (L_CTR_2 - 1))
+    }
+}
+
+L_FOUND = "N"
+L_CTR_2 = 0
+L_CTR_3 = 0
+
+While L_FOUND = "N" And
+      L_CTR_2 < L_NUMBER_OF_PAYMENTS -- changed from "4" 02/13/2001
+{
+   L_CTR_2 = L_CTR_2 + 1
+   L_CTR_3 = L_CTR_2 + 1
+
+   If L_DUE_DATE[1] >= L_13_DUE_DATE[L_CTR_2] And
+      L_DUE_DATE[1] <= L_13_DUE_DATE[L_CTR_3] Then
+      {
+         L_FOUND = "Y"
+      }
+}
+
+/* if the loop worked then realign the due dates.  However,
+   in the event that the first due date for the transaction
+   is past the last due calculated based on the sfpname:eff_date
+   and the months between then use the calculated due date based
+   on the original calculate_first_period procedure
+*/
+
+If L_FOUND = "Y" Then
+{
+L_CTR_2 = 0
+While L_CTR_2 < ARSPAYPLAN:INSTALLMENT_MONTHS_BETWEEN
+{
+    L_CTR_2 = L_CTR_2 + 1
+    L_DUE_DATE[L_CTR_2] = L_13_DUE_DATE[L_CTR_3]
+    L_CTR_3 = L_CTR_3 + 1
+}
+
+}
+
+}
+
+}
+
+Procedure Delete_current_records
+{
+
+l_company_id = ""
+
+access arsbillingwork_alt, set arsbillingwork_alt:company_id = l_company_id, approximate
+
+while arsbillingwork_alt:errornumber = 0
+{
+     access arsbilling_alt, set arsbilling_alt:company_id       = arsbillingwork_alt:company_id,
+                                arsbilling_alt:policy_no        = arsbillingwork_alt:policy_no,
+                                arsbilling_alt:trans_date       = arsbillingwork_alt:trans_date,
+                                arsbilling_alt:trans_eff        = arsbillingwork_alt:trans_eff,
+                                arsbilling_alt:trans_exp        = arsbillingwork_alt:trans_exp,
+                                arsbilling_alt:trans_code       = arsbillingwork_alt:trans_code,
+                                arsbilling_alt:line_of_business = arsbillingwork_alt:line_of_business,
+                                arsbilling_alt:comm_rate        = arsbillingwork_alt:comm_rate,
+                                arsbilling_alt:sub_code         = arsbillingwork_alt:sub_code,
+                                arsbilling_alt:billing_ctr      = arsbillingwork_alt:billing_ctr,
+                                arsbilling_alt:return_check_ctr = arsbillingwork_alt:return_check_ctr
+
+     if arsbilling_alt:company_id       = arsbillingwork_alt:company_id and
+        arsbilling_alt:policy_no        = arsbillingwork_alt:policy_no and
+        arsbilling_alt:trans_date       = arsbillingwork_alt:trans_date and
+        arsbilling_alt:trans_eff        = arsbillingwork_alt:trans_eff and
+        arsbilling_alt:trans_exp        = arsbillingwork_alt:trans_exp and
+        arsbilling_alt:trans_code       = arsbillingwork_alt:trans_code and
+        arsbilling_alt:line_of_business = arsbillingwork_alt:line_of_business and
+        arsbilling_alt:comm_rate        = arsbillingwork_alt:comm_rate and
+        arsbilling_alt:sub_code         = arsbillingwork_alt:sub_code and
+        arsbilling_alt:billing_ctr      = arsbillingwork_alt:billing_ctr and
+        arsbilling_alt:return_check_ctr = arsbillingwork_alt:return_check_ctr then
+        {
+            delete arsbilling_alt
+        }
+
+next arsbillingwork_alt
+
+}
+
+} -- end of Procedure Delete_current_records
+
+Procedure GET_BILLING_SUBCODE
+{
+Access ARSBILLING_ALT, Set ARSBILLING_ALT:COMPANY_ID = ARSBILLINGWORK_ALT:COMPANY_ID,
+                           ARSBILLING_ALT:POLICY_NO  = ARSBILLINGWORK_ALT:POLICY_NO,
+                           ARSBILLING_ALT:TRANS_DATE = ARSBILLINGWORK_ALT:TRANS_DATE,
+                           ARSBILLING_ALT:TRANS_EFF  = ARSBILLINGWORK_ALT:TRANS_EFF,
+                           ARSBILLING_ALT:TRANS_EXP  = ARSBILLINGWORK_ALT:TRANS_EXP,
+                           ARSBILLING_ALT:TRANS_CODE = ARSBILLINGWORK_ALT:TRANS_CODE,
+                           ARSBILLING_ALT:LINE_OF_BUSINESS = ARSBILLINGWORK_ALT:LINE_OF_BUSINESS,
+                           ARSBILLING_ALT:COMM_RATE  = ARSBILLINGWORK_ALT:COMM_RATE, Approximate
+
+While ARSBILLING_ALT:COMPANY_ID = ARSBILLINGWORK_ALT:COMPANY_ID And
+      ARSBILLING_ALT:POLICY_NO  = ARSBILLINGWORK_ALT:POLICY_NO And
+      ARSBILLING_ALT:TRANS_DATE = ARSBILLINGWORK_ALT:TRANS_DATE And
+      ARSBILLING_ALT:TRANS_EFF  = ARSBILLINGWORK_ALT:TRANS_EFF And
+      ARSBILLING_ALT:TRANS_EXP  = ARSBILLINGWORK_ALT:TRANS_EXP And
+      ARSBILLING_ALT:TRANS_CODE = ARSBILLINGWORK_ALT:TRANS_CODE And
+      ARSBILLING_ALT:LINE_OF_BUSINESS = ARSBILLINGWORK_ALT:LINE_OF_BUSINESS And
+      ARSBILLING_ALT:COMM_RATE   = ARSBILLINGWORK_ALT:COMM_RATE
+      {        L_SUB_CODE = ARSBILLING_ALT:SUB_CODE
+        Next ARSBILLING_ALT
+      }
+} -- END OF Procedure GET_BILLING_SUBCODE
+
+Procedure Create_surcharges_record
+{
+
+l_company_id = ""
+l_sub_code = 0
+l_record_updated = "N"
+
+do GET_BILLING_SUBCODE
+l_sub_code = l_sub_code + 10
+
+
+access arsbillingwork_alt, set arsbillingwork_alt:company_id = l_company_id, approximate
+
+
+while arsbillingwork_alt:errornumber = 0
+{
+   if arsbillingwork_alt:billing_ctr = 1 and
+      arsbillingwork_alt:trans_code one of 19 then
+--      l_record_updated = "N" then -- use the very first record found to establish due date
+   {
+       Access ARSBILLING, Set ARSBILLING:COMPANY_ID       = arsbillingwork_alt:COMPANY_ID,
+                              ARSBILLING:POLICY_NO        = ARSBILLINGWORK_alt:POLICY_NO,
+                              ARSBILLING:TRANS_DATE       = ARSBILLINGWORK_alt:TRANS_DATE,
+                              ARSBILLING:TRANS_EFF        = ARSBILLINGWORK_alt:TRANS_EFF,
+                              ARSBILLING:TRANS_EXP        = ARSBILLINGWORK_alt:TRANS_EXP,
+                              ARSBILLING:TRANS_CODE       = L_TRANS_CODE,
+                              ARSBILLING:LINE_OF_BUSINESS = ARSBILLINGWORK_alt:LINE_OF_BUSINESS,
+                              ARSBILLING:COMM_RATE        = ARSBILLINGWORK_alt:COMM_RATE,
+                              ARSBILLING:SUB_CODE         = L_SUB_CODE,
+                              ARSBILLING:BILLING_CTR      = arsbillingwork_alt:BILLING_CTR,
+                              ARSBILLING:RETURN_CHECK_CTR = arsbillingwork_alt:RETURN_CHECK_CTR, Approximate
+
+      If (ARSBILLING:COMPANY_ID       <> ARSBILLINGWORK_alt:COMPANY_ID Or
+          ARSBILLING:POLICY_NO        <> ARSBILLINGWORK_alt:POLICY_NO Or
+          ARSBILLING:TRANS_DATE       <> ARSBILLINGWORK_alt:TRANS_DATE Or
+          ARSBILLING:TRANS_EFF        <> ARSBILLINGWORK_alt:TRANS_EFF Or
+          ARSBILLING:TRANS_EXP        <> ARSBILLINGWORK_alt:TRANS_EXP Or
+          ARSBILLING:TRANS_CODE       <> L_TRANS_CODE Or
+          ARSBILLING:LINE_OF_BUSINESS <> ARSBILLINGWORK_alt:LINE_OF_BUSINESS Or
+          ARSBILLING:COMM_RATE        <> ARSBILLINGWORK_alt:COMM_RATE Or
+          ARSBILLING:SUB_CODE         <> L_SUB_CODE Or
+          ARSBILLING:BILLING_CTR      <> arsbillingwork_alt:BILLING_CTR Or
+          ARSBILLING:RETURN_CHECK_CTR <> arsbillingwork_alt:RETURN_CHECK_CTR) then -- record does not exist
+          {
+              Add ARSBILLING
+              {
+                 ARSBILLING:COMPANY_ID           = ARSBILLINGWORK:COMPANY_ID
+                 ARSBILLING:POLICY_NO            = ARSBILLINGWORK:POLICY_NO
+                 ARSBILLING:TRANS_DATE           = ARSBILLINGWORK:TRANS_DATE
+                 ARSBILLING:TRANS_EFF            = ARSBILLINGWORK:TRANS_EFF
+                 ARSBILLING:TRANS_EXP            = ARSBILLINGWORK:TRANS_EXP
+                 ARSBILLING:TRANS_CODE           = L_TRANS_CODE
+                 ARSBILLING:LINE_OF_BUSINESS     = ARSBILLINGWORK:LINE_OF_BUSINESS
+                 ARSBILLING:AGENT_NO             = ARSBILLINGWORK:AGENT_NO
+                 ARSBILLING:COMM_RATE            = 0.00
+                 ARSBILLING:SUB_CODE             = L_SUB_CODE
+                 ARSBILLING:BILLING_CTR          = arsbillingwork_alt:BILLING_CTR
+                 ARSBILLING:RETURN_CHECK_CTR     = arsbillingwork_alt:RETURN_CHECK_CTR
+                 ARSBILLING:LOB_SUBLINE          = ARSBILLINGWORK:LOB_SUBLINE
+                 ARSBILLING:BILL_PLAN            = ARSBILLINGWORK:BILL_PLAN
+                 ARSBILLING:PAYMENT_PLAN         = g_PAYMENT_PLAN
+                 ARSBILLING:POL_YEAR             = ARSBILLINGWORK:POL_YEAR
+                 ARSBILLING:END_SEQUENCE         = ARSBILLINGWORK:END_SEQUENCE
+                 arsbilling:installment_amount   = l_amount
+--                 arsbilling:due_date             = arsbillingwork_alt:due_date
+                 arsbilling:due_date             = l_due_date[1]
+                 arsbilling:status               = "B"
+                 arsbilling:billed_date          = todaysdate
+                 arsbilling:status_date          = todaysdate
+                 arsbilling:consent_order        = 9
+                 l_record_updated                = "Y"
+                 } -- end of add
+         } -- end of record exists checking
+
+         } -- end of billing_ctr = 1 checking
+
+         next arsbillingwork_alt
+
+         } -- end of loop
+
+} -- end of procedure
+
+Procedure Create_charges_record
+{
+
+l_company_id = ""
+l_sub_code = 0
+l_record_updated = "N"
+
+do GET_BILLING_SUBCODE
+l_sub_code = l_sub_code + 10
+
+access arsbillingwork_alt, set arsbillingwork_alt:company_id = l_company_id, approximate
+
+while arsbillingwork_alt:errornumber = 0
+{
+   if arsbillingwork_alt:billing_ctr = 1 and
+      arsbillingwork_alt:trans_code one of 10, 14 and
+      l_record_updated = "N" then -- use the very first record found to establish due date
+   {
+       Access ARSBILLING, Set ARSBILLING:COMPANY_ID       = arsbillingwork_alt:COMPANY_ID,
+                              ARSBILLING:POLICY_NO        = ARSBILLINGWORK_alt:POLICY_NO,
+                              ARSBILLING:TRANS_DATE       = ARSBILLINGWORK_alt:TRANS_DATE,
+                              ARSBILLING:TRANS_EFF        = ARSBILLINGWORK_alt:TRANS_EFF,
+                              ARSBILLING:TRANS_EXP        = ARSBILLINGWORK_alt:TRANS_EXP,
+                              ARSBILLING:TRANS_CODE       = L_TRANS_CODE,
+                              ARSBILLING:LINE_OF_BUSINESS = ARSBILLINGWORK_alt:LINE_OF_BUSINESS,
+                              ARSBILLING:COMM_RATE        = ARSBILLINGWORK_alt:COMM_RATE,
+                              ARSBILLING:SUB_CODE         = L_SUB_CODE,
+                              ARSBILLING:BILLING_CTR      = arsbillingwork_alt:BILLING_CTR,
+                              ARSBILLING:RETURN_CHECK_CTR = arsbillingwork_alt:RETURN_CHECK_CTR, Approximate
+
+      If (ARSBILLING:COMPANY_ID       <> ARSBILLINGWORK_alt:COMPANY_ID Or
+          ARSBILLING:POLICY_NO        <> ARSBILLINGWORK_alt:POLICY_NO Or
+          ARSBILLING:TRANS_DATE       <> ARSBILLINGWORK_alt:TRANS_DATE Or
+          ARSBILLING:TRANS_EFF        <> ARSBILLINGWORK_alt:TRANS_EFF Or
+          ARSBILLING:TRANS_EXP        <> ARSBILLINGWORK_alt:TRANS_EXP Or
+          ARSBILLING:TRANS_CODE       <> L_TRANS_CODE Or
+          ARSBILLING:LINE_OF_BUSINESS <> ARSBILLINGWORK_alt:LINE_OF_BUSINESS Or
+          ARSBILLING:COMM_RATE        <> ARSBILLINGWORK_alt:COMM_RATE Or
+          ARSBILLING:SUB_CODE         <> L_SUB_CODE Or
+          ARSBILLING:BILLING_CTR      <> arsbillingwork_alt:BILLING_CTR Or
+          ARSBILLING:RETURN_CHECK_CTR <> arsbillingwork_alt:RETURN_CHECK_CTR) then -- record does not exist
+          {
+              Add ARSBILLING
+              {
+                 ARSBILLING:COMPANY_ID           = ARSBILLINGWORK:COMPANY_ID
+                 ARSBILLING:POLICY_NO            = ARSBILLINGWORK:POLICY_NO
+                 ARSBILLING:TRANS_DATE           = ARSBILLINGWORK:TRANS_DATE
+                 ARSBILLING:TRANS_EFF            = ARSBILLINGWORK:TRANS_EFF
+                 ARSBILLING:TRANS_EXP            = ARSBILLINGWORK:TRANS_EXP
+                 ARSBILLING:TRANS_CODE           = L_TRANS_CODE
+                 ARSBILLING:LINE_OF_BUSINESS     = ARSBILLINGWORK:LINE_OF_BUSINESS
+                 ARSBILLING:AGENT_NO             = ARSBILLINGWORK:AGENT_NO
+                 ARSBILLING:COMM_RATE            = 0.00
+                 ARSBILLING:SUB_CODE             = L_SUB_CODE
+                 ARSBILLING:BILLING_CTR          = arsbillingwork_alt:BILLING_CTR
+                 ARSBILLING:RETURN_CHECK_CTR     = arsbillingwork_alt:RETURN_CHECK_CTR
+                 ARSBILLING:LOB_SUBLINE          = ARSBILLINGWORK:LOB_SUBLINE
+                 ARSBILLING:BILL_PLAN            = ARSBILLINGWORK:BILL_PLAN
+                 ARSBILLING:PAYMENT_PLAN         = g_PAYMENT_PLAN
+                 ARSBILLING:POL_YEAR             = ARSBILLINGWORK:POL_YEAR
+                 ARSBILLING:END_SEQUENCE         = ARSBILLINGWORK:END_SEQUENCE
+                 arsbilling:installment_amount   = l_amount
+--                 arsbilling:due_date             = arsbillingwork_alt:due_date
+                 arsbilling:due_date             = l_due_date[1]
+                 arsbilling:status               = "B"
+                 arsbilling:billed_date          = todaysdate
+                 arsbilling:status_date          = todaysdate
+                 arsbilling:consent_order        = 9
+                 l_record_updated                = "Y"
+                 } -- end of add
+         } -- end of record exists checking
+
+         } -- end of billing_ctr = 1 checking
+
+         next arsbillingwork_alt
+
+         } -- end of loop
+
+} -- end of procedure
+
+Procedure get_installment_fee
+{
+
+l_amount = 0.00
+l_record_updated = "N"
+
+access arsbillingwork_alt, set arsbillingwork_alt:company_id = l_company_id, approximate
+
+while arsbillingwork_alt:errornumber = 0
+{
+   if arsbillingwork_alt:billing_ctr = 1 and
+      arsbillingwork_alt:trans_code one of 10, 14 and
+      l_record_updated = "N" then -- use the very first record found to establish due date
+   {
+       access arspayplan, set arspayplan:company_id       = arsbillingwork_alt:company_id,
+                              arspayplan:line_of_business = arsbillingwork_alt:line_of_business,
+                              arspayplan:Payment_plan     = g_payment_plan
+       l_record_updated = "Y"
+       if arspayplan:installment_charge_rate <> 0 then
+       {
+           l_amount = arspayplan:installment_charge_rate
+
+       }
+   }
+   next arsbillingwork_alt
+   }
+
+} -- end of procedure
+
+Procedure cleanup_arsinqwrkpp
+{
+
+l_company_id=""
+
+access arsinqwrkpp, set arsinqwrkpp:company_id = l_company_id, approximate
+
+while arsinqwrkpp:errornumber = 0
+{
+    delete arsinqwrkpp
+    next arsinqwrkpp
+}
+
+} -- end of procedure
+
+} -- end of Program

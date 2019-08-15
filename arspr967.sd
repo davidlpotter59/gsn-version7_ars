@@ -1,0 +1,86 @@
+%%
+Screen
+        Name            = "arspr967" ;
+        Type            = "Detail" ;
+        Padcharacter    = Space;
+        Highlite        = Underscore;
+        Domain          = "ARSSCAN";
+        Screensize      = "dynamic";
+        Windowtitle="%a     %s - SCAN Selection - Version 7.00   %m";
+        iconline        = 0;
+        errortype       = nolock;
+
+        Global Wdate G_STARTING_DATE ;
+        Global Wdate G_ENDING_DATE ;
+        Global String G_COMPANY_ID[10];
+        Global String G_COMPANY[10];
+        Global String G_REPORT_DEVICE[10];
+        global unsigned ascii number g_scan[1],
+                                     g_image_array_position[1] ;
+
+        String L_USERNAME[15],
+               L_scan_label[6]="Scan: ",
+               l_scan[1] ;
+        String L_ENTER[1];
+        String L_SFSCODE[3]="SFS";
+
+        Access ARSscan, Set ARSscan:COMPANY_ID = G_COMPANY_ID, Approximate;
+
+        Include "STDKEYS7.INC"
+
+
+Functions
+
+        Include "STDFUNC7.INC"
+--        "WORK" Proc/noconsole "cli arsprinter.mk" ;
+
+        -- include "SCIPSPRINT.FUN"
+
+Menu Definition
+    include "stdmenu7.inc"
+}
+
+ToolBar Definition
+    include "stdtoolbar7.inc"
+}
+
+
+Screen
+Properties
+    {
+    LayOutType      = Column
+    }
+{
+
+Panel Tagged Header_pl
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = AsNeeded
+    }
+{
+%%
+                                                       ____________
+            *----------------------------------------*
+            |                                        |
+            |           Scan:      _                 |
+            |                                        |
+            *----------------------------------------*
+%%
+
+Components
+
+Fields
+101     FUNCTION/noecho/showasguidetext ;
+--401     arsscan:scan/checkbox/values="0,1" ;
+401     l_scan/checkbox/values="0,1" ;
+}
+
+}
+
+Screen Exit
+        g_scan = val(l_scan)
+        Access ARSscan_ALT, Set ARSscan:COMPANY_ID = ARSscan:COMPANY_ID
+        Delete ARSscan_ALT -- cleans up file for next date entry
+
+End

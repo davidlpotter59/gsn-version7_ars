@@ -1,0 +1,312 @@
+%%
+Screen
+        Name = "arsmt040" ;
+        Type = "Detail" ;
+        Padcharacter = Space;
+        Highlite=Underscore;
+        Screensize="dynamic";
+        domain="arscontrol" ;
+        Windowtitle = "%a     %s Control File - Ver. 7.00     %m";
+--      resizeable = yes ;
+        iconline = 0 ;
+
+        Include "stdkeys7.inc"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        add/reuse  tagged add_fn;
+
+        Include "stdfunc7.inc"
+
+Menu Definition
+
+        Include "stdmenu7.inc"
+
+}
+
+Toolbar Definition
+
+        Include "stdtoolbar7.inc"
+}
+
+screen at 2,1 to 25, 81
+Properties
+        {
+        LayoutType = Column
+        }
+{
+Panel Tagged Header_pl
+Properties
+        {
+        Borderstyle     = Raised
+        ScrollBarPolicy = asneeded
+        }
+{
+%%
+                                                        _______________
+*-----------------------------------------------------------------------------*
+| (Place 10 X's in company to set default company)                            |
+| Company: ____________   ___________________________________________________ |
+| Default Company:        ____________                                        |
+*-----------------------------------------------------------------------------*
+
+%%
+
+components
+
+Fields
+        FUNCTION/noecho/showasguidetext ;
+401     Begin
+        If FUNCTION = "ADD" Then
+            Begin
+            Access ARSCONTROL_ALT, Set ARSCONTROL_ALT:COMPANY_ID = "XXXXXXXXXX"
+
+            ARSCONTROL:COMPANY_ID = ARSCONTROL_ALT:DEFAULT_COMPANY
+            End
+        End
+        ARSCONTROL:COMPANY_ID                  Mandatory
+        include "companyhlp.inc"
+402     sfscompany:name[1] ;
+501     ARSCONTROL:DEFAULT_COMPANY
+        Hide If ARSCONTROL:COMPANY_ID <> "XXXXXXXXXX" ;
+
+}
+
+carddialog GUI at 1,1
+Properties
+        {
+        layoutconstraints = stretch
+        }
+{
+Panel
+Properties
+        {
+        scrollbarpolicy = asneeded
+        text            = "Controls"
+        }
+{
+%%
+*-----------------------------------------------------------------------------*
+| Annual Trans Code:             ___            Use: _              Run Days  |
+| Renewal Trans Code:            ___            Non Pay Days: ___      __     |
+| Decrease Trans Code:           ___            Zero Due Invoices: _          |
+| Increase Trans Code:           ___            *---------------------*       |
+| Cancellation Trans Code:       ___            | Credit Waive: ____  |       |
+| Payment Trans Code:            ___            | Debit Waive:  ____  |       |
+| Disbursement Trans Code:       ___            | Notice Waive: ___   |       |
+| Direct Trans Code Range:       ___            | Days   Bill Install |       |
+| Assumed Trans Code Range:      ___            | To Bill  Days Advn  |       |
+| Ceded Trans Code Range:        ___            |   ___      __       |       |
+| Reinstatement Trans Code:      ___            *---------------------*       |
+| Installment Charge Trans Code: ___  CX: ____  | Bill Date: _        |       |
+| Surcharge Trans Code:          ____ CX: ____  | Age On:    _        |       |
+| Actual Due Date Endorsements:  _              *---------------------*       |
+| Reports Past Due Days:         ___            Non Pay Grace Days: __        |
+*-----------------------------------------------------------------------------*
+
+%%
+
+components
+
+fields
+201     ARSCONTROL:ANNUAL_TRANS_CODE;
+202     ARSCONTROL:USE;
+301     ARSCONTROL:RENEWAL_TRANS_CODE;
+302     ARSCONTROL:NON_PAY_DAYS;
+303     ARSCONTROL:NON_PAY_RUN_DAYS;
+401     ARSCONTROL:DECREASE_TRANS_CODE;
+402     ARSCONTROL:ZERO_DUE_INVOICES/checkbox ;
+501     ARSCONTROL:INCREASE_TRANS_CODE;
+601     ARSCONTROL:CANCELLATION_TRANS_CODE;
+602     ARSCONTROL:WAIVE_AMOUNT_CREDIT;
+701     ARSCONTROL:PAYMENT_TRANS_CODE;
+702     ARSCONTROL:WAIVE_AMOUNT_DEBIT;
+801     ARSCONTROL:DISBURSEMENT_TRANS_CODE;
+802     ARSCONTROL:CANCEL_WAIVE_AMOUNT;
+901     ARSCONTROL:DIRECT_TRANS_CODE_RANGE[1];
+1001    ARSCONTROL:ASSUMED_TRANS_CODE_RANGE[1];
+1101    ARSCONTROL:CEDED_TRANS_CODE_RANGE[1];
+1102    ARSCONTROL:TOTAL_DAYS_INVOICE;
+1103    ARSCONTROL:BILL_INSTALLMENTS_DAYS_ADVANCE;
+1201    ARSCONTROL:REINSTATEMENT_TRANS_CODE;
+1301    ARSCONTROL:INSTALLMENT_CHARGE_TRANS_CODE;
+1302    ARSCONTROL:INSTALLMENT_CHARGE_TRANS_CX;
+1303    ARSCONTROL:BILL_DATE;
+1401    ARSCONTROL:SURCHARGE_TRANS_CODE;
+1402    ARSCONTROL:SURCHARGE_TRANS_CX;
+1403    ARSCONTROL:AGE_ON;
+1501    ARSCONTROL:ACTUAL_DUE_DATE_ENDORSEMENTS;
+1601    ARSCONTROL:REPORTS_PAST_DUE_DAYS;
+1602    ARSCONTROL:NON_PAY_GRACE_DAYS;
+
+}
+
+Panel
+Properties
+        {
+        scrollbarpolicy = asneeded
+        text            = "More Controls"
+        }
+{
+%%
+*-----------------------------------------------------------------------------*
+| Reports Past Due Warning:      ________________________________________     |
+| Invoice Printer: _______________ Night Processing Printer: _______________  |
+| CX Notice Printer: _______________ CX Notice Night Printer: _______________ |
+| Re-bill Trans: ____   Return Check Trans: ____   Return Check Charge: ____  |
+| Voided Check Trans: ____  NSF Voided Trans Code: __          *------------* |
+| Include Installment Charge on Invoice Total to Pay:       _  | Commission | |
+| Include Deposit Premium from Total Amount Due on Invoice: _  | Money _    | |
+| Print Future Installments on Invoice                      _  | Cash  _    | |
+| Print Credit Slip on Invoice                              _  *------------* |
+| Use Agents Experience Modifiers on Commission Statements  _ Factor : _____  |
+| Invoice Tray Option: __________  Print Payor on Agents Copy: _              |
+| Print First Installment, if not paid, on installment invoices: _            |
+| Print Invoice Option: [R _ All Copies _ Agent & Payor _ Payor Only R]       |
+*-----------------------------------------------------------------------------*
+
+%%
+
+components
+
+fields
+201     ARSCONTROL:REPORTS_PAST_DUE_WARNING;
+301     ARSCONTROL:INVOICE_PRINTER;
+302     ARSCONTROL:INVOICE_PRINTER_NIGHT_PROCESS;
+401     ARSCONTROL:CX_NOTICE_PRINTER;
+402     ARSCONTROL:CX_NOTICE_NIGHT_PROCESS;
+501     ARSCONTROL:RETURNED_CHECK_REBILL_TRANS;
+502     ARSCONTROL:RETURNED_CHECK_TRANS_CODE;
+503     ARSCONTROL:RETURNED_CHECK_CHARGE;
+601     ARSCONTROL:VOIDED_CHECK_TRANS_CODE;
+602     ARSCONTROL:NSF_VOIDED_PAYMENT_TRANS_CODE;
+701     ARSCONTROL:INCLUDE_INSTALL_CRG_FOR_PREMIUM/checkbox;
+801     ARSCONTROL:INCLUDE_AMOUNT_PAID_FOR_TOTAL/checkbox;
+802     ARSCONTROL:COMMISSIONS_ONLY_IF_MONEY/checkbox
+        Hide If ARSCONTROL:COMMISSIONS_ONLY_ON_CASH = 1 ;
+901     ARSCONTROL:PRINT_FUTURE_INSTALLMENTS/checkbox;
+902     ARSCONTROL:COMMISSIONS_ONLY_ON_CASH /checkbox
+        Hide If ARSCONTROL:COMMISSIONS_ONLY_IF_MONEY = 1;
+1001    ARSCONTROL:PRINT_CREDIT_SLIP_ON_INVOICE/checkbox;
+1101    ARSCONTROL:USE_AGENT_EXP_MOD_ON_STMTS /checkbox;
+1102    Begin
+        If FUNCTION = "ADD" Then
+            Begin
+            ARSCONTROL:EXPERIENCE_ADJUSTMENT_FACTOR = 1.000
+            End
+        End
+        ARSCONTROL:EXPERIENCE_ADJUSTMENT_FACTOR /mask="Z.ZZZ"/default
+        Hide If ARSCONTROL:USE_AGENT_EXP_MOD_ON_STMTS Not One Of 1;
+1201    ARSCONTROL:INVOICE_TRAY_OPTION;
+1202    ARSCONTROL:PRINT_PAYOR_ON_AGENTS_COPY/checkbox;
+1301    ARSCONTROL:PRINT_ALL_PAST_DUE/checkbox;
+1401    ARSCONTROL:INVOICE_COPIES_TO_PRINT/button/values="I,A,P";
+
+}
+
+Panel
+Properties
+        {
+        scrollbarpolicy = asneeded
+        text            = "Invoice Controls"
+        }
+{
+%%
+*------------------------------------------------------------------------------*
+|   Invoice Message:                                          *--------------* |
+|   __________________________________________________        |   Positions  | |
+|   __________________________________________________        | H Pos  ____  | |
+|   __________________________________________________        | V Pos  ____  | |
+|   __________________________________________________        *--------------* |
+|   __________________________________________________                         |
+|   __________________________________________________                         |
+|   Invoice Type:      ________________________________________                |
+|   Invoice Seperator: __________________________________________              |
+|                                                                              |
+|   Invoice Payto:     ________________________________________                |
+|   Invoice Company:   ________________________________________                |
+|   Invoice Slogan:    ________________________________________                |
+|   Invoice Payment Options: __________________________________                |
+|                                                                              |
+|   Invoice Closing:         __________________________________                |
+|                                                                              |
+|   Invoice Pay Amount:      ______________________________                    |
+|   Automatically Hold Checks After Cancellation Date: __                      |
+|   Endorsemets on Installments Effective: __________                          |
+|~~~Print~Mortgagee~on:~~~~Invoice~Head~_~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+|~~~~~~~~~~~~~~~~~~~~~~~~~~Invoice~Body~_~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+|~~~Print~All~Past~Due:~~~~~~~~~~~~~_~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+|~~~Print~Cx~Notice~On~Open~Status:~_~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+|~~~Print~Non~Pay~With~Other~Cx:~~~~_~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+*------------------------------------------------------------------------------*
+
+%%
+
+components
+
+Fields
+301     ARSCONTROL:INVOICE_MESSAGE_ARRAY[1];
+401     ARSCONTROL:INVOICE_MESSAGE_ARRAY[2];
+402     ARSCONTROL:INVOICE_BOTTOM_H_POSITION;
+501     ARSCONTROL:INVOICE_MESSAGE_ARRAY[3];
+502     ARSCONTROL:INVOICE_BOTTOM_V_POSITION;
+601     ARSCONTROL:INVOICE_MESSAGE_ARRAY[4];
+701     ARSCONTROL:INVOICE_MESSAGE_ARRAY[5];
+801     ARSCONTROL:INVOICE_MESSAGE_ARRAY[6];
+901     ARSCONTROL:INVOICE_TYPE ;
+1001    ARSCONTROL:INVOICE_SEPERATOR/freetextlines=2 ;
+1301    ARSCONTROL:INVOICE_COMPANY ;
+1201    ARSCONTROL:INVOICE_PAYTO ;
+1401    ARSCONTROL:INVOICE_SLOGAN ;
+1501    ARSCONTROL:INVOICE_PAYMENT_OPTIONS/freetextlines=2 ;
+1701    ARSCONTROL:INVOICE_CLOSING/freetextlines=2 ;
+1901    ARSCONTROL:INVOICE_PAY_AMOUNT;
+2001    ARSCONTROL:HOLD_CX_CHECKS /checkbox/values="0,1";
+2101    ARSCONTROL:INVOICE_APPLY_END_EFF;
+2201    ARSCONTROL:PRINT_MORTGAGEE_ON_INVOICE_HEAD/checkbox/values="0,1"/anchor;
+2301    ARSCONTROL:PRINT_MORTGAGEE_ON_INVOICE_BODY/checkbox/values="0,1"/anchor;
+2401    ARSCONTROL:PRINT_ALL_PAST_DUE/checkbox/values="0,1";
+2501    ARSCONTROL:PRINT_CX_NOTICE_ON_OPEN_STATUS /checkbox/values="0,1";
+2601    ARSCONTROL:PRINT_NON_PAY_WITH_OTHER_CX/checkbox/values="0,1";
+
+}
+
+Panel
+Properties
+        {
+        scrollbarpolicy = asneeded
+        text            = "Account Numbers"
+        }
+{
+%%
+*------------------------------------------------------------------------------*
+| Checking Account Number: ____________________                                |
+| Commissions Account Number: ____________________                             |
+|                                                                              |
+| Checking Brank Name: __________________________________________________      |
+|                                                                              |
+| Checking Branch:     ________________________________________                |
+*------------------------------------------------------------------------------*
+
+
+%%
+
+components
+
+Fields
+201     ARSCONTROL:BANK_ACCOUNT_NO;
+301     ARSCONTROL:COMMISSION_ACCOUNT_NO;
+501     ARSCONTROL:BANK_NAME;
+701     ARSCONTROL:BANK_BRANCH;
+
+}
+
+}
+
+}
+
+End

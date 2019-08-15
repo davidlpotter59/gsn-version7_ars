@@ -1,0 +1,542 @@
+%%
+Screen
+        Name = "Arsmt02a" ;
+        Type = "Multiline" ;
+        Highlite = Underscore;
+        Screensize = "dynamic";
+        Padcharacter = Space;
+        Windowtitle="%a      %s Mortgagee - Payee Information - Version 4.11      %m";
+        Repeat line_items_tg, 7 Times Down;
+        iconline = 0;
+
+     Global Unsigned Ascii Number G_CHECK_REFERENCE[7],
+                                  G_POLICY_NO[9],
+                                  G_QUOTE_NO[8] ,
+                                  G_AGENT_NO[4] ;
+
+     Global String G_SUPP_NAME[50],
+                   G_CARE_OF[50],
+                   G_STREET[30],
+                   G_CITY_STATE[30],
+                   G_COMPANY[10],
+                   G_CHECK_NUMBER[20];
+
+     Global Signed Ascii Number G_TOTAL_DUE[9]/DECIMALS=2,
+                                G_CHECK_AMOUNT[9]/DECIMALS=2;
+
+     Global Unsigned Ascii Number G_ZIP_CODE[9] ;
+
+     Signed Ascii Number L_AMOUNT[10]=0/DECIMALS=2;
+     Signed Ascii Number L_BALANCE[10]=0/DECIMALS=2;
+     Signed Ascii Number L_TOTAL_CHECKS[10]=0/DECIMALS=2;
+     Signed Ascii Number L_TOTAL_DUE[9]=0/DECIMALS=2;
+     String L_FOUND_MORT[1]="N";
+     String L_SFS_CODE[3]="SFS";
+     Unsigned Ascii Number L_SUB_CODE[4]=0;
+     Unsigned Ascii Number L_POLICY_NO[9]=0;
+     String L_ENTER[1];
+     Wdate L_HOLD_CX_EFF_DATE;
+     String L_POLICY_CX[1];
+     String L_CANCELLATION_EXISTS[1];
+     string l_continue_1[100];
+     unsigned ascii number l_master_reference[7];
+
+        Include "csexec.var"
+
+--        Access ARSCHKSU, Set ARSCHKSU:COMPANY_ID = G_COMPANY
+
+        Include "STDKEYS7.INC"
+
+Style Definition
+
+     include "styles.inc"
+
+Functions
+
+        Include "STDFUNC7m.INC"
+
+menu definition
+
+     include "stdmenu7m.inc"
+
+} -- must have this here to allow for application specific includes to be
+  -- added above
+
+Toolbar Definition
+
+       Include "stdtoolbar7m.inc"
+}
+
+Screen Entry
+
+L_FOUND_MORT ="N"
+
+Screen at 1,1 to 20,100
+Properties
+    {
+    LayoutType = Column
+    }
+{
+Panel Tagged Header_pl
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = asneeded
+    }
+{
+
+%%
+                                                       ____________
+*-------------------*---------------------------------------------------*
+| Payor Information |                                                   |
+*-------------------*                                                   |
+| Company ID:    __________  _________________________________________  |
+*-----------------------------------------------------------------------*
+| Check No: ____________________    Date: __________ Amount:  _________ |
+| Bank No:  _______________ Deposit Date: __________ Balance: _________ |
+| Money Order: _                                                        |
+*-----------------------------------------------------------------------*
+| Policy No               Insured          Amount Due       Reference   |
+| _________ ______________________________ ___________       _______    |
+|                                                                       |
+|                                                                       |
+|                                                                       |
+|                                                                       |
+|                                                                       |
+|                                                                       |
+*-----------------------------------------------------------------------*
+| Mortgage ID:   __________                                             |
+| Name:          ________________________________________               |
+|                ______________________________                         |
+| Address:       ______________________________               Reference |
+| City State:    ______________________________ _________      _______  |
+*-----------------------------------------------------------------------*
+%%
+
+Components
+
+Fields
+0101    FUNCTION/noecho/showasguidetext ;
+501     Begin
+        If FUNCTION = "ADD" Or
+           FUNCTION = "NEW" Or
+           FUNCTION = "APPEND" Then
+            ARSCHKSU:COMPANY_ID = G_COMPANY
+        End
+        ARSCHKSU:COMPANY_ID/DEFAULT    Mandatory
+        Include "companyhlp.inc"
+502     SFSCOMPANY:NAME[1];
+
+/* Check Information */
+701     ARSCHKSU:CHECK_NO/UPPER mandatory;
+701     Begin
+        If FUNCTION one of "APPEND", "ADD","NEW" And
+           ARSCHKSU:MONEY_ORDER = "1" Then
+           Begin
+               ARSCHKSU:CHECK_NO = "MO-" + ARSCHKSU:CHECK_NO
+           End
+        End
+        ARSCHKSU:CHECK_NO/DISPLAYONLY;
+702     Begin
+        If FUNCTION one of "APPEND", "ADD", "NEW" Then
+        Begin
+            ARSCHKSU:CHECK_DATE = TODAYSDATE
+            ARSCHKSU:TRANS_DATE = TODAYSDATE
+            L_TOTAL_CHECKS      = 0.00
+        End
+        End
+        ARSCHKSU:TRANS_DATE/DISPLAYONLY/DEFAULT;
+703     L_AMOUNT
+        Error "Check Amount Equals $0.00" If FLEN = 0;
+801     ARSCHKSU:BANK_NO/UPPER;
+802     ARSCHKSU:DEPOSIT_DATE/DISPLAYONLY;
+803     Begin
+        If FUNCTION one of "APPEND","ADD", "NEW" Then
+        Begin
+            L_BALANCE = L_AMOUNT
+        End
+        End
+        L_BALANCE/DEFAULT/DISPLAYONLY ;
+901     ARSCHKSU:MONEY_ORDER/CHECKBOX/VALUES="0,1";
+
+/* beginning of the multiline screen */
+1201    ARSCHKSU:POLICY_NO tagged Line_items_tg mandatory
+        if sfpname:errornumber <> 0 then
+        begin
+            warning
+        end ;
+--        if arschksu:policy_no = 0 then
+--        begin
+--            l_continue_1 = dialog("Check Entry Error","warning.bmp",
+--            "Policy number can not be ZERO ","Re-Enter")
+--
+--        end ;
+1201    Begin
+        If FUNCTION One Of "ADD","APPEND", "NEW" Then
+            Begin
+            G_POLICY_NO = ARSCHKSU:POLICY_NO
+            Do CHECK_FOR_CANCELLATION
+            Error "Policy Has Been Cancelled" If L_CANCELLATION_EXISTS = "Y" Or
+            L_POLICY_CX = "Y"
+            End
+        End
+        ARSCHKSU:POLICY_NO/DEFAULT/DISPLAYONLY
+Begin
+        If FUNCTION one of "APPEND", "ADD", "NEW" Then
+            Begin
+            ARSCHKSU:POLICY_NO = G_POLICY_NO
+            Do CHECK_FOR_CANCELLATION
+            Error "Policy Has Been Cancelled" If L_CANCELLATION_EXISTS = "Y" Or
+            L_POLICY_CX = "Y"
+            End
+End
+        if sfpname:errornumber <> 0 then -- record not found
+        begin
+            Error "No Policy Number On File.  Policy Number MUST be Valid!"
+            arschksu:policy_no = 0
+        end
+        Error "Mortgagee Check Has been Fully Applied"
+        If L_BALANCE <= 0 ;
+1202    Begin
+        If FUNCTION One Of "ADD", "APPEND", "NEW" Then
+        Begin
+        If L_FOUND_MORT = "N" Then
+        Begin
+            Access SFPSUPP, Set SFPSUPP:POLICY_NO = SFPNAME:POLICY_NO,
+                                SFPSUPP:POL_YEAR  = SFPNAME:POL_YEAR,
+                                SFPSUPP:END_SEQUENCE = SFPNAME:END_SEQUENCE, approximate
+
+        While SFPSUPP:POLICY_NO = SFPNAME:POLICY_NO And
+              SFPSUPP:POL_YEAR  = SFPNAME:POL_YEAR  And
+              SFPSUPP:END_SEQUENCE = SFPNAME:END_SEQUENCE
+              Begin
+                  If SFPSUPP:MORTGAGE_TYPE_1 One Of "M","B","C","X" and
+                     sfpsupp:mortgage_type_2 = "P" Then
+                  Begin
+                      L_FOUND_MORT = "Y"
+                      ARSCHKSU:MORTGAGE_ID = SFPSUPP:MORTGAGE_ID
+                  End
+                  Next SFPSUPP
+              End
+        End
+        End
+        End
+        SFPNAME:NAME[1] tagged line_items_tg
+        Hide If ARSCHKSU:POLICY_NO = 0 ;
+1202    SFPNAME:NAME[1]
+        Hide If ARSCHKSU:POLICY_NO <> 0 ;
+1203    Begin
+        If FUNCTION = "ADD" Or
+           FUNCTION = "APPEND" or
+           function = "NEW" Then
+        Begin
+            ARSCHKSU:CHECK_AMOUNT = L_BALANCE
+            ARSCHKSU:BALANCE      = ARSCHKSU:CHECK_AMOUNT
+            If ARSCHKSU:POLICY_NO <> 0 Then
+            Begin
+                Do GET_AMOUNT_DUE
+                If L_BALANCE < L_TOTAL_DUE Then
+                Begin
+                     ARSCHKSU:CHECK_AMOUNT = L_BALANCE
+                End
+                Else
+                Begin
+                    ARSCHKSU:CHECK_AMOUNT = L_TOTAL_DUE
+                End
+            End
+        End
+        End
+        ARSCHKSU:CHECK_AMOUNT/DEFAULT tagged line_items_tg ;
+1204    Begin
+        If (FUNCTION = "ADD" Or
+            FUNCTION = "APPEND" or
+            function = "NEW") And
+            ARSCHKSU:POLICY_NO <> 0 Then
+        Begin
+        /* added default 06/03/2002 */
+        If G_COMPANY = "" Then
+        Begin
+            Access SFSDEFAULT, Set SFSDEFAULT:SFS_CODE = L_SFS_CODE
+            G_COMPANY            = SFSDEFAULT:COMPANY_ID
+        End
+         ARSCHKSU:AGENT_NO       = SFPNAME:AGENT_NO
+         ARSCHKSU:COMPANY_ID     = G_COMPANY
+         ARSCHKSU:USER_CONSOLE   = CONSOLE
+         ARSCHKSU:ENTER_TIME     = SYSTEMTIME
+         ARSCHKSU:ENTER_DATE     = SYSTEMDATE
+         ARSCHKSU:COMMENTS       = "Paid with Mortgagee Check"
+         ARSCHKSU:PAYOR_TYPE     = "M" -- mortgagee
+         ARSCHKSU:DISPOSITION    = "OPEN"
+         ARSCHKSU:USER           = USERNAME
+         ARSCHKSU:TRANS_EFF      = SFPNAME:EFF_DATE
+         arschksu:pol_year       = sfpname:pol_year
+         if l_master_reference = 0 then
+         begin
+             do update_csexec_master
+             l_master_reference      = i_csexec_number + 1
+             do add_check_master
+         end
+         arschksu:master_reference   = l_master_reference
+         Do UPDATE_CSEXEC
+         ARSCHKSU:CHECK_REFERENCE = I_CSEXEC_NUMBER
+         L_BALANCE =  L_BALANCE - ARSCHKSU:CHECK_AMOUNT
+         -- ARSCHKSU:BALANCE = L_BALANCE
+         L_TOTAL_CHECKS = L_TOTAL_CHECKS + ARSCHKSU:CHECK_AMOUNT
+         ARSCHKSU:BALANCE = ARSCHKSU:CHECK_AMOUNT
+        End
+        End
+        ARSCHKSU:CHECK_REFERENCE/DEFAULT/DISPLAYONLY tagged line_items_tg
+        Warning "WARNING: Check Amount Entered was " + Str(L_AMOUNT,"$,$$$,$$$.99") +
+        " Total Applied was " + Str(L_TOTAL_CHECKS,"$,$$$,$$$.99-")
+        If L_TOTAL_CHECKS > L_AMOUNT ;
+2001 /*   Begin
+        If FUNCTION One Of "ADD", "APPEND", "NEW" Then
+        Begin
+            ARSCHKSU:MORTGAGE_ID = SFPSUPP:MORTGAGE_ID
+        End
+        End */
+        ARSCHKSU:MORTGAGE_ID/DISPLAYONLY ;
+
+2001    ARSCHKSU:MORTGAGE_ID
+         Hide If FUNCTION One Of "ADD", "APPEND", "NEW"
+         Activehelp SFSMORT:MORTGAGE_ID,
+                    SFSMORT:NAME[1]/HEADING="Mortgagee Name ";
+2101    Begin
+        If FUNCTION = "ADD" Or
+           FUNCTION = "NEW" Or
+           FUNCTION = "APPEND" Or
+           FUNCTION = "CHANGE" Then
+            Begin
+            If ARSCHKSU:MORTGAGE_ID <> "" Then
+                Begin
+                ARSCHKSU:PAYOR_NAME = SFSMORT:NAME[1]
+                ARSCHKSU:PAYOR_CARE_OF = SFSMORT:NAME[2]
+                ARSCHKSU:PAYOR_ADDRESS = SFSMORT:ADDRESS[1]
+                ARSCHKSU:PAYOR_CITY = Trun(SFSMORT:CITY) + ", " +
+                                      SFSMORT:STR_STATE
+                ARSCHKSU:PAYOR_ZIP_CODE_STR = SFSMORT:STR_ZIPCODE
+                End
+            End
+        End
+        ARSCHKSU:PAYOR_NAME/UPPERCASE/DISPLAYONLY/DEFAULT       ;
+2101    ARSCHKSU:PAYOR_NAME/UPPERCASE/DEFAULT
+        Hide If ARSCHKSU:MORTGAGE_ID <> "" And
+        FUNCTION One Of "ADD", "APPEND";
+2201    ARSCHKSU:PAYOR_CARE_OF/UPPERCASE/DISPLAYONLY/DEFAULT ;
+2201    ARSCHKSU:PAYOR_CARE_OF/UPPERCASE
+        Hide If ARSCHKSU:MORTGAGE_ID <> "" ;
+2301    ARSCHKSU:PAYOR_ADDRESS/UPPERCASE/DISPLAYONLY/DEFAULT  ;
+2301    ARSCHKSU:PAYOR_ADDRESS/UPPERCASE
+        Hide If ARSCHKSU:MORTGAGE_ID <> "" ;
+2401    ARSCHKSU:PAYOR_CITY/UPPERCASE/DISPLAYONLY/DEFAULT   ;
+2401    ARSCHKSU:PAYOR_CITY/UPPERCASE
+        Hide If ARSCHKSU:MORTGAGE_ID <> "" ;
+2402    ARSCHKSU:PAYOR_ZIP_CODE_STR/DISPLAYONLY/DEFAULT  ;
+2402    ARSCHKSU:PAYOR_ZIP_CODE_STR
+        Hide If ARSCHKSU:MORTGAGE_ID <> "" ;
+2403    l_master_reference/mask="ZZZZZZZ"/displayonly;
+
+/* redisplay the new value of l_balance */
+803     L_BALANCE/DISPLAYONLY;
+
+}
+}
+
+Screen Exit
+        If L_BALANCE <> 0 Then
+        Begin
+            Warning "Check has a remaining balance, click CANCEL to create A/P"
+            If Abort = "NO" Then
+            Begin
+                Do CREATE_AP
+            End
+        End
+        If ARSCHKSU:CHECK_REFERENCE > 0
+        Then G_CHECK_REFERENCE = ARSCHKSU:CHECK_REFERENCE ;
+
+        If ARSCHKSU:POLICY_NO <> 0
+        Then G_POLICY_NO = ARSCHKSU:POLICY_NO ;
+
+Procedure Definition
+
+Procedure UPDATE_CSEXEC_master
+Begin
+       I_CSEXEC_APPLICATION="CHECK_MASTER"/SPACEFILL
+       Include "sfscsexec.pro"
+End
+
+Procedure UPDATE_CSEXEC
+Begin
+       I_CSEXEC_APPLICATION="CHECK_REFERENCE"/SPACEFILL
+       Include "sfscsexec.pro"
+End
+
+Procedure GET_AMOUNT_DUE
+Begin
+
+    L_TOTAL_DUE                = 0
+
+    Access ARSBILLING, Set ARSBILLING:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                           ARSBILLING:POLICY_NO = ARSCHKSU:POLICY_NO, Approximate
+
+/* put the company check here, arsbilling:company_id must = arschksu:company_id */
+
+    While ARSBILLING:COMPANY_ID = ARSCHKSU:COMPANY_ID And
+          ARSBILLING:POLICY_NO = ARSCHKSU:POLICY_NO
+    Begin
+    If ARSBILLING:STATUS = "B" Then
+    Begin
+        L_TOTAL_DUE = L_TOTAL_DUE + ARSBILLING:INSTALLMENT_AMOUNT -
+                                    (ARSBILLING:TOTAL_AMOUNT_PAID +
+                                    ARSBILLING:WRITE_OFF_AMOUNT)
+    End
+
+    Next ARSBILLING
+
+End
+
+End
+
+Procedure CREATE_AP
+Begin
+L_SUB_CODE = 0
+
+Access APSMORTCK, Set APSMORTCK:COMPANY_ID  = ARSCHKSU:COMPANY_ID,
+                      APSMORTCK:MORTGAGE_ID = ARSCHKSU:MORTGAGE_ID, Approximate
+
+While APSMORTCK:COMPANY_ID  = ARSCHKSU:COMPANY_ID And
+      APSMORTCK:MORTGAGE_ID = ARSCHKSU:MORTGAGE_ID
+      Begin
+         If APSMORTCK:SUB_CODE > L_SUB_CODE Then
+         Begin
+             L_SUB_CODE = APSMORTCK:SUB_CODE
+         End
+      Next APSMORTCK
+      End
+
+L_SUB_CODE = L_SUB_CODE + 10
+
+    Add APSMORTCK
+    Begin
+        APSMORTCK:COMPANY_ID          = ARSCHKSU:COMPANY_ID
+        APSMORTCK:MORTGAGE_ID         = ARSCHKSU:MORTGAGE_ID
+        APSMORTCK:SUB_CODE            = L_SUB_CODE
+        APSMORTCK:ACCOUNT             = SFSCOMPANY:CHECKING_ACCOUNT_NO[2]
+        APSMORTCK:APS_TRANS_CODE      = "OVER"
+        APSMORTCK:TEN99               = 0
+        APSMORTCK:LOSS_PAYEE          = 0
+        APSMORTCK:PAYEE_NAME[1]       = ARSCHKSU:PAYOR_NAME/RAW
+        APSMORTCK:PAYEE_NAME[2]       = ARSCHKSU:PAYOR_CARE_OF/RAW
+        APSMORTCK:PAYEE_NAME[3]       = " "
+        APSMORTCK:PAYEE_NAME[4]       = " "
+        APSMORTCK:PAYEE_NAME[5]       = " "
+        APSMORTCK:PAYEE_NAME[6]       = " "
+        APSMORTCK:MAILTO_NAME[1]      = ARSCHKSU:PAYOR_NAME/RAW
+        APSMORTCK:MAILTO_NAME[2]      = " "
+        APSMORTCK:MAILTO_NAME[3]      = " "
+        APSMORTCK:ADDRESS[1]          = ARSCHKSU:PAYOR_ADDRESS/RAW
+        APSMORTCK:ADDRESS[2]          = " "
+        APSMORTCK:ADDRESS[3]          = " "
+        APSMORTCK:CITY                = SFSMORT:CITY
+        APSMORTCK:STR_STATE           = SFSMORT:STR_STATE
+        APSMORTCK:STR_ZIPCODE         = ARSCHKSU:PAYOR_ZIP_CODE_STR/RAW
+        APSMORTCK:CHECK_DRAFT         = "C"
+        APSMORTCK:COMMENTS            = "Check Created by arsmt02a"
+        APSMORTCK:PAYMENT_MESSAGE     = "Return Premium - Mortgagee Overpay"
+        APSMORTCK:CHECK_AMOUNT        = L_BALANCE
+        APSMORTCK:CHECK_NO            = " "
+        APSMORTCK:CHECK_DATE          = 00.00.0000
+        APSMORTCK:RELEASE             = " "
+        APSMORTCK:RELEASE_DATE        = 00.00.0000
+        APSMORTCK:CHECK_CLEARED       = 0
+        APSMORTCK:CHECK_CLEARED_DATE  = 00.00.0000
+        APSMORTCK:ENTERING_USER_NAME  = USERNAME
+        APSMORTCK:CLEARING_USER_NAME  = " "
+        APSMORTCK:RELEASE_USER_NAME   = " "
+        APSMORTCK:PAYEE_TYPE[1]       = "M"
+        APSMORTCK:PAYEE_TYPE[2]       = "M"
+        APSMORTCK:AGENT_NO[1]         = 00
+        APSMORTCK:AGENT_NO[2]         = 00
+        APSMORTCK:EFF_DATE            = 000
+        APSMORTCK:TIN                 = " "
+        APSMORTCK:STATUS_AFTER_CHECK  = " "
+        APSMORTCK:MORTGAGE_SUB_CODE   = 0
+End
+
+End
+Procedure CHECK_FOR_CANCELLATION
+Begin
+
+L_CANCELLATION_EXISTS = "N"
+L_HOLD_CX_EFF_DATE = 00.00.0000
+
+    Access ARSCANCEL, Set ARSCANCEL:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                          ARSCANCEL:POLICY_NO  = ARSCHKSU:POLICY_NO, Approximate
+
+    While ARSCANCEL:COMPANY_ID = ARSCHKSU:COMPANY_ID And
+          ARSCANCEL:POLICY_NO  = ARSCHKSU:POLICY_NO
+          Begin
+              If ARSCANCEL:CX_EFF_DATE <= TODAYSDATE - ARSCONTROL:NON_PAY_GRACE_DAYS And
+                 ARSCANCEL:CX_STATUS <> "R" And
+                 L_CANCELLATION_EXISTS <> "Y" Then
+                 Begin
+                    L_CANCELLATION_EXISTS = "Y"
+                    L_HOLD_CX_EFF_DATE = ARSCANCEL:CX_EFF_DATE
+-- do not add notes here, this is done later so that check info can be added too
+              --      Do CREATE_NOTES
+                 End
+          Next ARSCANCEL
+          End
+-- checking for cancellations from sfpname
+
+L_POLICY_CX = "N"
+
+Access SFPNAME, Set SFPNAME:POLICY_NO = SFPCURRENT:POLICY_NO, Approximate
+
+While SFPNAME:POLICY_NO = ARSCHKSU:POLICY_NO
+Begin
+      If L_POLICY_CX = "N" And
+         SFPNAME:STATUS = "CANCELLED" Then
+         Begin
+             L_POLICY_CX = "Y"
+         End
+      Else
+      If L_POLICY_CX = "Y" And
+         SFPNAME:STATUS = "CURRENT" Then
+         Begin
+             L_POLICY_CX = "N"
+         End
+
+         Next SFPNAME
+End
+
+/* reaccess the sfpname file since the loop above will point the file to
+   the next policy number (DLP) */
+
+Access SFPCURRENT, Set SFPCURRENT:POLICY_NO = ARSCHKSU:POLICY_NO
+
+Access SFPNAME, Set SFPNAME:POLICY_NO = SFPCURRENT:POLICY_NO,
+                    SFPNAME:POL_YEAR  = SFPCURRENT:POL_YEAR,
+                    SFPNAME:END_SEQUENCE = SFPCURRENT:END_SEQUENCE
+
+
+End
+
+procedure add_check_master
+begin
+
+access arschkmstr, set  arschkmstr:company_id       = arschksu:company_id,
+                        arschkmstr:master_reference = l_master_reference
+
+if arschkmstr:company_id       <> arschksu:company_id or
+   arschkmstr:master_reference <> l_master_reference then
+   add arschkmstr
+   begin
+       arschkmstr:record           = arschksu:record/raw
+       arschkmstr:master_reference = l_master_reference
+       arschkmstr:check_amount     = l_amount
+   end
+
+end
+
+End

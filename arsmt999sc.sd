@@ -1,0 +1,614 @@
+%%
+Screen
+        Name = "Arsmt999sc" ;
+        Type = "Detail" ;
+        Padcharacter = Space;
+        Highlite = Underscore;
+        Domain="ARSINQWRKPP" ;
+        Screensize="dynamic";
+        iconline = 0;
+        resizeable = yes ;
+  --      errortype = nolock ;
+
+/*
+   update log
+   06-05-2007 -- copied from arsin042 to create the subscreen
+*/
+        Global String G_COMPANY[10],
+                      G_COMPANY_ID[10];
+
+        Global Wdate G_DUE_DATE,
+                     G_BILLED_DATE;
+
+        Global Unsigned Ascii Number G_YEAR[4];
+
+        Global String G_REPORT_DEVICE[10];
+        Global Unsigned Ascii Number G_COPIES[1];
+
+        String G_STATUS[1],
+               G_lib_2[10];
+
+        String l_filename[100]="/usr/cqcs/users/davep/delos/billing";
+--        String l_filename[100]="billing";
+
+        Unsigned Ascii Number G_TRANS_CODE[4];
+
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+
+        Global Wdate G_EFF_DATE;
+
+        Global Signed Ascii Number G_TOTAL_DUE[9]=0/decimals=2,
+                                   G_TOTAL_PAID[9]=0/decimals=2,
+                                   G_NET_DUE[9]=0/decimals=2,
+                                   G_TOTAL_INSTALLMENT_CHARGE[5]=0/decimals=2,
+                                   G_TOTAL_SURCHARGE[5]=0/decimals=2,
+                                   G_CURRENT_DUE[9]=0/decimals=2,
+                                   G_TOTAL_RECEIVED[9]=0/dec=2,
+                                   G_TOTAL_WRITE_OFF[9]=0/decimals=2,
+                                   G_TOTAL_DISBURSEMENTS[9]=0/decimals=2,
+                                   G_TOTAL_PENDING_DISBURSEMENTS[9]=0/decimals=2;
+        String L_DESCRIPTION[20],
+               L_FIRST_TIME[1]="Y";
+
+        Signed Ascii Number L_TOTAL_DUE[9]=0/decimals=2,
+                            L_TOTAL_PAID[9]=0/decimals=2,
+                            L_NET_DUE[9]=0/decimals=2,
+                            L_TOTAL_INSTALLMENT_CHARGE[5]=0/decimals=2,
+                            L_TOTAL_SURCHARGE[5]=0/decimals=2,
+                            L_CURRENT_DUE[9]=0/decimals=2,
+                            L_TOTAL_RECEIVED[9]=0/dec=2,
+                            L_TOTAL_WRITE_OFF[9]=0/decimals=2,
+                            L_TOTAL_DISBURSEMENTS[9]=0/decimals=2,
+                            L_TOTAL_PENDING_DISBURSEMENTS[9]=0/decimals=2;
+
+        String L_MORTGAGEE_EXISTS[1]="N";
+
+        Wdate L_NEXT_DUE_DATE,
+              l_rev_date ;
+        Signed Ascii Number L_NEXT_NET_AMOUNT_DUE[9]=0/decimals=2;
+
+        Unsigned Ascii Number L_TRANS_CODE[2];
+        String L_ENTER[1];
+
+        String L_SPECIAL_BILLS[11]="arsbills.mf";
+        String L_SPECIAL_MACRO[13]="specbills.par";
+        Unsigned Ascii Number L_POL_YEAR[4]=0/decimals=0;
+        Unsigned Ascii Number L_MORT_CTR[4]=0/decimals=0;
+        Signed Ascii Number L_TOTAL_PAST_DUE[9]=0/decimals=2;
+        String L_REINSTATED[1]="N";
+
+        Include "sfscsexec.var"
+
+        Include "scipsprint.var"
+
+        Access ARSINQWRKPP,
+           Set ARSINQWRKPP:COMPANY_ID = G_COMPANY,
+               ARSINQWRKPP:POLICY_NO  = G_POLICY_NO, Approximate, Using First Index;
+
+        Include "arsmenu.var"
+
+        Include "virtualdecs.var"
+
+        String L_DEC[12]="arsup930.pcl";
+        Unsigned Ascii Number L_RUN_MODE[1]=0;
+        String L_MORTGAGEE_EXISTS_STR[30]="";
+        Signed Ascii Number L_NSF_CHARGES[4]=0/decimals=0;
+        Signed Ascii Number L_NSF_CHECK_AMOUNT[9]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_DISBURSEMENT[9]=0/decimals=2;
+        Signed Ascii Number L_RETURN_PREMIUM[9]=0/decimals=2;
+        Unsigned Ascii Number L_OVERPAYMENT[9]=0/decimals=2;
+        Signed Ascii Number L_BAD_ENTER_CHECK[9]=0/decimals=0;
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        Include "stdfunc7.inc"
+        reaccess ;
+
+EVENT DEFINITION
+    default eventhandler {
+            "reload" { function ="reaccess" abort() }
+                         }
+
+Toolbar Definition
+
+Screen Entry
+
+If G_POLICY_NO <> 0 And
+   ARSINQWRKPP:POLICY_NO  <> 0 Then
+{
+
+Do GET_TOTALS
+--Do GET_TOTAL_DISBURSEMENTS
+--Do CHECK_FOR_MORTGAGEE
+
+Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = G_COMPANY_ID
+
+}
+
+l_rev_date = todaysdate
+
+Access Validation
+    If ARSINQWRKPP:POLICY_NO <> G_POLICY_NO Then Error
+    "No More Records for This Policy" ;
+
+Screen
+Properties
+    {
+    LayOutType      = Column
+    backgroundcolor = "White"
+    foregroundcolor = "black"
+    }
+{
+
+Panel Tagged Header_pl
+Properties
+    {
+--    BorderStyle     = raised
+    ScrollBarPolicy = asNeeded
+    backgroundcolor = "White"
+    foregroundcolor = "black"
+    }
+{
+%%
+                                                  Totals    ___________ ___________ ___________ ___________
+                                                  Balance   ___________
+%%
+
+Components
+
+Fields
+0101    L_TOTAL_DUE + L_BAD_ENTER_CHECK /mask="(ZZ,ZZZ.99)"/displayonly
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        }
+        ;
+
+0102    L_TOTAL_PAID + L_NSF_CHECK_AMOUNT + L_OVERPAYMENT +L_BAD_ENTER_CHECK  /mask="(ZZ,ZZZ.99)"/displayonly
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        } ;
+
+0103    L_TOTAL_WRITE_OFF/mask="(ZZ,ZZZ.99)"/displayonly
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        } ;
+
+0104    L_TOTAL_DISBURSEMENT/displayonly/mask="(ZZ,ZZZ.99)"
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        } ;
+
+
+0201    (L_TOTAL_DUE + L_BAD_ENTER_CHECK) -
+        (L_TOTAL_PAID + L_NSF_CHECK_AMOUNT + L_OVERPAYMENT + L_BAD_ENTER_CHECK)
+        - L_TOTAL_WRITE_OFF -
+        L_NSF_CHECK_AMOUNT + L_RETURN_PREMIUM  /displayonly
+        /mask="(ZZ,ZZZ.99)"
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        } ;
+/*
+0106    L_TOTAL_PAST_DUE/displayonly/mask="(ZZ,ZZZ.99)"
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        } ;
+
+0301    L_NEXT_DUE_DATE/mask="MM/DD/YYYY"/displayonly
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        } ;
+
+0302    L_NEXT_NET_AMOUNT_DUE/mask="(ZZ,ZZZ.99)"/displayonly
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        } ;
+
+0401    L_TOTAL_DUE - L_TOTAL_PAID - L_TOTAL_WRITE_OFF -
+        L_NSF_CHECK_AMOUNT + L_RETURN_PREMIUM
+        /displayonly
+        /mask="(ZZ,ZZZ.99)"
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        } ;
+
+0501    L_TOTAL_PENDING_DISBURSEMENTS/mask="(ZZ,ZZZ.99)"/displayonly
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        } ;
+
+0502    L_TOTAL_INSTALLMENT_CHARGE/displayonly
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        } ;
+
+0601    L_TOTAL_RECEIVED - L_RETURN_PREMIUM /mask="(ZZ,ZZZ.99)"/displayonly
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        } ;
+
+0602    L_TOTAL_DISBURSEMENTS/mask="(ZZ,ZZZ.99)" /displayonly
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        } ;
+
+0603    L_TOTAL_SURCHARGE/displayonly
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        } ;
+
+0701    L_NSF_CHECK_AMOUNT + L_BAD_ENTER_CHECK /mask="(ZZ,ZZZ.99)" /displayonly
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        } ;
+
+0702    L_NSF_CHARGES/mask="ZZ,ZZ9.99"/displayonly
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        } ;
+
+0801    (L_TOTAL_DISBURSEMENTS + L_TOTAL_PENDING_DISBURSEMENTS) * -1/displayonly/mask="(ZZ,ZZZ.ZZ)"
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        } ;
+
+0901    L_TOTAL_PAID + L_NSF_CHECK_AMOUNT - L_RETURN_PREMIUM + L_BAD_ENTER_CHECK /mask="(ZZ,ZZZ.99)"/displayonly
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        } ;
+
+0902    L_MORTGAGEE_EXISTS_STR/showasguidetext/inverse/bright/underscore
+        Properties
+        {
+            backgroundcolor = "White"
+            foregroundcolor = "black"
+        }
+        Hide If L_MORT_CTR = 0;
+*/
+
+}
+
+}
+
+Screen Exit
+        If ARSINQWRKPP:COMPANY_ID <> ""
+        Then G_COMPANY = ARSINQWRKPP:COMPANY_ID;
+        If ARSINQWRKPP:COMPANY_ID <> "" Then
+        G_COMPANY_ID = ARSINQWRKPP:COMPANY_ID ;
+        If ARSINQWRKPP:POLICY_NO > 0
+        Then G_POLICY_NO = ARSINQWRKPP:POLICY_NO ;
+
+
+Procedure Definition
+
+Procedure GET_TOTALS
+{
+
+L_TOTAL_DUE                = 0
+L_TOTAL_PAID               = 0
+L_TOTAL_DISBURSEMENT       = 0
+L_TOTAL_INSTALLMENT_CHARGE = 0
+L_TOTAL_SURCHARGE          = 0
+L_CURRENT_DUE              = 0
+L_NET_DUE                  = 0
+L_TOTAL_RECEIVED           = 0
+L_NEXT_DUE_DATE            = 00.00.0000
+L_NEXT_NET_AMOUNT_DUE      = 0
+L_TOTAL_WRITE_OFF          = 0
+L_TOTAL_PAST_DUE           = 0.00
+L_NSF_CHARGES              = 0.00
+L_NSF_CHECK_AMOUNT         = 0.00
+L_RETURN_PREMIUM           = 0.00
+L_OVERPAYMENT              = 0.00
+
+Access ARSINQWRKPP_ALT, Set ARSINQWRKPP_ALT:COMPANY_ID = G_COMPANY_ID,
+                          ARSINQWRKPP_ALT:POLICY_NO  = G_POLICY_NO, Approximate
+
+While ARSINQWRKPP_ALT:COMPANY_ID = G_COMPANY_ID And
+      ARSINQWRKPP_ALT:POLICY_NO  = G_POLICY_NO
+      {
+      If ARSINQWRKPP_ALT:STATUS Not One Of "C" Then -- And
+--         ARSINQWRKPP_ALT:TRANS_CODE  Not One Of 25 Then
+      {
+          L_TOTAL_DUE = L_TOTAL_DUE + ARSINQWRKPP_ALT:AMOUNT_DUE
+          L_TOTAL_PAST_DUE = L_TOTAL_PAST_DUE + ARSINQWRKPP_ALT:PAST_DUE_AMOUNT
+          If ARSINQWRKPP_ALT:STATUS Not One Of "D","R" Then
+          {
+              L_TOTAL_PAID = L_TOTAL_PAID + ARSINQWRKPP_ALT:AMOUNT_PAID
+          }
+
+          If ARSINQWRKPP_ALT:STATUS One Of "D" And
+             ARSINQWRKPP_ALT:TRANS_CODE One Of 30,31 Then
+             {
+                L_OVERPAYMENT  = L_OVERPAYMENT + ARSINQWRKPP_ALT:AMOUNT_PAID
+             }
+
+--          If ARSINQWRKPP_ALT:STATUS One Of "D" And
+--             ARSINQWRKPP_ALT:TRANS_CODE One Of 30,31 Then
+--          {
+--              L_TOTAL_DISBURSEMENT = (L_TOTAL_DISBURSEMENT + ARSINQWRKPP_ALT:AMOUNT_PAID)
+--          }
+
+          If ARSINQWRKPP_ALT:STATUS One Of "D" And
+             ARSINQWRKPP_ALT:TRANS_CODE One Of 30, 31 Then
+             {
+                 L_TOTAL_DISBURSEMENT = L_TOTAL_DISBURSEMENT + ARSINQWRKPP_ALT:DISBURSEMENT_AMOUNT
+                 L_RETURN_PREMIUM     = L_RETURN_PREMIUM + L_TOTAL_DISBURSEMENT
+             }
+
+          If ARSINQWRKPP_ALT:TRANS_CODE Not One Of 61 Then
+          {
+          L_TOTAL_RECEIVED = L_TOTAL_PAID + L_NSF_CHECK_AMOUNT + L_TOTAL_DISBURSEMENT
+          }
+
+          L_TOTAL_WRITE_OFF = L_TOTAL_WRITE_OFF + ARSINQWRKPP_ALT:WRITE_OFF_AMOUNT
+
+          If ARSINQWRKPP_ALT:STATUS = "R" And
+             ARSINQWRKPP_ALT:TRANS_CODE Not One Of 61 Then
+          {
+              L_NSF_CHECK_AMOUNT = L_NSF_CHECK_AMOUNT + ARSINQWRKPP_ALT:NSF_CHECK_AMOUNT
+          }
+
+          If ARSINQWRKPP_ALT:STATUS = "R" And
+             ARSINQWRKPP_ALT:TRANS_CODE One Of 61 Then
+          {
+              L_BAD_ENTER_CHECK = L_BAD_ENTER_CHECK + ARSINQWRKPP_ALT:AMOUNT_PAID
+          }
+
+          If ARSINQWRKPP_ALT:TRANS_CODE One Of 18, 28 Then
+          {
+          L_TOTAL_INSTALLMENT_CHARGE = L_TOTAL_INSTALLMENT_CHARGE +
+                                       ARSINQWRKPP_ALT:AMOUNT_DUE
+          }
+          If ARSINQWRKPP_ALT:TRANS_CODE One Of 19,22,23,29 Then
+          {
+          L_TOTAL_SURCHARGE = L_TOTAL_SURCHARGE + ARSINQWRKPP_ALT:AMOUNT_DUE
+          }
+          L_NET_DUE = L_TOTAL_DUE - (L_TOTAL_PAID + L_TOTAL_WRITE_OFF)
+          If ARSINQWRKPP_ALT:RDUE_DATE<= TODAYSDATE Then
+          {
+              L_CURRENT_DUE = L_CURRENT_DUE + ARSINQWRKPP_ALT:AMOUNT_DUE
+          }
+
+          If ARSINQWRKPP_ALT:TRANS_CODE One Of 50 Then
+          {
+              L_NSF_CHARGES = L_NSF_CHARGES + ARSINQWRKPP_ALT:AMOUNT_DUE
+          }
+
+          If L_NEXT_DUE_DATE = 00.00.0000 And
+             ARSINQWRKPP_ALT:STATUS Not One Of "P","D","V" Then
+             {
+                 L_NEXT_DUE_DATE = ARSINQWRKPP_ALT:RDUE_DATE
+                 L_NEXT_NET_AMOUNT_DUE = ARSINQWRKPP_ALT:NET_AMOUNT_DUE
+             }
+          Else
+          If L_NEXT_DUE_DATE = ARSINQWRKPP_ALT:RDUE_DATE And
+                  ARSINQWRKPP_ALT:STATUS Not One Of "P","D","V" Then
+             {
+                  L_NEXT_NET_AMOUNT_DUE = L_NEXT_NET_AMOUNT_DUE +
+                                          ARSINQWRKPP_ALT:AMOUNT_DUE
+             }
+--        } -- end of status check
+
+}
+
+          Next ARSINQWRKPP_ALT
+}
+        deletefile (l_filename)
+        writefile (l_filename,"%s%s",str(l_total_due),"<NL>")
+        writefile (l_filename,"%s%s",str(l_total_paid),"<NL>")
+        writefile (l_filename,"%s%s",str(l_net_due),"<NL>")
+        writefile (l_filename,"%s%s",str(l_total_installment_charge),"<NL>")
+        writefile (l_filename,"%s%s",str(l_total_surcharge),"<NL>")
+        writefile (l_filename,"%s%s",str(l_current_due),"<NL>")
+        writefile (l_filename,"%s%s",str(l_total_received),"<NL>")
+        writefile (l_filename,"%s%s",str(l_total_write_off),"<NL>")
+        writefile (l_filename,"%s%s",str(l_total_disbursements),"<NL>")
+        writefile (l_filename,"%s%s",str(l_total_pending_disbursements),"<NL>")
+        closefile (l_filename)
+}
+
+Procedure RUN_ARSUP930
+{
+
+/* new invoice program 12/10/2001 */
+
+L_RUN_MODE = 1
+If G_COPIES = 1 Then
+{
+    L_RUN_MODE = 7
+}
+
+If SFSCOMPANY:DEBUG_MODE = 0 Then
+{
+    Proc ("csbatch arsup930 %n%s%s%s%s",L_RUN_MODE,Str(ARSINQWRKPP:RDUE_DATE,"MMDDYYYY"),Str(ARSINQWRKPP:RDUE_DATE,"MMDDYYYY"),Str(ARSINQWRKPP:POLICY_NO,"999999999"),G_REPORT_DEVICE)/noconsole
+}
+Else
+{
+    Proc ("csbatch arsup930 %n%s%s%s%s",L_RUN_MODE,Str(ARSINQWRKPP:RDUE_DATE,"MMDDYYYY"),Str(ARSINQWRKPP:RDUE_DATE,"MMDDYYYY"),Str(ARSINQWRKPP:POLICY_NO,"999999999"),G_REPORT_DEVICE)
+}
+
+}
+
+Procedure RUN_ARSUP930_RUN_MODE_6
+{
+
+/* new invoice program 12/10/2001 */
+
+If SFSCOMPANY:DEBUG_MODE = 0 Then
+{
+    Proc ("csbatch arsup930 6%s%s%s%s",Str(ARSINQWRKPP:RDUE_DATE,"MMDDYYYY"),Str(ARSINQWRKPP:RDUE_DATE,"MMDDYYYY"),Str(ARSINQWRKPP:POLICY_NO,"999999999"),G_REPORT_DEVICE)/noconsole
+}
+Else
+{
+    Proc ("csbatch arsup930 6%s%s%s%s",Str(ARSINQWRKPP:RDUE_DATE,"MMDDYYYY"),Str(ARSINQWRKPP:RDUE_DATE,"MMDDYYYY"),Str(ARSINQWRKPP:POLICY_NO,"999999999"),G_REPORT_DEVICE)
+}
+
+}
+
+Procedure GET_TOTAL_DISBURSEMENTS
+{
+
+L_TOTAL_DISBURSEMENTS = 0
+
+Access ARSCHECK, Set ARSCHECK:COMPANY_ID = ARSINQWRKPP:COMPANY_ID,
+                     ARSCHECK:POLICY_NO  = ARSINQWRKPP:POLICY_NO, Approximate
+
+While ARSCHECK:COMPANY_ID  = ARSINQWRKPP:COMPANY_ID And
+      ARSCHECK:POLICY_NO   = ARSINQWRKPP:POLICY_NO
+      {
+
+      if arscheck:eff_date => arsinqwrkpp:eff_date and
+         arscheck:eff_date <= arsinqwrkpp:exp_date then
+      {
+      If ARSCHECK:RELEASE = "Y" And
+         ARSCHECK:APS_TRANS_CODE  Not One Of  "VOIDRP" Then
+      {
+          L_TOTAL_DISBURSEMENTS = L_TOTAL_DISBURSEMENTS + ARSCHECK:CHECK_AMOUNT
+      }
+      Else
+      {
+      If ARSCHECK:RELEASE Not One Of "Y","V" Then
+      {
+         L_TOTAL_PENDING_DISBURSEMENTS = L_TOTAL_PENDING_DISBURSEMENTS + ARSCHECK:CHECK_AMOUNT
+      }
+      }
+      } -- end of date checking
+
+  Next ARSCHECK
+
+}
+
+}
+
+Procedure CHECK_FOR_MORTGAGEE
+{
+
+L_MORTGAGEE_EXISTS = "N"
+L_MORT_CTR         =  0
+
+Access SFPSUPP, Set SFPSUPP:POLICY_NO = ARSINQWRKPP:POLICY_NO, Generic
+
+While SFPSUPP:POLICY_NO = ARSINQWRKPP:POLICY_NO
+      {
+          L_MORT_CTR         = L_MORT_CTR + 1
+          L_MORTGAGEE_EXISTS = "Y"
+          Next SFPSUPP
+      }
+}
+
+procedure VIRTUAL_DECS
+{
+
+--   L_DEC_PDF = "arsup930.pdf"
+-- changed to create a unique report number for each person that runs this
+-- march 12, 2002 - dlp
+
+   I_CSEXEC_APPLICATION = "PRINT"
+
+   Include "sfscsexec.pro"
+
+   L_DEC_PDF = "ars"+Trun(Str(I_CSEXEC_NUMBER))+".pdf"
+
+   Include "virtualdecs2.pro"
+
+}
+
+Procedure CHECK_FOR_REINSTATEMENT
+{
+
+L_REINSTATED = "N"
+
+Access ARSINQWRKPP_ALT, Set ARSINQWRKPP_ALT:COMPANY_ID = G_COMPANY_ID, Approximate
+
+While ARSINQWRKPP_ALT:COMPANY_ID = G_COMPANY_ID And
+      L_REINSTATED Not One Of "Y"
+      {
+          If ARSINQWRKPP_ALT:TRANS_CODE One Of 16 Then
+          {
+              L_REINSTATED = "Y"
+          }
+      Next ARSINQWRKPP_ALT
+      }
+
+}
+
+Procedure SCIPS_MACRO
+{
+
+I_SCIPS_SELECT = "Y"
+If I_SCIPS_SELECT = "Y" Then
+{
+    I_SCIPS_PARAM_NAME = Lowercase(Trun(PROGRAMID)) + Trun(Str(PID)) + ".par"
+    Writefile(I_SCIPS_PARAM_NAME,"%n<nl>",ARSINQWRKPP:POLICY_NO)
+}
+
+Include "scipsprint.pro"
+
+Procedure build_parameter_file
+{
+
+-- added the proc to create a new finder2 file Nov 1, 2001
+
+/* buidling paramter file to user  in arspr01a */
+Deletefile(L_SPECIAL_MACRO)
+Writefile (L_SPECIAL_MACRO,"%d%s",todaysdate,"<NL>")
+Writefile (L_SPECIAL_MACRO,"%d%s",todaysdate,"<NL>")
+Writefile (L_SPECIAL_MACRO,"%s%s",ARSINQWRKPP:company_id,"<NL>")
+Writefile (L_SPECIAL_MACRO,"%n%s",ARSINQWRKPP:policy_no,"<NL>")
+Closefile (L_SPECIAL_MACRO)
+
+/*  building macro file now to print the selected invoice */
+Deletefile(L_SPECIAL_BILLS)
+Deletefile("arsin042.cqe")
+Deletefile("arsin042.cq")
+Writefile (L_SPECIAL_BILLS,"/* special bills macro */<NL>")
+Writefile (L_SPECIAL_BILLS,"Clear List<NL>")
+Writefile (L_SPECIAL_BILLS,"Clear Find<NL>")
+Writefile (L_SPECIAL_BILLS,"Clear sum<NL>")
+Writefile (L_SPECIAL_BILLS,"run/parameter=specbills arsin042<NL>")
+Writefile (L_SPECIAL_BILLS,"rsave arsin042<NL>")
+Closefile (L_SPECIAL_BILLS)
+
+} -- end of procedure
+
+} -- end of program

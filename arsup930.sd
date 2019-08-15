@@ -1,0 +1,4615 @@
+%%                                                          
+/*   arsup930.sd
+
+     SCIPS.com
+
+     December 8, 2001
+
+     Direct Bill Invoices
+
+     Run                   Description
+     Mode      Update
+     ====      ======      ===========================
+      0          Y         Nightly Processing of Installment Invoices/AR DB Installment invoices
+      1          N         Customer Service Screen
+      2          Y         Invoices created with the declaration page
+      3          Y         Run from the Manual Processing Selection - Initital Invoices
+      4          Y         unused as of 08/04/2002 (DLP)
+      5          N         Rerun from the Manual Processing Selection - Initial Invoices and Installment Invoices
+      6          Y         Rerun the daily processing for 1st invoices missed, cretes installment charges
+      7          N         Customer Service Screen - All Copies
+      8          N         Rerun from command line, installment bills (billed date)
+      9          X         unsued
+
+      Nighly Processing = cron (UNIX)
+      DEC Pages         = sfppr300
+      Manual Processing = arsmt300
+
+*/
+Program
+        Name = "arsup930" ;
+        Type="File" ;
+        Domain="arsmenu" ;
+        Padcharacter = Space ;
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9] ,
+                                     g_image_array_position[1],
+                                     g_scan[1] ;
+        Global Wdate G_TRANS_DATE ;
+        Global Wdate G_TRANS_EFF ;
+        Global Wdate G_TRANS_EXP ;
+
+        Global Wdate G_STARTING_DATE,
+                     G_ENDING_DATE;
+
+        Global Unsigned Ascii Number G_TRANS_CODE[4] ;
+        Global Unsigned Ascii Number G_LINE_OF_BUSINESS[4] ;
+        Global Unsigned Ascii Number G_COMM_RATE[4]/decimals=2 ;
+        Global Unsigned Ascii Number G_SUB_CODE[4] ;
+        Global Unsigned Ascii Number G_BILLING_CTR[4] ;
+        Global Unsigned Ascii Number G_RETURN_CHECK_CTR[4],
+                                     g_printer_no[4] ;
+        Global String G_REPORT_DEVICE[10];
+
+        String L_OPTION[1]="",
+               l_billing_ctr_1[1]="Y",
+               l_skip_invoice[1]="N",
+               l_skip_invoice_mob="N",
+               l_skip_form[1]="N",
+               l_skip_form_mob[1]="N" ;
+
+        String L_UNDERWRITING_CX[1]="N";
+        array[2] of string l_invoice_name[20];
+        String L_OUTFILE[15]="arsup930.out";
+        Unsigned Ascii Number L_LINE_CTR[3]=0,
+                              l_lob[4] ;
+        String L_ENTER[1];
+        String L_FIRST_TIME[1]="Y";
+        Unsigned Ascii Number L_SUB[2];
+        Unsigned Ascii Number L_V_POSITION[5]=0/decimals=0;
+        String L_ZIPCODE[10]="";
+        Unsigned Ascii Number L_LOOP_CTR[2]=0;
+        Unsigned Ascii Number L_LINES_PRINTED[2]=0;
+        Unsigned Ascii Number L_COPY_CTR[2]=0;
+
+        Unsigned Ascii Number L_PAGES_CTR[4]=0;
+        String L_COMPANY[10]="";
+        String L_COMPANY_id[10]="";
+        String L_SFS_CODE[3]="SFS";
+        Unsigned Ascii Number L_SUB_CODE[4]=0/decimals=0;
+
+        String L_TRANSACTION[50]="";
+        String L_LOGFILE[15]="arsup930.log";
+        String L_TOTALS_PAGE[1]="N";
+        Unsigned Ascii Number L_ERRORS[4]=0;
+        Unsigned Ascii Number L_HOLD_POLICY_NO[9]=0/decimals=0;
+        Unsigned Ascii Number L_HOLD_POLICY_NO2[9]=0/decimals=0;
+        Unsigned Ascii Number L_COPIES_REQUIRED[2]=0;
+        Unsigned Ascii Number L_POL_YEAR[4]=0;
+        Unsigned Ascii Number L_END_SEQUENCE[4]=0;
+        Unsigned Ascii Number L_POLICY_NO[9]=0,
+                              l_mm[2]=0,
+                              l_dd[2]=0,
+                              l_yy[4]=0,
+                              l_printer_no[4],
+                              l_portal_copy[1];
+
+        String L_COPY_LIT[20]="",
+               l_invoice_PDF_1[20]="",
+               l_header_name[50],
+               l_policy_str[14],
+               l_file_number[80]="",
+               l_file_name[70]="",
+               l_drawer[45]="",
+               l_folder_type[80]="",
+               l_doc_type[45]="",
+               l_doc_date[70]="",
+               l_unix_path[100],
+               L_py_policy_year[150],
+               l_file_type[150],
+               l_policy[9],
+               l_sfpname_zip[10],
+               l_agent_zip[10];
+
+        unsigned ascii number l_policy5[9]=0,
+                              l_policy5_install[9]=0;
+        string l_company_id5[10],
+               l_company_id5_install[10] ;
+        wdate l_trans_eff ;
+        wdate l_trans_exp,
+              l_trans_exp_install ;
+
+
+        Unsigned Ascii Number L_HOLD_COPY_CTR[4]=0,
+                              l_last_policy_no[9]=0;
+        Unsigned Ascii Number L_H_POSITION[4]=0;
+        String L_MANUAL_RUN[1]="N";
+        Signed Ascii Number L_TOTAL_AMT_DUE[9]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_ANNUAL_NET[9]=0/decimals=2,
+                            l_total_annual_installments[9]=0/decimals=2 ;
+        Unsigned Ascii Number L_RECORD_COUNTER_69[9]=0/decimals=0;
+        Unsigned Ascii Number COUNTER[10]/decimals=0;
+        Unsigned Ascii Number L_CREATED_INSTALLMENT_CHARGE[1]=0;
+
+/* buidling the array to hold sfpname keys */
+Array [200] Of Unsigned Ascii Number L_SFPNAME_POLICY_NO[9],
+                                     L_SFPNAME_POL_YEAR[4],
+                                     L_SFPNAME_END_SEQUENCE[4],
+                                     L_SFPNAME_PREM_NO[4],
+                                     L_SFPNAME_BUILD_NO[4],
+                                     L_SFPNAME_SUB_CODE[4];
+
+Array[3] Of String L_PAYOR_NAME[50],
+                   L_PAYOR_ADDRESS[50];
+
+String L_PAYOR_CITY[30],
+       L_PAYOR_STATE[2],
+       L_PAYOR_ZIPCODE[10];
+
+/* mortgagee information for new procedures 06/27/2002 */
+Array[3] Of String L_MORT_NAME[50], -- was 50 changed 7/30/2002 per JD - FOS
+                                    -- changed back to 50 from 35 08/12/2002 per JD - FOS
+                   L_MORT_ADDRESS[50]; -- was 50 changed 7/30/2002 per JD - FOS
+                                       -- changed back to 50 from 35 08/12/2002 per JD - FOS
+
+String L_MORT_CITY[30],
+       L_MORT_STATE[2],
+       L_MORT_ZIPCODE[10];
+
+
+Unsigned Ascii Number L_SFPNAME_LOOP_CTR[4]=0;
+Unsigned Ascii Number L_TEMP_POLICY_NO[9]=0;
+Unsigned Ascii Number L_TEMP_POL_YEAR[4]=0;
+Unsigned Ascii Number L_TEMP_END_SEQUENCE[4]=0;
+Unsigned Ascii Number L_TEMP_PREM_NO[4]=0;
+Unsigned Ascii Number L_TEMP_BUILD_NO[4]=0;
+Unsigned Ascii Number L_TEMP_SUB_CODE[4]=0;
+Unsigned Ascii Number L_ERROR[4]=0;
+Unsigned Ascii Number L_NON_PAY_RUN_DAYS[3]=0;
+Unsigned Ascii Number L_MAIL_BOOK_CTR[3]=0/decimals=0;
+String L_LOB_SUBLINE[2]="00";
+String L_RERUN_NOTICES[1]="N";
+String L_REPORT_DEVICE[10]="";
+String L_LINE_PRINTED[1]="N";
+Signed Ascii Number L_TOTAL_AMOUNT_DUE[9]=0/decimals=2;
+String L_POLICY_PRINTED[1]="N";
+String L_NON_PAY_NOTICE[1]="N";
+String L_TRANS_TYPE[1]="";
+Global Unsigned Ascii Number G_RUN_MODE[1];
+Unsigned Ascii Number L_TRANS_CODE[4]=0/decimals=0;
+String L_HOLD_COMPANY_ID[10]="";
+Unsigned Ascii Number L_MESSAGE_CTR[2]=0;
+Unsigned Ascii Number L_MESSAGE_LEN_CTR[3]=0;
+
+Array[6] Of String L_MESSAGE[50];
+Signed Ascii Number L_TOTAL_ANNUAL[9]=0/decimals=2;
+Rwdate L_PRIOR_BILLING_DATE=00.00.0000;
+Rwdate L_CURRENT_BILLING_DATE=00.00.0000;
+Unsigned Ascii Number L_PAYMENT_CTR[2]=0;
+Unsigned Ascii Number L_RECORD_CTR[4]=0/decimals=0;
+String L_SKIP_PAYMENT[1]="N";
+Unsigned Ascii Number L_MAXIMUM_BILLING_CTR[4]=0/decimals=0;
+Unsigned Ascii Number L_BILLING_CTR[4]=0/decimals=0;
+Unsigned Ascii Number L_BILLING_CTR_annual_total[4]=0/decimals=0;
+String L_PAYOR_FOUND[1]="N";
+Unsigned Ascii Number L_CTR[2]=0;
+Wdate L_HOLD_EXP_DATE;
+Wdate L_HOLD_EFF_DATE;
+wdate l_sfpname_exp_date ;
+Signed Ascii Number L_FUTURE_AMOUNT_DUE[9]=0/decimals=2;
+Signed Ascii Number L_FUTURE_TOTAL_DUE[9]=0/decimals=2,
+                    l_credit_card_total_due[9]=0/decimals=2;
+String L_PAYOR_TYPE[1]="";
+String L_MORT_TYPE[1]="";
+String L_HEAD_PRINT[1]="";
+String L_MORT_TYPE_STRING[40]="";
+string l_user_id[15];
+Telephone L_MORT_TELEPHONE="";
+String L_MORT_FOUND[1]="N";
+Rwdate L_REVERSE_DATE;
+Unsigned Ascii Number L_WORK_HOLD_POLICY_NO[9];
+Unsigned Ascii Number L_MESSAGE_LOOP[2]=0/dec=0;
+Wdate L_HOLD_TRANS_EFF;
+Wdate L_HOLD_TRANS_EXP;
+unsigned ascii number l_line_of_business[4]=0/decimals=0;
+
+String L_MORT_ACCOUNT[25] = "";
+Unsigned Ascii Number L_UPDATE_CTR[6]=0/decimals=0;
+Unsigned Ascii Number L_LAST_TRANS_CODE[2]=0/decimals=0;
+
+/* *****  new check scanning line variables */
+string l_check_scan_policy_no[9],
+       l_check_scan_due_date[8],
+       l_check_scan_current_due[8],
+       l_check_scan_total_due[8],
+       l_check_scan_check_digit[2],
+       l_check_scan_line[50],
+       l_check_digit_final_str[3];
+
+-- use this to force amount due to whole numbers without decimals
+unsigned ascii number l_check_scan_amount[8]=0/decimals=0;
+
+-- temporary for check digit calculations
+array [100] of unsigned ascii number l_check_digit_amount[3];
+unsigned ascii number l_check_digit_weight[1],
+                      l_check_digit_sub[3]=0/decimals=0,
+                      l_check_digit_total[4]=0/decimals=0,
+                      l_check_digit_number[4]=0/decimals=0,
+                      l_check_digit_raw[4]=0/decimals=0,
+                      l_check_digit_final[3]=0/decimals=0,
+                      l_printer[4];
+
+signed ascii number l_net_amount_due[9]=0/decimals=2;
+
+-- new logic for MD
+signed ascii number l_expiring_premium[9]=0.00/decimals=2;
+
+string l_company_id3[10],
+       l_subline3[2];
+
+unsigned ascii number l_state3[2],
+                      l_county3[3],
+                      l_line_of_business3[4],
+                      l_ctr3[1];
+-- added 09/11/2007
+unsigned ascii number l_open_buckets[1]=0/decimals=0;
+
+Include "sdpqueue.var"
+
+        Include "scipserr.var"
+
+        Include "sfsrevname.var"
+
+        Include "csfonts.inc"
+
+        Include "sfscsexec.var"
+        Include "line_spacing1.var"
+
+
+Initialization
+l_invoice_name[1] = lowercase(programid) + ".pcl"
+l_invoice_name[2] = lowercase(programid) + "i.pcl"
+l_header_name = programid + "_header"
+deletefile(l_header_name)
+deletefile(l_invoice_name[1])
+deletefile(l_invoice_name[2])
+
+COUNTER = 0
+
+If SYSTEM[1,3]="Win" Then
+Begin
+    Proc (":cli arsinvwork")/noconsole
+    Proc (":cli arsinvwork2")/noconsole
+    Proc (":cli arsinvwork99")/noconsole
+End
+Else
+Begin
+    Proc ("cli arsinvwork.mk")/noconsole
+    Proc ("cli arsinvwork2.mk")/noconsole
+    proc ("cli arsinvwork99.mk")/noconsole
+End
+
+L_SFS_CODE = "SFS"
+
+Access SFSDEFAULT,
+   Set SFSDEFAULT:SFS_CODE = L_SFS_CODE
+
+Access ARSCONTROL2,
+   Set ARSCONTROL2:COMPANY_ID = sfsdefault:company_id
+
+if arscontrol2:USE_SFSPRINTER_FOR_TRAY_SELECT one of 1 then
+  {
+    G_RUN_MODE      = Val(COMMANDLINE[1,1])
+    G_STARTING_DATE = Date(COMMANDLINE[2,9])
+    G_ENDING_DATE   = Date(COMMANDLINE[10,17])
+    G_POLICY_NO     = Val(COMMANDLINE[18,26])
+    g_scan          = val(commandline[27,27])
+    g_image_array_position = val(commandline[28,28])
+    G_TRANS_CODE    = Val(COMMANDLINE[29,32]) -- expecting 0012, 0013 from here
+    l_printer_no    = val(commandline[33,36])   --printer number for sfsprinter
+    l_portal_copy   = val(commandline[37,37])  -- added so that 1 copy only portal
+  }
+else
+  {
+    G_RUN_MODE      = Val(COMMANDLINE[1,1])
+    G_STARTING_DATE = Date(COMMANDLINE[2,9])
+    G_ENDING_DATE   = Date(COMMANDLINE[10,17])
+    G_POLICY_NO     = Val(COMMANDLINE[18,26])
+    g_scan          = val(commandline[27,27])
+    g_image_array_position = val(commandline[28,28])
+    G_TRANS_CODE    = Val(COMMANDLINE[29,32]) -- expecting 0012, 0013 from here
+    l_printer_no    = val(commandline[33,36])   --printer number for sfsprinter
+    l_portal_copy   = val(commandline[37,37])  -- added so that 1 copy only portal
+  }
+
+  l_user_id = username
+  Access SFSPRINTER,
+     Set SFSPRINTER:COMPANY_ID = sfsdefault:company_id,
+         SFSPRINTER:USER_ID    = L_USER_ID,
+         SFSPRINTER:PRINTER_NO = L_PRINTER_no, generic
+
+  g_report_device = sfsprinter:report_device
+
+/*
+Write ("<014>")
+Write ("%c%s%n",01001,"Run Mode           = ",G_RUN_MODE)
+Write ("%c%s%d",02001,"Starting Date      = ",G_STARTING_DATE)
+Write ("%c%s%d",03001,"Ending Date        = ",G_ENDING_DATE)
+Write ("%c%s%n",04001,"policy no          = ",G_policy_no)
+Write ("%c%s%n",05001,"g_image array      = ",G_image_array_position)
+Write ("%c%s%n",06001,"g_scan             = ",G_scan)
+Write ("%c%s%s",07001,"g_report_device    = ",G_report_device)
+Write ("%c%s%n",08001,"g_trans code       = ",G_trans_code)
+Write ("%c%s%n",09001,"l_printer_no       = ",l_printer_no)
+Write ("%c%s%x",10001,"l_company_id       = ",sfsdefault:company_id)
+Write ("%c%s%x",11001,"l_user_id          = ",l_user_id)
+Write ("%c%s%x",12001,"sfsprinter:report_device         = ",sfsprinter:report_device)
+Read (23,1,"above 2 ---Press Enter to Continue ",L_ENTER,1)
+*/
+--write ("<014>")
+--write ("%c%s%S",01001,"Command line = ",commandline)
+--Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+
+--Write ("<014>")
+--Write ("Running ARSUP930.........................<NL>")
+--Write ("%c%s%n",05001,"Run Mode = ",G_RUN_MODE)
+--read("%c%s",10001,"RUN MODE ",l_enter,1)
+
+If G_RUN_MODE = 2 Then -- coming in from the dec pages
+  Begin
+    Deletefile (l_invoice_name[1])
+  End
+
+-- now get the default company
+L_COMPANY = SFSDEFAULT:COMPANY_ID
+
+Access ARSCONTROL,
+   Set ARSCONTROL:COMPANY_ID = L_COMPANY, generic
+
+Access ARSCONTROL2,
+   Set ARSCONTROL2:COMPANY_ID = L_COMPANY
+
+Access SFSCOMPANY,
+   Set SFSCOMPANY:COMPANY_ID = L_COMPANY
+
+If G_RUN_MODE = 0 Then
+Begin
+
+-- G_ENDING_DATE = TODAYSDATE + ARSCONTROL:BILL_INSTALLMENTS_DAYS_ADVANCE
+--Write ("<014>")
+--Write ("after g_run-mode = 0........................<NL>")
+--read("%c%s",11001,"RUN MODE ",l_enter,1)
+
+If ARSCONTROL2:AS_OF_INVOICES One Of 1 Then
+Begin
+    G_STARTING_DATE = 01.01.0000 -- very beginning of time
+End
+Else
+Begin
+    G_STARTING_DATE = G_ENDING_DATE - ARSCONTROL:TOTAL_DAYS_INVOICE
+End
+
+proc ("arsinvwork.mk")/noconsole
+
+    If G_REPORT_DEVICE = "" Then
+      Begin
+        G_REPORT_DEVICE = ARSCONTROL:INVOICE_PRINTER
+      End
+    Access ARSINVDATE, Set ARSINVDATE:COMPANY_ID = ARSCONTROL:COMPANY_ID
+    If ARSINVDATE:COMPANY_ID = ARSCONTROL:COMPANY_ID Then
+      Begin
+        Change ARSINVDATE
+          Begin
+            ARSINVDATE:STARTING_DATE = G_STARTING_DATE + ARSCONTROL:TOTAL_DAYS_INVOICE
+            ARSINVDATE:ENDING_DATE   = G_ENDING_DATE + ARSCONTROL:TOTAL_DAYS_INVOICE
+            ARSINVDATE:RUN_DATE      = TODAYSDATE
+            ARSINVDATE:USER          = USERNAME + TERMINAL
+          End
+      End -- end of record exists
+    Else If ARSINVDATE:COMPANY_ID <> ARSCONTROL:COMPANY_ID Then
+      Begin
+        Add ARSINVDATE
+          Begin
+            ARSINVDATE:COMPANY_ID    = ARSCONTROL:COMPANY_ID
+            ARSINVDATE:STARTING_DATE = G_STARTING_DATE + ARSCONTROL:TOTAL_DAYS_INVOICE
+            ARSINVDATE:ENDING_DATE   = G_ENDING_DATE + ARSCONTROL:TOTAL_DAYS_INVOICE
+            ARSINVDATE:RUN_DATE      = TODAYSDATE
+            ARSINVDATE:USER          = USERNAME + TERMINAL
+          End
+      End
+  End
+
+-- run modes tested below
+--      1          N         Customer Service Screen
+--      2          Y         Invoices created with the declaration page
+--      6          Y         Rerun the daily processing for 1st invoices missed, cretes installment charges
+--      7          N         Customer Service Screen - All Copies
+--Write ("<014>")
+--Write ("before g runmode = 1 2 6 7......................<NL>")
+--read ("%c%s",12001,"RUN MODE ",l_enter,1)
+
+/*
+Write ("<014>")
+Write ("%c%s%n",01001,"Run Mode           = ",G_RUN_MODE)
+Write ("%c%s%d",02001,"Starting Date      = ",G_STARTING_DATE)
+Write ("%c%s%d",03001,"Ending Date        = ",G_ENDING_DATE)
+Write ("%c%s%n",04001,"policy no          = ",G_policy_no)
+Write ("%c%s%n",05001,"g_image array      = ",G_image_array_position)
+Write ("%c%s%n",06001,"g_scan             = ",G_scan)
+Write ("%c%s%s",07001,"g_report_device    = ",G_report_device)
+Write ("%c%s%n",08001,"g_trans code       = ",G_trans_code)
+Write ("%c%s%n",09001,"l_printer_no       = ",l_printer_no)
+Read (23,1,"above 2 ---Press Enter to Continue ",L_ENTER,1)
+*/
+
+
+-- Added Run mode 4 checking - 06/04/2018
+If G_RUN_MODE One Of 1,2,4,6,7 Then
+Begin
+    Do BUILD_INVOICE_WORK_FILE_POLICY_NO
+        If L_MAXIMUM_BILLING_CTR < 2 And
+           L_LAST_TRANS_CODE One Of 10 Then
+            Begin
+             Do PROCESS_PAYMENTS_RECEIVED
+            End
+End
+Else
+Begin
+   Do BUILD_INVOICE_WORK_FILE
+End
+
+  Do CHECK_FOR_MINIMUM_AMOUNTS
+-- arsinvwork2 is used to print future installments in due date order and not
+-- transaction date order
+-- added May 2, 2002 (DLP)
+
+Do BUILD_INVOICE_WORK_FILE2
+-- find and print past due only with installment invoices
+-- for lebanon if this is here and the amount due is on the prior I think
+-- it causes problems....keep an eye on it.
+if g_run_mode one of 0 then
+begin
+    do check_for_past_due
+end
+
+
+Do NEW_NOTICES
+
+Writefile(l_invoice_name[1],"%s%s",L_RESET,"<NL>")  -- reset the printer
+
+Closefile(l_invoice_name[1])
+
+If G_RUN_MODE Not One Of 2 Then
+  Begin
+    If G_REPORT_DEVICE <> "visual" Then
+      Begin
+        If SFSCOMPANY:DEBUG_MODE = 0 Then
+          Begin
+            Proc("lp -d %s -oraw ./%s",Trun(G_REPORT_DEVICE), l_invoice_name[1])/noconsole
+          End
+        Else
+          Begin
+            Proc("lp -d %s -oraw ./%s",Trun(G_REPORT_DEVICE), l_invoice_name[1])
+            pause (1000)
+          End
+      End
+  End
+
+/* new document processing system interface */
+
+If G_RUN_MODE Not One Of 2 Then -- do not do this when coming from dec pages
+Begin
+
+L_SFS_CODE = "SFS"
+Access SFSDEFAULT,
+   Set SFSDEFAULT:SFS_CODE = L_SFS_CODE
+
+-- these need to be assigned prior to the include file
+    I_INVOICE_NAME  = l_invoice_name[1]
+    I_COMPANY_ID    = SFSDEFAULT:COMPANY_ID
+    I_REPORT_DEVICE = G_REPORT_DEVICE
+    I_STARTING_DATE = G_STARTING_DATE
+    I_ENDING_DATE   = G_ENDING_DATE
+    I_RUN_MODE      = G_RUN_MODE
+
+Include "sdpqueue.pro"
+
+End -- end of checking for run_mode = 2
+
+Update
+
+
+Screen Exit
+/* since the last record would force the program to exit the loop for
+   arscxwork the last policy number would not have its accumulator
+   incremented on sfpname, this will allow that record to be updated */
+
+Closefile( L_LOGFILE )
+/* If G_STARTING_DATE <> 00.00.0000 And
+   G_ENDING_DATE   <> 00.00.0000 Then
+   Begin
+   Deletefile (L_OUTFILE)
+   Writefile (L_OUTFILE,"<NL>")
+   Writefile (L_OUTFILE,"%s%s","==========| Automatic Invoice Processing |=========", "<NL><NL>")
+   Writefile (L_OUTFILE,"%s%d%s","Starting Date =====| ",G_STARTING_DATE,             "<NL>")
+   Writefile (L_OUTFILE,"%s%d%s","Ending Date   =====| ",G_ENDING_DATE,               "<NL>")
+   Writefile (L_OUTFILE,"%s%s%s","Username      =====| ",USERNAME,                    "<NL>")
+   Writefile (L_OUTFILE,"%s%d%s","Rundate       =====| ",TODAYSDATE,                  "<NL>")
+   Writefile (L_OUTFILE,"%s%t%s","System Time   =====| ",SYSTEMTIME,                  "<NL>")
+   Writefile (L_OUTFILE,"%s%s%s","Manual Run    =====| ",L_MANUAL_RUN,                "<NL>")
+   Writefile (L_OUTFILE,"%s%n%s","Days Since Due=====| ",L_NON_PAY_RUN_DAYS,          "<NL>")
+   Writefile (L_OUTFILE,"%s%n%s","Completed with ====| ",L_ERRORS," number of errors   <NL>")
+   Writefile (L_OUTFILE,"%s","<NL>If Manual Run is 'Y' then Days Since Due will be zero.<NL>")
+   Writefile (L_OUTFILE,"%s","<NL>NOTE: if the number of errors reported on the line above <NL>")
+   Writefile (L_OUTFILE,"%s","is greater than 0 (ZERO) then there was a problem with the <NL>")
+   Writefile (L_OUTFILE,"%s","automatic invoicing procedure.  Please contact SCIPS at 1-877-724-7799 or<NL>")
+   Writefile (L_OUTFILE,"%s%s","email ",Trun(ARSINVDATE_ALT:COMPANY_ID))
+   Writefile (L_OUTFILE,"%s","@scips.com for immediate help<NL><NL>")
+   Writefile (L_OUTFILE,"%s%s","==========| Automatic Invoice Processing Completed |=========","<NL><NL>")
+   Closefile (L_OUTFILE)
+--   Proc (":cli mail -s arsup930 davep@scips.com < %s",Trun(L_OUTFILE))/noconsole
+   End
+*/
+
+    Proc ("arsinvwork.mk")/noconsole
+    Proc ("arsinvwork2.mk")/noconsole
+    proc ("arsinvwork99.mk")/noconsole
+
+closefile(l_invoice_name[1])
+proc("cli cp %s %s",l_invoice_name[1],"arspr01c.pcl")/noconsole
+
+Errors
+If ERRORNUMBER <> ERR_EOF Then
+Begin
+    L_ERRORS = L_ERRORS + 1
+/*    Writefile (L_LOGFILE,"arsup930 had errors<NL>")
+    Writefile (L_LOGFILE,"Date of run: %d<NL> ",TODAYSDATE )
+    Writefile (L_LOGFILE,"Time of run: %t<NL> ",SYSTEMTIME )
+    Writefile (L_LOGFILE,"Policy No  : %n<NL> ",ARSBILLING:POLICY_NO )
+    Writefile (L_LOGFILE,"Error        %n %s<NL><NL> ",ERRORNUMBER,ERRORTEXT)
+    Writefile (L_LOGFILE,"========================================<NL><NL>")
+*/
+End
+
+Procedure Definition
+
+Procedure BUILD_INVOICE_WORK_FILE_POLICY_NO
+
+Begin
+
+L_LAST_TRANS_CODE = 0
+
+Access ARSBILLING,
+   Set ARSBILLING:COMPANY_ID = L_COMPANY,
+       ARSBILLING:POLICY_NO  = G_POLICY_NO, Approximate
+
+While  ARSBILLING:COMPANY_ID = L_COMPANY AND
+       ARSBILLING:POLICY_NO = G_POLICY_NO
+
+Begin
+  If L_HOLD_POLICY_NO2 = 0 Then -- first time through
+    Begin
+      L_HOLD_POLICY_NO2            = ARSBILLING:POLICY_NO
+      L_HOLD_TRANS_EFF             = ARSBILLING:TRANS_EFF
+      L_HOLD_TRANS_EXP             = ARSBILLING:TRANS_EXP
+      L_LAST_TRANS_CODE            = ARSBILLING:TRANS_CODE
+      L_CREATED_INSTALLMENT_CHARGE = 0
+      L_TOTAL_ANNUAL = 0
+    End
+
+  If L_HOLD_POLICY_NO2 <> ARSBILLING:POLICY_NO Then
+    Begin
+      L_HOLD_POLICY_NO2            = ARSBILLING:POLICY_NO
+      L_HOLD_TRANS_EFF             = ARSBILLING:TRANS_EFF
+      L_HOLD_TRANS_EXP             = ARSBILLING:TRANS_EXP
+      L_LAST_TRANS_CODE            = ARSBILLING:TRANS_CODE
+      L_CREATED_INSTALLMENT_CHARGE = 0
+      L_HOLD_COMPANY_ID            = ARSBILLING:COMPANY_ID
+      if arsbilling:trans_code one of 14 then
+      begin
+          do get_expiring_premium
+      end
+    End
+
+  If L_HOLD_TRANS_EFF < ARSBILLING:TRANS_EFF Then
+    Begin
+      L_HOLD_TRANS_EFF = ARSBILLING:TRANS_EFF
+    End
+
+  If L_HOLD_TRANS_EXP < ARSBILLING:TRANS_EXP Then
+    Begin
+      L_HOLD_TRANS_EXP = ARSBILLING:TRANS_EXP
+    End
+
+  Do CHECK_FOR_UNDERWRITING_CX
+  Do CHECK_FOR_NON_PAY
+
+-- Added the check for run mode 4 - 06/04/2018
+  If G_RUN_MODE One Of 1,4,7 And -- run from customer service
+     ARSBILLING:POLICY_NO = G_POLICY_NO And
+   /* from the customer service screen let an invoice be created
+      even if one or both of these types of cancellations is outstanding */
+     ARSBILLING:DUE_DATE <= G_ENDING_DATE And
+     ARSBILLING:BILL_PLAN = "DB" And
+     ARSBILLING:STATUS One Of "B" Then
+     Begin
+       Do ADD_ARSINVWORK
+     End
+
+If G_RUN_MODE  One Of 2 And -- run from dec page processing
+   ARSBILLING:POLICY_NO = G_POLICY_NO And
+   arsbilling:trans_code not one of 15 and
+   L_UNDERWRITING_CX   <> "Y" And
+   L_NON_PAY_NOTICE    <> "Y" And
+   ARSBILLING:BILL_PLAN = "DB"
+   And ARSBILLING:STATUS One Of "B"
+   Then
+   Begin
+      Do ADD_ARSINVWORK
+      do update_arsbilling
+   End
+
+If G_RUN_MODE  One Of 2 And -- run from dec page processing
+   ARSBILLING:POLICY_NO = G_POLICY_NO And
+   arsbilling:trans_code one of 15 and
+   L_UNDERWRITING_CX   <> "Y" And
+   L_NON_PAY_NOTICE    <> "Y" And
+   ARSBILLING:trans_eff >= G_STARTING_DATE And
+   ARSBILLING:trans_exp <= G_ENDING_DATE And
+   ARSBILLING:BILL_PLAN = "DB"
+   And ARSBILLING:STATUS One Of "B" -- coming from the dec page this should be "O"
+   Then
+   Begin
+      Do ADD_ARSINVWORK
+      do update_arsbilling
+   End
+
+
+If G_RUN_MODE  One Of 6 And -- run from dec page processing
+   ARSBILLING:POLICY_NO = G_POLICY_NO And
+   L_UNDERWRITING_CX   <> "Y" And
+   L_NON_PAY_NOTICE    <> "Y" And
+   ARSBILLING:BILLING_CTR = 1 And  -- initial invoices
+/* this will pick up all missed initial invoices to date */
+   ARSBILLING:DUE_DATE >= G_STARTING_DATE And
+   ARSBILLING:DUE_DATE <= G_ENDING_DATE And
+   ARSBILLING:BILL_PLAN = "DB"
+   And ARSBILLING:STATUS One Of "O" -- coming from the dec page this should be "O"
+   Then
+   Begin
+      Do ADD_ARSINVWORK
+      Do UPDATE_ARSBILLING
+   End
+   If ARSBILLING:TRANS_CODE > L_LAST_TRANS_CODE And
+      ARSBILLING:TRANS_CODE One Of  10, 14 Then
+   Begin
+       L_LAST_TRANS_CODE = ARSBILLING:TRANS_CODE
+   End
+
+   Next ARSBILLING
+
+End -- end of while
+
+End -- end of procedure
+
+Procedure BUILD_INVOICE_WORK_FILE
+Begin
+--Read (23,1,"build invoice work file --- Press Enter to Continue ",L_ENTER,1)
+
+
+L_RECORD_COUNTER_69 = 0
+
+Access ARSBILLING, Set ARSBILLING:COMPANY_ID = L_COMPANY, Approximate
+
+While ARSBILLING:ERRORNUMBER <> ERR_EOF
+
+begin
+
+COUNTER = COUNTER + 1
+If COUNTER Mod 10000 = 0 Then
+Begin
+    Write ("%c%s%n",05001,"Building Workfile Counter = ",COUNTER )
+End
+
+If L_HOLD_POLICY_NO2 = 0 Then -- first time through
+Begin
+    L_HOLD_POLICY_NO2 = ARSBILLING:POLICY_NO
+    L_CREATED_INSTALLMENT_CHARGE = 0
+End
+
+If L_HOLD_POLICY_NO2 <> ARSBILLING:POLICY_NO Then
+Begin
+    L_HOLD_POLICY_NO2 = ARSBILLING:POLICY_NO
+    L_HOLD_TRANS_EFF  = ARSBILLING:TRANS_EFF
+    L_HOLD_TRANS_EXP  = ARSBILLING:TRANS_EXP
+    L_CREATED_INSTALLMENT_CHARGE = 0
+    L_TOTAL_ANNUAL = 0
+End
+
+If L_HOLD_TRANS_EFF < ARSBILLING:TRANS_EFF Then
+Begin
+    L_HOLD_TRANS_EFF = ARSBILLING:TRANS_EFF
+End
+
+If L_HOLD_TRANS_EXP < ARSBILLING:TRANS_EXP Then
+Begin
+    L_HOLD_TRANS_EXP = ARSBILLING:TRANS_EXP
+End
+
+    Do CHECK_FOR_UNDERWRITING_CX
+    Do CHECK_FOR_NON_PAY
+
+If ARSCONTROL:PRINT_ALL_PAST_DUE One Of 0 And
+   G_RUN_MODE  = 0 And  -- nightly processing of installment
+   L_UNDERWRITING_CX   <> "Y" And
+   L_NON_PAY_NOTICE    <> "Y" And
+/* this will pick up all missed installment invoices to date */
+  (ARSBILLING:DUE_DATE <= G_ENDING_DATE And
+   ARSBILLING:BILL_PLAN = "DB" And
+   ARSBILLING:STATUS One Of "O")   -- pickup OPENS only
+   Then
+   Begin
+      Do ADD_ARSINVWORK
+      Do UPDATE_ARSBILLING
+   End
+
+If ARSCONTROL:PRINT_ALL_PAST_DUE One Of 1 And
+   G_RUN_MODE  = 0 And  -- nightly processing of installment
+/* this will pick up all missed installment invoices to date */
+  (ARSBILLING:DUE_DATE <= G_ENDING_DATE And
+   ARSBILLING:BILL_PLAN = "DB" And
+   ARSBILLING:STATUS One Of "O", "B","C")   -- pickup OPENS only
+   and ((todaysdate - arsbilling:billed_date) mod arscontrol:days_to_rebill = 0 and arsbilling:billed_date < todaysdate)
+   Then
+   Begin
+      Do ADD_ARSINVWORK
+      Do UPDATE_ARSBILLING
+   End
+
+If G_RUN_MODE  = 3 And -- run from screen select
+   L_UNDERWRITING_CX   <> "Y" And
+   L_NON_PAY_NOTICE    <> "Y" And
+   ARSBILLING:BILLING_CTR = 1 And  -- initial invoices
+   ARSBILLING:DUE_DATE >= G_STARTING_DATE And
+   ARSBILLING:DUE_DATE <= G_ENDING_DATE And
+   ARSBILLING:BILL_PLAN = "DB" And
+   ARSBILLING:STATUS One Of "O"
+   Then
+   Begin
+      Do ADD_ARSINVWORK
+
+      Do UPDATE_ARSBILLING
+   End
+
+If G_RUN_MODE  = 4 And -- run from screen select
+   L_UNDERWRITING_CX   <> "Y" And
+   L_NON_PAY_NOTICE    <> "Y" And
+   ARSBILLING:BILLING_CTR > 1 And  -- installment invoices
+   -- april 11,2002 - dlp- was due_date now billed_date
+  ((ARSBILLING:DUE_DATE >= G_STARTING_DATE And
+    ARSBILLING:DUE_DATE <= G_ENDING_DATE And
+    ARSBILLING:BILL_PLAN = "DB" And
+    ARSBILLING:STATUS One Of "O") Or
+   (ARSBILLING:STATUS = "O" And
+    ARSBILLING:DUE_DATE < G_STARTING_DATE))
+   Then
+   Begin
+      Do ADD_ARSINVWORK
+      Do UPDATE_ARSBILLING
+   End
+
+/* re-print both intial and installment invoices */
+If G_RUN_MODE  = 5 And -- run from screen select
+   L_UNDERWRITING_CX   <> "Y" And
+   L_NON_PAY_NOTICE    <> "Y" And
+   -- april 11 2002 - changed from due date to billed date
+   ARSBILLING:BILLED_DATE >= G_STARTING_DATE And
+   ARSBILLING:BILLED_DATE <= G_ENDING_DATE And
+   ARSBILLING:BILL_PLAN = "DB" And
+   ARSBILLING:STATUS One Of "B"
+   Then
+   Begin
+      Do ADD_ARSINVWORK
+   End
+
+/* re-print both installment invoices */
+If G_RUN_MODE  = 8 And -- run from screen select
+   L_UNDERWRITING_CX   <> "Y" And
+   L_NON_PAY_NOTICE    <> "Y" And
+   ARSBILLING:BILLED_DATE >= G_STARTING_DATE And
+   ARSBILLING:BILLED_DATE <= G_ENDING_DATE And
+   ARSBILLING:BILL_PLAN = "DB" And
+   ARSBILLING:STATUS One Of "B" And
+   ARSBILLING:BILLING_CTR > 1
+   Then
+   Begin
+      Do ADD_ARSINVWORK
+   End
+
+   Next ARSBILLING
+
+
+End
+
+
+End
+
+PROCEDURE CHECK_FOR_PAST_DUE
+BEGIN
+l_last_policy_no  = 0
+L_COMPANY_id      = ""
+l_payment_ctr     = 1
+l_trans_type      = "I"
+l_net_amount_due  = 0.00
+
+-- USING THE NEWLY CREATED ARSINVWORK FILE CHECK THE ARSBILLING
+-- FILE FOR ANY RECORDS WITH THE SAME POLICY NUMBER THAT HAVE
+-- AN AMOUNT DUE - CONSIDER THIS ALL PAST DUE
+
+Access ARSINVWORK_ALIAS, Set ARSINVWORK_ALIAS:COMPANY_ID = l_company_id, Approximate
+
+While ARSINVWORK_ALIAS:COMPANY_ID <> ""
+Begin
+  if arsinvwork_alias:policy_no  <> l_last_policy_no then
+
+  {
+   access arsbilling_alt, set arsbilling_alt:company_id = arsinvwork_alias:company_id,
+                              arsbilling_alt:policy_no  = arsinvwork_alias:policy_no, approximate
+
+   while arsbilling_alt:company_id = arsinvwork_alias:company_id and
+         arsbilling_alt:policy_no  = arsinvwork_alias:policy_no
+        begin
+        l_net_amount_due = (arsbilling_alt:installment_amount -
+                           (arsbilling_alt:total_amount_paid + arsbilling_alt:write_off_amount))
+
+        if l_net_amount_due           > 0.00 and
+           arsbilling_alt:due_date < todaysdate and
+           arsbilling_alt:status one of "B" then
+           {
+
+             Access ARSINVWORK_alt2, Set ARSINVWORK_alt2:COMPANY_ID  = ARSBILLING_alt:COMPANY_ID,
+                                         ARSINVWORK_alt2:POLICY_NO   = ARSBILLING_alt:POLICY_NO,
+                                         ARSINVWORK_alt2:TRANS_TYPE  = L_TRANS_TYPE,
+                                         ARSINVWORK_alt2:DUE_DATE    = ARSBILLING_alt:DUE_DATE,
+                                         ARSINVWORK_alt2:PAYMENT_CTR = L_PAYMENT_CTR
+
+
+             If ARSINVWORK_alt2:COMPANY_ID  <> ARSBILLING_alt:COMPANY_ID Or
+                ARSINVWORK_alt2:POLICY_NO   <> ARSBILLING_alt:POLICY_NO Or
+                ARSINVWORK_alt2:TRANS_TYPE  <> L_TRANS_TYPE Or
+                ARSINVWORK_alt2:DUE_DATE    <> ARSBILLING_alt:DUE_DATE Or
+                ARSINVWORK_alt2:PAYMENT_CTR <> L_PAYMENT_CTR Then
+                Begin
+                   Add ARSINVWORK_alt2
+                   Begin
+                     ARSINVWORK_alt2:COMPANY_ID            = ARSBILLING_alt:COMPANY_ID
+                     ARSINVWORK_alt2:POLICY_NO             = ARSBILLING_alt:POLICY_NO
+                     ARSINVWORK_alt2:TRANS_TYPE            = L_TRANS_TYPE
+                     ARSINVWORK_alt2:DUE_DATE              = ARSBILLING_alt:DUE_DATE
+                     ARSINVWORK_alt2:PAYMENT_CTR           = L_PAYMENT_CTR
+                     ARSINVWORK_alt2:STATUS                = ARSBILLING_alt:STATUS
+                     ARSINVWORK_alt2:BILLED_DATE           = arsbilling_alt:billed_date
+                     ARSINVWORK_alt2:EFF_DATE              = ARSBILLING_alt:TRANS_EFF
+                     ARSINVWORK_alt2:EXP_DATE              = ARSBILLING_alt:TRANS_EXP
+                     ARSINVWORK_alt2:TRANS_CODE            = ARSBILLING_alt:TRANS_CODE
+                     ARSINVWORK_alt2:BILLING_CTR           = ARSBILLING_alt:BILLING_CTR
+                     ARSINVWORK_alt2:INSTALLMENT_AMOUNT    = l_net_amount_due
+                     ARSINVWORK_alt2:TOTAL_AMOUNT_PAID     = 0.00
+                     ARSINVWORK_alt2:WRITE_OFF_AMOUNT      = 0.00
+                     ARSINVWORK_alt2:NET_AMOUNT_DUE        = l_net_amount_due
+                     -- here we are using consent order for workerscomp reverse when all the due
+                     -- dates are paid and an endorsement is done so the wording on the
+                     -- invoice is "Endorsement" NOT "Installment #"
+                     arsinvwork_alt2:consent_order         = arsbilling_alt:consent_order
+
+                     If ARSBILLING_alt:TRANS_CODE One Of 10,14,15,16,12,13,19,60,64,66,62,63,69,72,75  Then
+                      {
+                        l_company_id5   = arsbilling_alt:company_id
+                        l_policy5    = arsbilling_alt:policy_no
+                        access sfpname, set sfpname:policy_no   = ARSBILLING_alt:POLICY_NO,
+                                            sfpname:pol_year        = ARSBILLING_alt:POL_YEAR,
+                                            sfpname:end_sequence    = ARSBILLING_alt:END_SEQUENCE, GENERIC
+
+                        if sfpname:status = "EXPIRED" then
+                         {
+                          l_trans_eff = dateadd(arsbilling_alt:trans_eff,0,1)
+                          l_trans_exp = dateadd(arsbilling_alt:trans_exp,0,1)
+                         }
+                        else
+                         {
+                          l_trans_eff = arsbilling_alt:trans_eff
+                          l_trans_exp = arsbilling_alt:trans_exp
+                         }
+                        Do GET_TOTAL_ANNUAL
+
+                     }
+
+                     ARSINVWORK_alt2:TOTAL_ANNUAL          = l_total_annual    -- 0.00
+                     ARSINVWORK_alt2:PAST_DUE              = "Y"
+                     ARSINVWORK_alt2:PAYMENT_PLAN          = ARSBILLING_alt:PAYMENT_PLAN
+                     ARSINVWORK_alt2:AGENT_NO              = ARSBILLING_alt:AGENT_NO
+                     ARSINVWORK_alt2:LINE_OF_BUSINESS      = ARSBILLING_alt:LINE_OF_BUSINESS
+                     ARSINVWORK_alt2:LOB_SUBLINE           = ARSBILLING_alt:LOB_SUBLINE
+                     ARSINVWORK_alt2:COMM_RATE             = ARSBILLING_alt:COMM_RATE
+                    ARSINVWORK_alt2:RETURN_CHECK_CTR      = ARSBILLING_alt:RETURN_CHECK_CTR
+                    ARSINVWORK_alt2:CHECK_NO              = ARSBILLING_alt:CHECK_NO
+                    ARSINVWORK_alt2:reversed_premium      = ARSBILLING_alt:reversed_premium
+                   End
+                end
+             else
+              change arsinvwork_alt2
+               begin
+                 if arsinvwork_alt2:trans_code one of 15,22,23 then
+                  {
+                  ARSINVWORK_alt2:INSTALLMENT_AMOUNT    = arsinvwork_alt2:installment_amount + l_net_amount_due
+                  }
+                 else
+                  {
+                   if arsinvwork_alt2:due_date = arsbilling_alt:due_date then
+                    ARSINVWORK_alt2:INSTALLMENT_AMOUNT    = arsinvwork_alt2:installment_amount + l_net_amount_due
+                  }
+
+                 if arsbilling_alt:trans_code = 15 then
+                  {
+                   arsinvwork_alt2:trans_code = arsbilling_alt:trans_code
+                  }
+
+                 if arsbilling_alt:trans_code one of 10,14,16 and
+                    arsbilling_alt:trans_code one of 12,13,22,23 then
+                  {
+                   arsinvwork_alt2:trans_code = arsbilling_alt:trans_code
+                  }
+               end
+
+           } -- end of checking for l_net_amount_due > 0.00
+
+        next arsbilling_alt
+        end
+  }
+  l_last_policy_no = arsinvwork_alias:policy_no
+  Next ARSINVWORK_ALIAS
+  End
+
+END -- END OF PROCEDURE
+
+
+Procedure NEW_NOTICES
+Begin
+L_FIRST_TIME      = "Y"
+L_COMPANY_id      = ""
+L_TOTALS_PAGE     = "N"
+L_COPIES_REQUIRED = 0
+L_POLICY_PRINTED  = "N"
+
+Deletefile(l_invoice_name[1])
+
+-- commented the next 2 lines on march 28, 2002
+--Writefile(l_invoice_name[1],"%s<NL>",L_RESET)  -- reset the printer
+--Writefile(l_invoice_name[1],"%s<NL>","<033>&l2A")  -- set to letter size
+
+L_LINES_PRINTED = 0 -- to track the lines being printed
+L_PAGES_CTR     = 0
+L_COPY_CTR      = 0 -- this is only to control the # of stmts for testing, remove for live
+
+Access ARSINVWORK, Set ARSINVWORK:COMPANY_ID = L_COMPANY_id, Approximate
+
+While ARSINVWORK:COMPANY_ID <> ""  -- not end of file
+  Begin
+    If L_FIRST_TIME = "Y" Then
+      Begin
+        L_POLICY_PRINTED   = "N"
+        L_FIRST_TIME       = "N"
+        L_TOTAL_AMOUNT_DUE = 0.00
+        L_MAXIMUM_BILLING_CTR = 0
+        L_HOLD_COMPANY_ID  = ARSINVWORK:COMPANY_ID
+        L_HOLD_POLICY_NO   = ARSINVWORK:POLICY_NO
+        L_HOLD_EXP_DATE    = ARSINVWORK:EXP_DATE
+        L_HOLD_EFF_DATE    = ARSINVWORK:EFF_DATE
+        L_PAGES_CTR = 1
+        Do GET_CURRENT_SFPNAME
+        Access SFPNAME,
+           Set SFPNAME:POLICY_NO    = L_POLICY_NO,
+               SFPNAME:POL_YEAR     = L_POL_YEAR,
+               SFPNAME:END_SEQUENCE = L_END_SEQUENCE
+        l_sfpname_exp_date = dateadd(sfpname:exp_date,0,-1)
+        if ARSINVWORK:trans_code one of 14 then
+          begin
+            do get_expiring_premium
+          end
+
+        access scipsimage,
+           set scipsimage:company_id = sfpname:company_id, generic
+
+        access scipsimage_version5,
+           set scipsimage_version5:company_id = sfpname:company_id, generic
+
+
+        L_COPY_CTR = 3 -- start at 3 since this is a fixed number
+        Do GET_NUMBER_OF_COPIES
+        L_HOLD_COPY_CTR = 1
+        Do EJECT_PAGE
+        Do PRINT_FORM
+        L_LINES_PRINTED = 0
+        L_V_POSITION    = 1800
+      End
+
+    If L_HOLD_POLICY_NO <> ARSINVWORK:POLICY_NO Then
+      Begin
+        L_POLICY_PRINTED = "N"
+        L_PAGES_CTR = 1
+        -- sets l_policy_no, l_pol_year and l_end_sequence values
+        L_HOLD_COMPANY_ID = ARSINVWORK:COMPANY_ID
+        L_HOLD_POLICY_NO = ARSINVWORK:POLICY_NO
+        L_HOLD_EXP_DATE  = ARSINVWORK:EXP_DATE
+        L_HOLD_EXP_DATE  = ARSINVWORK:EFF_DATE
+        if ARSINVWORK:trans_code one of 14 then
+          begin
+            do get_expiring_premium
+          end
+        Do GET_CURRENT_SFPNAME
+        Access SFPNAME, Set SFPNAME:POLICY_NO    = L_POLICY_NO,
+                            SFPNAME:POL_YEAR     = L_POL_YEAR,
+                            SFPNAME:END_SEQUENCE = L_END_SEQUENCE
+        L_COPY_CTR = 3 -- start at 3 since this is a fixed number
+        Do GET_NUMBER_OF_COPIES
+        L_HOLD_COPY_CTR = 1
+        Do EJECT_PAGE
+        Do PRINT_FORM
+        L_LINES_PRINTED = 0
+        L_V_POSITION    = 1800
+        L_MAXIMUM_BILLING_CTR = 0
+      End
+
+    If L_POLICY_PRINTED = "N" Then
+      Begin
+        L_POLICY_PRINTED = "Y"
+
+        --- new logic i added dap to print the insured copy if a payor found other than insured
+        if sfpname:company_id = "LEBINS" and
+           l_payor_found = "Y" and
+           l_payor_type <> "I" then
+            l_copy_ctr = 4
+        else
+            L_COPY_CTR = 3
+
+
+        if l_portal_copy = 1 then 
+        { 
+              l_copy_ctr = 0
+        }
+
+        For L_SUB = 1 To L_COPY_CTR
+          Begin
+           l_skip_invoice = "N"
+           l_skip_invoice_mob = "N"
+
+           if l_sub = 2 and arscontrol2:no_print_producer_agent = 1 then
+           {
+            l_skip_invoice = "Y"
+           }
+
+           access mobmaster, set mobmaster:company_id = arsinvwork:company_id,
+                                 mobmaster:policy_no  = arsinvwork:policy_no, generic
+
+/*
+write ("<014>")
+write ("%c%s%n",2001,"arscontrol2:mob  = ",arscontrol2:mob)
+write ("%c%s%n",3001,"l_sub            = ",l_sub)
+write ("%c%s%n",4001,"mobmaster:paperless_invoicing  = ",mobmaster:paperless_invoicing)
+write ("%c%s%n",5001,"arsinvwork:billing_ctr         = ",arsinvwork:billing_ctr)
+write ("%c%s%n",6001,"arscontrol2:no_print_producer_agent = ",arscontrol2:no_print_producer_agent)
+Read (23,1,"at mobmaster Press Enter to Continue ",L_ENTER,1)
+*/
+
+           if arscontrol2:mob = 1 then
+           {
+            if l_sub = 1 and mobmaster:paperless_invoicing = 1 and
+               arsinvwork:billing_ctr <> 1 then
+            {
+             l_skip_invoice_mob  = "Y"
+            }
+           }
+
+           if (l_sub = 2 and
+              l_skip_invoice = "N") or
+              (l_sub = 1 and
+              l_skip_invoice_mob = "N") or
+              l_sub > 2 then
+           {
+            /* loop here for the number of copies needed */
+            If L_HOLD_COPY_CTR <> L_SUB Then
+              {
+                If ((ARSCONTROL:INVOICE_COPIES_TO_PRINT One Of "I" And
+                     L_SUB <> 0) Or
+                    (ARSCONTROL:INVOICE_COPIES_TO_PRINT One Of "A" And
+                     L_SUB <> 3) Or
+                    (ARSCONTROL:INVOICE_COPIES_TO_PRINT One Of "P" And
+                     L_SUB One Of 1)) Then
+                  Begin
+                    L_PAGES_CTR = 1
+                    L_HOLD_COPY_CTR = L_SUB
+                    Do EJECT_PAGE
+                    if scipsimage:items_as_image[5] one of "1" and   --if there is something here use old scips image file
+                       g_scan one of 1 then
+                      {
+                        if l_hold_copy_ctr one of 3 then
+                          {
+                            l_invoice_name[1] = programid + "i.pcl"
+                            l_invoice_name[2] = programid + ".pcl"
+                          }
+                      }
+                    else
+                      if scipsimage_version5:items_as_image[5] one of "1" and  -- if there is nothing in scipsimage:items-as_image[5] use this new version5
+                         g_scan one of 1 then
+                        {
+                          if l_hold_copy_ctr one of 3 then
+                            {
+                              l_invoice_name[1] = programid + "i.pcl"
+                              l_invoice_name[2] = programid + ".pcl"
+                            }
+                        }
+                    Do PRINT_FORM
+                    L_LINES_PRINTED = 0
+                    L_V_POSITION    = 1800
+                  End      --if
+              }
+
+            If ((ARSCONTROL:INVOICE_COPIES_TO_PRINT One Of "I" And
+                 L_SUB <> 0) Or
+                (ARSCONTROL:INVOICE_COPIES_TO_PRINT One Of "A" And
+                 L_SUB <> 3) Or
+                (ARSCONTROL:INVOICE_COPIES_TO_PRINT One Of "P" And
+                 L_SUB One Of 1)) Then
+              Begin
+                Do PRINT_DETAIL_LINE
+                Do PRINT_TOTAL_DUE
+                If ARSCONTROL:PRINT_FUTURE_INSTALLMENTS = 1 Then
+                  Begin
+                    Do PRINT_POLICY_INSTALLMENTS
+                  End
+
+                if scipsimage:items_as_image[5] one of "1" and      --if there is something here use old scips image file
+                   g_scan one of 1 then
+                  {
+                    if l_hold_copy_ctr one of 3 then
+                      {
+                        closefile(l_invoice_name[1])
+                        do add_image_header
+                        l_invoice_name[1] = programid + ".pcl"
+                        l_invoice_name[2] = programid + "i.pcl"
+                      }
+                  }
+                else
+                  {
+                    if scipsimage_version5:items_as_image[5] one of "1" and    --if there is something here use old scips image file
+                       g_scan one of 1 then
+                      {
+                        if l_hold_copy_ctr one of 3 then
+                          {
+                            closefile(l_invoice_name[1])
+                            do add_image_header1
+                            l_invoice_name[1] = programid + ".pcl"
+                            l_invoice_name[2] = programid + "i.pcl"
+                          }
+                      }
+                  }
+              End  --if arscontrol:invoice_copies_to_print one of I, A, P
+           } -- end of skip
+          End      -- end of loop
+      End          -- end of l_policy_printed check
+    Next ARSINVWORK
+    l_credit_card_total_due = 0
+  End              -- end of checking for 0 policy no
+  Closefile(l_invoice_name[2])
+End -- end of new_invoices
+
+/* *****************  Printing Invoice Form ************************** */
+
+
+Procedure PRINT_FORM
+
+Begin
+ l_skip_form = "N"
+ l_skip_form_mob = "N"
+
+ if l_hold_copy_ctr = 2 and arscontrol2:no_print_producer_agent = 1 then
+   {
+    l_skip_form = "Y"
+   }
+
+ access mobmaster, set mobmaster:company_id = arsinvwork:company_id,
+                       mobmaster:policy_no  = arsinvwork:policy_no, generic
+
+ if arscontrol2:mob = 1 then
+   {
+    if l_hold_copy_ctr = 1 and
+       mobmaster:paperless_invoicing = 1 and
+       arsinvwork:billing_ctr <> 1  then
+     {
+      l_skip_form_mob = "Y"
+     }
+   }
+
+ if (l_hold_copy_ctr = 2 and
+    l_skip_form = "N") or
+    (l_hold_copy_ctr = 1 and
+    l_skip_form_mob = "N") or
+    l_hold_copy_ctr > 2 then
+ {
+  l_sfs_code = "SFS"
+  L_TOTALS_PAGE = "N"
+  l_file_name = l_invoice_name[1]
+
+  if l_total_annual <> 0 then
+      {
+       L_TOTAL_ANNUAL_NET = l_total_annual
+      }
+
+--  setup access to all external files here
+
+  Access SFSCOMPANY, Set SFSCOMPANY:NAME = ARSINVWORK:COMPANY_ID, Approximate
+
+  Access SFSDEFAULT, Set SFSDEFAULT:SFS_CODE = L_SFS_CODE, generic
+
+  Access SFSCOMPANY, Set SFSCOMPANY:COMPANY_ID = SFSDEFAULT:COMPANY_ID, generic
+
+  Access SFSAGENT,
+     Set SFSAGENT:COMPANY_ID = ARSINVWORK:COMPANY_ID,
+         SFSAGENT:AGENT_NO   = ARSINVWORK:AGENT_NO, Generic
+
+  Do GET_CURRENT_SFPNAME
+
+  Access SFPNAME,
+     Set SFPNAME:POLICY_NO    = L_POLICY_NO,
+         SFPNAME:POL_YEAR     = L_POL_YEAR,
+         SFPNAME:END_SEQUENCE = L_END_SEQUENCE
+
+  if sfpname:line_Of_business = 99 then
+    l_lob = 99
+  else
+    l_lob = arsinvwork:line_of_business
+
+  Access ARSPAYPLAN, Set ARSPAYPLAN:COMPANY_ID       = ARSINVWORK:COMPANY_ID,
+                         ARSPAYPLAN:LINE_OF_BUSINESS = l_lob,
+                         ARSPAYPLAN:PAYMENT_PLAN     = ARSINVWORK:PAYMENT_PLAN, Approximate
+
+  l_line_of_business = sfpname:line_of_business
+
+  Access SFSLINE, Set SFSLINE:COMPANY_ID       = sfscompany:company_id,
+                      SFSLINE:LINE_OF_BUSINESS = l_line_of_business,
+                      SFSLINE:LOB_SUBLINE      = l_lob_subline, Approximate
+
+  /* end of access setup */
+
+  -- select tray to print to
+  if sfscompany:company_id = "NWIC" then
+    {
+      write("%c%x",10001,SFSPRINTER:TRAY2[5])
+      Writefile(L_FILE_NAME,"%s%n%s","<033>&l",SFSPRINTER:TRAY2[5],"H")
+    }
+  else
+    {
+      Writefile(l_invoice_name[1],"<033>%s<NL>",Trun(ARSCONTROL:INVOICE_TRAY_OPTION))
+    }
+  Writefile(l_invoice_name[1],"<033>&a90h0V") -- CAP to top
+  Writefile(l_invoice_name[1],"%s<NL>",L_ARIAL)
+
+  /* draw the box around the form */
+
+     -- left and right verticle lines --          2900 replaced by 3050
+     -- was 2900
+  Writefile(l_invoice_name[1],"<033>&a90h0V<033>*c5a3000b0P<NL>")
+  Writefile(l_invoice_name[1],"<033>&a5670h0V<033>*c5a3000b0P")
+  Writefile(l_invoice_name[1],"<033>&a0h0V") -- CAP
+
+       -- top and bottom horizontal lines --
+  Writefile(l_invoice_name[1],"<033>&a90h0V<033>*c5580h5v0P<NL>")
+  -- was 6960
+  Writefile(l_invoice_name[1],"<033>&a90h7200V<033>*c5580h5v0P")
+  Writefile(l_invoice_name[1],"<033>&a0h0V") -- CAP
+
+  /* draw lines within the form */
+  Writefile(l_invoice_name[1],"<033>&a90h1440V<033>*c5580h5v0P<NL>") -- 1st line
+  Writefile(l_invoice_name[1],"<033>&a90h1620V<033>*c5580h5v0P<NL>") -- 2nd line
+  Writefile(l_invoice_name[1],"<033>&a90h1800V<033>*c5580h5v0P<NL>") -- 3rd line
+  -- was 5390
+  Writefile(l_invoice_name[1],"<033>&a90h5040V<033>*c5580h5v0P<NL>") -- 4th line
+  Writefile(l_invoice_name[1],"<033>&a90h1620V<033>*c2325a75b5g2P<NL>") -- shading
+
+  /* draw small verticle lines in headings */
+  Writefile(l_invoice_name[1],"<033>&a810h1620V<033>*c5a80b0P<NL>")  -- 1st line
+  Writefile(l_invoice_name[1],"<033>&a1530h1620V<033>*c5a80b0P<NL>") -- 2nd line
+  Writefile(l_invoice_name[1],"<033>&a3780h1620V<033>*c5a80b0P<NL>") -- 3rd line
+  Writefile(l_invoice_name[1],"<033>&a4680h1620V<033>*c5a80b0P<NL>") -- 4th line
+
+  /* draw pay this amount box */
+  -- was 5390
+  Writefile(l_invoice_name[1],"<033>&a2800h5040V<033>*c5a150b0P<NL>") -- left side verticle line
+  -- was 5750
+  Writefile(l_invoice_name[1],"<033>&a2800h5400V<033>*c2880h5v0P<NL>") -- bottom of box
+
+  /* draw fold tick mark */
+  Writefile(l_invoice_name[1],"<033>&a90h4635V<033>*c150h5v0P<NL>")
+
+  /* print arscontrol items */
+  Writefile(l_invoice_name[1],"%s",L_ARIAL)
+  -- was 5040
+  Writefile(l_invoice_name[1],"<033>&a180h4770V")
+  Writefile(l_invoice_name[1],"%s",ARSCONTROL:INVOICE_PAYTO+"<NL>")
+  -- was 5040
+  Writefile(l_invoice_name[1],"<033>&a3240h4770V")
+  Writefile(l_invoice_name[1],"%s",ARSCONTROL:invoice_company+"<NL>")
+  Writefile(l_invoice_name[1],"<033>&a3040h5160V")
+  Writefile(l_invoice_name[1],"%s",ARSCONTROL:INVOICE_SLOGAN+"<NL>")
+  -- was 5390
+  Writefile(l_invoice_name[1],"<033>&a180h5040V")
+  Writefile(l_invoice_name[1],"%s",ARSCONTROL:INVOICE_SEPERATOR+"<NL>")
+  Writefile(l_invoice_name[1],"<033>&a3100h5400V") -- was 5940V
+  Writefile(l_invoice_name[1],"%s",ARSCONTROL:INVOICE_PAYMENT_OPTIONS+"<NL>")
+  Writefile(l_invoice_name[1],"%s",L_ARIAL_ITALIC_12)
+  Writefile(l_invoice_name[1],"<033>&a2800h5520V") -- was 6060V
+  Writefile(l_invoice_name[1],"%s",ARSCONTROL:INVOICE_CLOSING+"<NL>")
+
+  Writefile(l_invoice_name[1],"%s",L_ARIAL)
+
+  /* print invoice message
+  do not print if other than first installment and
+  payment plan not equal to annual */
+
+  Access ARSCONTROL2,
+     Set ARSCONTROL2:COMPANY_ID = ARSCONTROL:COMPANY_ID
+
+  if arscontrol2:turn_on_pay_by_credit_card_msg one of 1 then
+    {
+      if ARSINVWORK:EFF_DATE >= arscontrol2:eff_date_pay_by_credit_card_msg and
+         arsinvwork:trans_code not one of 11 then
+        {
+          l_h_position1 = str(arscontrol2:CREDIT_CARD_HORIZONTAL_POSITION[1])
+          l_v_position1 = str(arscontrol2:CREDIT_CARD_VERTICAL_POSITION[1])
+          if arscontrol2:company_id one of "FLEMINGTON" then
+            {
+              Writefile(L_FILE_NAME,"%s%n%s","<033>&a",val(l_h_position1) - 125,"h")
+              Writefile(L_FILE_NAME,"%n%s",val(l_v_position1)-150,"V<033>*c10a220b0P")   --left vertical line
+              Writefile(L_FILE_NAME,"%s%n%s","<033>&a",val(l_h_position1) + 4400,"h")
+              Writefile(L_FILE_NAME,"%n%s",val(l_v_position1)-150,"V<033>*c10a220b0P")   --right vertical
+
+              Writefile(L_FILE_NAME,"%s%n%s","<033>&a",val(l_h_position1) -125,"h")
+              Writefile(L_FILE_NAME,"%n%s",val(l_v_position1)-150,"V<033>*c4530h20v0P") --top horizontal line to
+
+              Writefile(L_FILE_NAME,"%s%n%s","<033>&a",val(l_h_position1)- 125,"h")
+              Writefile(L_FILE_NAME,"%n%s",val(l_v_position1)+350,"V<033>*c4530h20v0P") --bottom horizontal line
+
+              L_FONT             = L_ARIAL_BOLD_12
+              L_MAX_CHAR         = 70
+              l_max_lines        = 60
+              l_character_string = trun(arscontrol2:pay_by_credit_card_wording)
+              Include "line_spacing1.inc"
+              l_line_counter = 0
+            }
+          else
+            {
+              if trun(arscontrol2:pay_by_credit_card_header) <> "" then
+                {
+                  l_h_position1 = str(arscontrol2:CREDIT_CARD_HORIZONTAL_POSITION[2])
+                  l_v_position1 = str(arscontrol2:CREDIT_CARD_VERTICAL_POSITION[2])
+                  Writefile(L_FILE_NAME,"%s%n%s","<033>&a",val(l_h_position1) -125,"h")
+                  Writefile(L_FILE_NAME,"%n%s",val(l_v_position1)-150,"V<033>*c4225h20v0P") --top horizontal line to
+                  Writefile(L_FILE_NAME,"%s%n%s","<033>&a",val(l_h_position1) - 125,"h")
+                  Writefile(L_FILE_NAME,"%n%s",val(l_v_position1)-150,"V<033>*c10a164b0P")   --left vertical line
+                  Writefile(L_FILE_NAME,"%s%n%s","<033>&a",val(l_h_position1) + 4100,"h")
+                  Writefile(L_FILE_NAME,"%n%s",val(l_v_position1)-150,"V<033>*c10a164b0P")   --right vertical
+                  writefile(l_file_name,"%s",l_arial_bold_12)
+                  writefile(L_FILE_NAME,"%s%n%s","<033>&a",val(L_H_POSITION1),"h")
+                  writefile(L_FILE_NAME,"%s%s",l_v_position1,"V")
+                  writefile(l_file_name,"%s",l_underline_start)
+                  writefile(L_FILE_NAME,"%s%n%s","<033>&a",val(L_H_POSITION1),"h")
+                  writefile(L_FILE_NAME,"%s%s",l_v_position1,"V")
+                  writefile(l_file_name,"%s",trun(arscontrol2:pay_by_credit_card_header))
+                  writefile(l_file_name,"%s",l_underline_end)
+                }
+              l_h_position1 = str(arscontrol2:CREDIT_CARD_HORIZONTAL_POSITION[1])
+              l_v_position1 = str(arscontrol2:CREDIT_CARD_VERTICAL_POSITION[1])
+              Writefile(L_FILE_NAME,"%s%n%s","<033>&a",val(l_h_position1) - 125,"h")
+              Writefile(L_FILE_NAME,"%n%s",val(l_v_position1)-150,"V<033>*c10a164b0P")   --left vertical line
+              Writefile(L_FILE_NAME,"%s%n%s","<033>&a",val(l_h_position1) + 4100,"h")
+              Writefile(L_FILE_NAME,"%n%s",val(l_v_position1)-150,"V<033>*c10a164b0P")   --right vertical
+  --            Writefile(L_FILE_NAME,"%n%s",val(l_v_position1)-150,"V<033>*c4225h20v0P") --top horizontal line to
+              Writefile(L_FILE_NAME,"%s%n%s","<033>&a",val(l_h_position1)- 125,"h")
+              Writefile(L_FILE_NAME,"%n%s",val(l_v_position1)+223,"V<033>*c4225h20v0P") --bottom horizontal line
+
+              L_FONT             = L_ARIAL_BOLD_12
+              L_MAX_CHAR         = 45
+              l_max_lines        = 60
+              l_character_string = trun(arscontrol2:pay_by_credit_card_wording)
+              Include "line_spacing1.inc"
+              l_line_counter     = 0
+            }
+        }
+    }
+
+  If ARSCONTROL2:PRINT_INVOICE_MESSAGE One Of 1 Then
+  {
+    -- this is the default setting - if no values are entered
+    -- then these will be used.
+    L_V_POSITION = 2880
+    L_H_POSITION = 450
+
+    If ARSCONTROL2:INVOICE_MESSAGE_V_POSITION <> 0 Then
+    Begin
+        L_V_POSITION = ARSCONTROL2:INVOICE_MESSAGE_V_POSITION
+    End
+
+    If ARSCONTROL2:INVOICE_MESSAGE_H_POSITION <> 0 Then
+    Begin
+        L_H_POSITION = ARSCONTROL2:INVOICE_MESSAGE_H_POSITION
+    End
+
+    For L_MESSAGE_LOOP = 1 To 6
+    Begin
+        L_V_POSITION = L_V_POSITION + 120
+        Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+        Writefile(l_invoice_name[1],"%s",ARSCONTROL:INVOICE_MESSAGE_ARRAY[L_MESSAGE_LOOP])
+    End
+
+  } -- end of condition for arscontrol2:print_invoice_message one of 1
+    if l_total_annual_net <> 0 then
+     {
+      l_credit_card_total_due = l_total_annual_net
+     }
+
+  If (ARSCONTROL2:PRINT_TOTAL_DUE_ALL_INSTALLMENTS One Of 1 And
+--      arsinvwork:trans_code Not One Of 12,13 And
+     (ARSINVWORK:PAYMENT_PLAN Not One Of 1 And
+      ARSINVWORK:TRANS_CODE One Of 10,11,12,13,14,16,19,70,60)) Or
+
+     (ARSCONTROL2:PRINT_TOTAL_DUE_ALL_INSTALLMENTS One Of 0 And
+      arsinvwork:TRANS_CODE Not One Of 12,13 And
+     (ARSINVWORK:BILLING_CTR One Of 1 And
+      ARSINVWORK:PAYMENT_PLAN Not One Of 1 And
+      ARSINVWORK:TRANS_CODE One Of 10,11,12,13,14,16,19,70,60)) or
+
+  -- new logic for lebins - print failure notice on annual
+     (ARSCONTROL2:PRINT_TOTAL_DUE_ALL_INSTALLMENTS One Of 1 And
+      arsinvwork:TRANS_CODE Not One Of 12,13 And
+     (ARScontrol2:print_failure_on_annual One Of 1 And
+      ARSINVWORK:TRANS_CODE One Of 10,11,12,13,14,16,18,70,60,68)) or
+
+--   catch if there is both an audit and an installment
+     (ARSCONTROL2:PRINT_TOTAL_DUE_ALL_INSTALLMENTS One Of 1 And
+      arsinvwork:trans_code One Of 15 And
+     (ARSINVWORK:PAYMENT_PLAN Not One Of 1 And
+      l_total_annual <> 0 )) or
+
+     ARSCONTROL2:PRINT_TOTAL_DUE_ALL_INSTALLMENTS One Of 1 And
+     arsinvwork:reversed_premium = 1 and
+     ARSINVWORK:PAYMENT_PLAN Not One Of 1 And
+     l_total_annual <> 0  then
+     Begin
+      Writefile(l_invoice_name[1],"%s",L_ARIAL_BOLD_12)
+
+      If ARSCONTROL2:PRINT_TOTAL_DUE_ALL_INSTALLMENTS One Of 1 then
+         {
+           L_TOTAL_ANNUAL_NET = ARSINVWORK:TOTAL_ANNUAL /* - ARSINVWORK:TOTAL_AMOUNT_PAID*/
+         }
+
+      If ARSCONTROL:INCLUDE_AMOUNT_PAID_FOR_TOTAL One Of 0 And
+         ARSINVWORK:BILLING_CTR  = 1 Then -- yes
+         {
+           L_TOTAL_ANNUAL_NET = L_TOTAL_ANNUAL_NET + ARSINVWORK:TOTAL_AMOUNT_PAID
+         }
+
+--  to or not include all unpaid installment fees on Your total amount paragraph
+
+      If ARSCONTROL:INCLUDE_INSTALL_CRG_FOR_PREMIUM = 1 then
+       {
+         do check_arsinvwork_for_first_installment
+         if l_billing_ctr_1 = "N" Then -- yes
+         {
+        -- cindyc must have loop to get all the installemnt charge in file for policy
+        -- because of multi records for due dates
+           l_total_annual_installments = 0
+           l_company_id5_install       = arsinvwork:company_id
+           l_policy5_install           = arsinvwork:policy_no
+           l_trans_exp_install         = arsinvwork:exp_date
+           if arsinvwork:trans_code one of 15 then
+              l_trans_exp_install = dateadd(l_trans_exp_install,0,1)
+
+           do get_total_annual_installments
+
+           L_TOTAL_ANNUAL_NET = L_TOTAL_ANNUAL_NET + L_TOTAL_ANNUAL_INSTALLMENTS
+
+           if l_total_annual_installments = l_total_annual_net then
+            {
+             l_total_annual_net = 0
+            }
+         }
+       }
+
+-- to get installment fees with due date > todays date
+      If ARSCONTROL:INCLUDE_INSTALL_CRG_FOR_PREMIUM = 0 then
+       {
+         do check_arsinvwork_for_first_installment
+         if l_billing_ctr_1 = "N" Then -- yes
+         {
+        -- cindyc must have loop to get all the installemnt charge in file for policy
+        -- because of multi records for due dates
+           l_total_annual_installments = 0
+           l_company_id5_install       = arsinvwork:company_id
+           l_policy5_install           = arsinvwork:policy_no
+           l_trans_exp_install         = arsinvwork:exp_date
+           do get_total_annual_installments_past_due
+
+           L_TOTAL_ANNUAL_NET = L_TOTAL_ANNUAL_NET + L_TOTAL_ANNUAL_INSTALLMENTS
+
+           if l_total_annual_installments = l_total_annual_net then
+            {
+             l_total_annual_net = 0
+            }
+         }
+       }
+
+      /* requesting the insured to look on the back of the current invoice */
+
+      if arsinvwork:payment_plan not one of 1 then
+       {
+
+        If ARSCONTROL2:BACK_OF_INVOICE_NOTICE One Of 1 Then
+         Begin
+           L_V_POSITION = 3360
+           L_H_POSITION = 450
+           Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+           Writefile(l_invoice_name[1],"%s",Trun(ARSCONTROL2:BACK_OF_INVOICE_REFERENCE))
+         End
+
+       }  -- end of back reference for annual pay
+
+      If ARSCONTROL2:PRINT_TOTAL_DUE_ALL_INSTALLMENTS One Of 1 or
+         ARSCONTROL2:PRINT_INVOICE_MESSAGE One Of 0 or
+          arsinvwork:reversed_premium = 1 then
+          Begin
+           L_V_POSITION = 3960
+           L_H_POSITION = 450
+
+           if arsinvwork:payment_plan not one of 1 and
+              l_total_annual_net <> 0 then
+            {
+            l_credit_card_total_due = l_total_annual_net
+
+             if arsinvwork:billing_ctr < arspayplan:number_of_payments then
+              {
+               Writefile(l_invoice_name[1],"%s",L_ARIAL_12)
+
+        -- added 03/09/2007 to only print Your total] amount due is ___ when last installment
+
+               Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+
+        --  if multiple due dates the l total annual does not work
+           Writefile(l_invoice_name[1],"%s","Your total amount due is" + Trun(Str(L_TOTAL_ANNUAL_NET,"($$$,$$$.99)")))
+        --     Writefile(l_invoice_name[1],"%s","Your total amount due is" + Trun(Str(arsinvwork:TOTAL_ANNUAL,"($$$,$$$.99)")))
+
+
+               L_V_POSITION = L_V_POSITION + 120
+               Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+               Writefile(l_invoice_name[1],"%s","You may pay the total amount or you")
+
+               L_V_POSITION = L_V_POSITION + 120
+               Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+               Writefile(l_invoice_name[1],"%s%s","can pay in installments with a",Trun(Str(ARSPAYPLAN:INSTALLMENT_CHARGE_RATE,"($$$.99)")))
+
+               L_V_POSITION = L_V_POSITION + 120
+               Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+               Writefile(l_invoice_name[1],"%s","per payment charge.")
+              }
+            } -- added Aug 26, 2003 (DLP)
+
+          end -- end of annual pp for arscontrol2:print_failure_on_annual
+
+      -- added 08/23/2002 - for flemington
+      Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = ARSCONTROL:COMPANY_ID
+      If ARSCONTROL2:INVOICE_FAILURE_LITERAL <> "" Then
+       {
+        if arsinvwork:payment_plan one of 1 then
+         {
+           l_V_position = l_v_position + 360
+         }
+        L_V_POSITION = L_V_POSITION + 240
+        L_H_POSITION = 260
+        Writefile(l_invoice_name[1],"%s",L_ARIAL_9)
+      --  Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+        Writefile(l_invoice_name[1],"<033>&a180h4570V")  --changed so it will work all the time
+        Writefile(l_invoice_name[1],"%s",Trun(ARSCONTROL2:INVOICE_FAILURE_LITERAL))
+       }
+
+  End
+
+  /* print mortgagee on invoice if found and control file has been set */
+
+  If ARSCONTROL:PRINT_MORTGAGEE_ON_INVOICE_HEAD = 1 Or
+     ARSCONTROL:PRINT_MORTGAGEE_ON_INVOICE_BODY = 1 Then
+  Begin
+      L_MORT_TYPE = ""
+      L_HEAD_PRINT = "Y"
+      Do GET_MORT_COPY
+      If L_MORT_FOUND One Of "Y" And
+         L_MORT_TYPE Not One Of "I" Then
+      Begin
+           Switch (L_MORT_TYPE)
+           Case "B"       : L_MORT_TYPE_STRING = "Payor Information            "
+           Case "C"       : L_MORT_TYPE_STRING = "Mortgagee/Payor Information  "
+           Case "F"       : L_MORT_TYPE_STRING = "Premium Financing Information"
+           case "P"       : l_mort_type_string = "Power of Attorney            "
+           Default        : L_MORT_TYPE_STRING = "Mortgagee Information        "
+           End
+      If ARSCONTROL:PRINT_MORTGAGEE_ON_INVOICE_HEAD = 1 Then
+      Begin
+           L_V_POSITION = 3840
+           L_H_POSITION = 3780
+           Writefile(l_invoice_name[1],"%s",L_ARIAL_BOLD)
+           Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+           Writefile(l_invoice_name[1],"%s",L_MORT_TYPE_STRING)
+
+           Writefile(l_invoice_name[1],"%s",L_ARIAL_6) -- change from l_arial_8 on 08/12/2002 per JD - FOS
+
+           For L_CTR = 1 To 3
+            Begin
+            If L_MORT_NAME[L_CTR] <> "" Then
+             {
+               L_V_POSITION = L_V_POSITION + 120
+               Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+               Writefile(l_invoice_name[1],"%s",L_MORT_NAME[L_CTR])
+             }
+            End
+           For L_CTR = 1 To 3
+           Begin
+             If L_MORT_ADDRESS[L_CTR] <> "" Then
+             {
+               L_V_POSITION = L_V_POSITION + 120
+               Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+               Writefile(l_invoice_name[1],"%s",L_MORT_ADDRESS[L_CTR])
+             }
+           End
+
+  If (Val(l_mort_zipcode[6,9]) = 0) Then
+     {
+       l_sfpname_zip = l_mort_ZIPCODE[1,5]
+     }
+     Else
+     {
+       l_sfpname_zip = l_mort_ZIPCODE[1,5] + "-" +   l_mort_ZIPCODE[6,9]
+     }
+
+  L_V_POSITION = L_V_POSITION + 120
+  Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+  Writefile(l_invoice_name[1],"%s",Trun(L_MORT_CITY) + ", " +
+                                Trun(L_MORT_STATE) + "  " +
+                                l_sfpname_zip + "<NL>")
+
+  If L_MORT_TELEPHONE <> "" Then
+   {
+      L_V_POSITION = L_V_POSITION + 120
+      Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+      Writefile(l_invoice_name[1],"%s",Str(Val(L_MORT_TELEPHONE),"(999) 999 - 9999"))
+   }
+
+  If ARSCONTROL2:PRINT_LOAN_NO_TOP One Of 1 And L_MORT_ACCOUNT <> "" Then
+    {
+      /**** Account number information here ****/
+      L_V_POSITION = L_V_POSITION + 120
+      Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+      Writefile(l_invoice_name[1],"%s","LOAN NO.: " + L_MORT_ACCOUNT + "<nl>")
+    }
+
+
+  End -- end of checking for arscontrol:print_mortgagee_on_head
+
+  If ARSCONTROL:PRINT_MORTGAGEE_ON_INVOICE_BODY = 1 Then
+  Begin
+  --         L_V_POSITION = 5760
+  -- per jim d request, move this down 2 lines
+           L_V_POSITION = 6000
+           L_H_POSITION = 3780
+           Writefile(l_invoice_name[1],"%s",L_ARIAL_BOLD)
+           Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+           Writefile(l_invoice_name[1],"%s",L_MORT_TYPE_STRING+"<NL>")
+
+           Writefile(l_invoice_name[1],"%s",L_ARIAL_6) -- changed 08/12/2002 per JD - FOS
+
+           For L_CTR = 1 To 3
+           Begin
+           If L_MORT_NAME[L_CTR] <> "" Then
+           Begin
+               L_V_POSITION = L_V_POSITION + 120
+               Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+               Writefile(l_invoice_name[1],"%s",L_MORT_NAME[L_CTR]+"<nl>")
+           End
+           End
+           For L_CTR = 1 To 3
+           Begin
+           If L_MORT_ADDRESS[L_CTR] <> "" Then
+           Begin
+               L_V_POSITION = L_V_POSITION + 120
+               Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+               Writefile(l_invoice_name[1],"%s",L_MORT_ADDRESS[L_CTR]+"<NL>")
+           End
+           End
+
+  If (Val(l_mort_zipcode[6,9]) = 0) Then
+     {
+         l_sfpname_zip = l_mort_ZIPCODE[1,5]
+     }
+     Else
+     {
+         l_sfpname_zip = l_mort_ZIPCODE[1,5] + "-" +   l_mort_ZIPCODE[6,9]
+     }
+
+  L_V_POSITION = L_V_POSITION + 120
+  Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+  Writefile(l_invoice_name[1],"%s",Trun(L_MORT_CITY) + ", " +
+                                Trun(L_MORT_STATE) + "  " +
+                                l_sfpname_zip + "<NL>")
+
+  If L_MORT_TELEPHONE <> "" Then
+  Begin
+      L_V_POSITION = L_V_POSITION + 120
+      Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+      Writefile(l_invoice_name[1],"%s",Str(Val(L_MORT_TELEPHONE),"(999) 999 - 9999"))
+  End
+
+           If ARSCONTROL2:PRINT_LOAN_NO_BOTTOM One Of 1 And L_MORT_ACCOUNT <> "" Then
+           {
+              /**** Account number information here ****/
+              L_V_POSITION = L_V_POSITION + 120
+              Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+              Writefile(l_invoice_name[1],"%s","LOAN NO.: " + L_MORT_ACCOUNT + "<nl>")
+           }
+
+  End -- end of checking for arscontrol:print_mortgagee_on_body
+
+  End  -- end of l_mort_found = "Y" checking
+
+  End  -- end of arscontrol:print_mortgagee_on_invoice_head = 1 checking
+
+
+  /* print the fixed literals */
+  Writefile(l_invoice_name[1],"%s",L_ARIAL)
+
+  --Writefile(l_invoice_name[1],"<033>&a3420h1155V")
+
+  --new logic added to print this wording on invoice if insured is not the payor - dap
+  if l_sub = 4 and
+     sfpname:company_id = "LEBINS" and
+     l_payor_found = "Y" and
+     l_payor_type <> "I" then
+      begin
+      Writefile(l_invoice_name[1],"%s",L_ARIAL_BOLD_16)
+      Writefile(l_invoice_name[1],"<033>&a180h1155V")
+      Writefile(l_invoice_name[1],"THIS IS NOT A BILL")
+      end
+
+  Writefile(l_invoice_name[1],"%s",L_ARIAL)
+  Writefile(l_invoice_name[1],"<033>&a3420h1155V")
+  Writefile(l_invoice_name[1],"Policy Type:<NL>")
+  Writefile(l_invoice_name[1],"<033>&a3420h1290V")
+  Writefile(l_invoice_name[1],"%s<NL>",SFSLINE:DESCRIPTION)
+  --Writefile(l_invoice_name[1],"<033>&a180h1455V") changed 05/01/2002
+  Writefile(l_invoice_name[1],"<033>&a180h1600V")
+  Writefile(l_invoice_name[1],"Run Date: %d<NL>",TODAYSDATE)
+  --Writefile(l_invoice_name[1],"<033>&a2620h1455V") changed 05/01/2002
+  Writefile(l_invoice_name[1],"<033>&a2620h1600V")
+  Writefile(l_invoice_name[1],"Payment Plan: %s<NL>",ARSPAYPLAN:DESCRIPTION)
+
+  Writefile(l_invoice_name[1],"%s",L_ARIAL_BOLD)
+  L_V_POSITION = 1755
+
+  Writefile(l_invoice_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+  Writefile(l_invoice_name[1],"Trans Eff<NL>")
+
+  Writefile(l_invoice_name[1],"%s","<033>&a910h" + Trun(Str(L_V_POSITION)+"V"))
+  Writefile(l_invoice_name[1],"Trans Exp<NL>")
+
+  Writefile(l_invoice_name[1],"%s","<033>&a2100h" + Trun(Str(L_V_POSITION)+"V"))
+  Writefile(l_invoice_name[1],"Description")
+
+  Writefile(l_invoice_name[1],"%s","<033>&a3990h" + Trun(Str(L_V_POSITION)+"V"))
+  Writefile(l_invoice_name[1],"Due Date<NL>")
+
+  Writefile(l_invoice_name[1],"%s","<033>&a4920h" + Trun(Str(L_V_POSITION)+"V"))
+  Writefile(l_invoice_name[1],"Amount Due<NL>")
+
+  -- print the company name and address here
+
+  Writefile(l_invoice_name[1],"%s",L_ARIAL)
+  L_V_POSITION = 5330
+
+  If SFSCOMPANY:USE_OTHER_MAILING = 0 Then -- use the primary address for return address
+  Begin
+  Writefile(l_invoice_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+  Writefile(l_invoice_name[1],"%s",Trun(SFSCOMPANY:NAME[1])+"<NL>"+"<CR>")
+  /* april 23, 2002 - do not print blank lines */
+  If SFSCOMPANY:NAME[2] <> "" Then
+  Begin
+      L_V_POSITION = L_V_POSITION + 120
+      Writefile(l_invoice_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+      Writefile(l_invoice_name[1],"%s",Trun(SFSCOMPANY:NAME[2])+"<NL>"+"<CR>")
+  End
+  L_V_POSITION = L_V_POSITION + 120
+  Writefile(l_invoice_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+  Writefile(l_invoice_name[1],"%s",Trun(SFSCOMPANY:ADDRESS[1])+"<NL>"+"<CR>")
+  L_V_POSITION = L_V_POSITION + 120
+  Writefile(l_invoice_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+  Writefile(l_invoice_name[1],"%s",Trun(SFSCOMPANY:CITY)+", "+
+                                Trun(SFSCOMPANY:STR_STATE) +
+                                "  " + Str(Val(SFSCOMPANY:STR_ZIPCODE),"99999-9999") + "<NL>")
+  End
+  Else If SFSCOMPANY:USE_OTHER_MAILING = 1 Then -- use the optional mailing address
+  Begin
+
+  Access SFSCOMPMAIL, Set SFSCOMPMAIL:COMPANY_ID = SFSCOMPANY:COMPANY_ID,approximate
+
+  Writefile(l_invoice_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+  Writefile(l_invoice_name[1],"%s",Trun(SFSCOMPMAIL:NAME[1])+"<NL>"+"<CR>")
+  /* april 23, 2002 - do not print blank lines */
+  If SFSCOMPMAIL:NAME[2] <> "" Then
+  Begin
+      L_V_POSITION = L_V_POSITION + 120
+      Writefile(l_invoice_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+      Writefile(l_invoice_name[1],"%s",Trun(SFSCOMPMAIL:NAME[2])+"<NL>"+"<CR>")
+  End
+  L_V_POSITION = L_V_POSITION + 120
+  Writefile(l_invoice_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+  Writefile(l_invoice_name[1],"%s",Trun(SFSCOMPMAIL:ADDRESS[1])+"<NL>"+"<CR>")
+  L_V_POSITION = L_V_POSITION + 120
+  Writefile(l_invoice_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+  Writefile(l_invoice_name[1],"%s",Trun(SFSCOMPMAIL:CITY)+", "+
+                                Trun(SFSCOMPMAIL:STR_STATE) +
+                                "  " + Str(Val(SFSCOMPMAIL:STR_ZIPCODE),"99999-9999") + "<NL>")
+  End
+
+  Writefile (l_invoice_name[1],"%s<NL>",L_ARIAL_ITALIC_BOLD_16)
+  Writefile (l_invoice_name[1],"<033>&a2160h0V")
+  Writefile (l_invoice_name[1],"I N V O I C E<nl>")
+
+  /* =====================  Insured =========================   */
+  Writefile (l_invoice_name[1],"%s<NL>",L_ARIAL_BOLD)
+
+  Writefile(l_invoice_name[1],"<033>&a180h90V")
+  Writefile(l_invoice_name[1],"   Insured<NL>")
+  Writefile(l_invoice_name[1],"%s<NL>",L_ARIAL)
+  Writefile (l_invoice_name[1],"<033>&a180h210V")
+  if arscontrol2:no_alpha_invoices = 1 then
+   {
+    Writefile(l_invoice_name[1],"%s", Str(Val(Str(ARSINVWORK:POLICY_NO,"ZZZZZZZZZ")))+"<NL>")
+   }
+  else
+   {
+    Writefile(l_invoice_name[1],"%s", Trun(SFSLINE:ALPHA) + Str(Val(Str(ARSINVWORK:POLICY_NO,"ZZZZZZZZZ")))+"<NL>")
+   }
+
+  L_LOOP_CTR = 0
+  L_V_POSITION = 210
+  For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the name
+  Begin
+      If SFPNAME:NAME[L_LOOP_CTR] <> "" Then
+      {
+          L_V_POSITION = L_V_POSITION + 120
+          Writefile(l_invoice_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+          I_NAME=SFPNAME:NAME[L_LOOP_CTR]
+
+          Do REVERSE_NAME
+          Writefile(l_invoice_name[1],"%s",I_REV_NAME + "<NL>")
+          i_rev_name = ""
+      }
+  End
+
+  For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the address
+  Begin
+      If SFPNAME:ADDRESS[L_LOOP_CTR] <> "" Then
+      {
+          L_V_POSITION = L_V_POSITION + 120
+          Writefile(l_invoice_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+          Writefile(l_invoice_name[1],"%s",SFPNAME:ADDRESS[L_LOOP_CTR] + "<NL>")
+      }
+  End
+
+  L_V_POSITION = L_V_POSITION + 120
+  -- ----
+
+  If (Val(SFPNAME:STR_ZIPCODE[6,9]) = 0) Then
+     {
+         l_sfpname_zip = SFPNAME:STR_ZIPCODE[1,5]
+     }
+     Else
+     {
+         l_sfpname_zip = SFPNAME:STR_ZIPCODE[1,5] + "-" +   SFPNAME:STR_ZIPCODE[6,9]
+     }
+
+  Writefile(l_invoice_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+  Writefile(l_invoice_name[1],"%s",Trun(SFPNAME:CITY) + ", " +
+                                Trun(SFPNAME:STR_STATE) + "  " +
+                                l_sfpname_zip + "<nl>")
+  --                              Str(Val(SFPNAME:STR_ZIPCODE),"99999-9999") + "<NL>")
+
+  /* =====================   AGENT  =========================   */
+
+  -- set CAP to 0h0V and set to arial on march 28, 2002
+  Writefile(l_invoice_name[1],"<033>&a0h0V<NL>")
+  Writefile(l_invoice_name[1],"%s<NL>",L_ARIAL)
+  Writefile(l_invoice_name[1],"%s<NL>",L_ARIAL_BOLD)
+  Writefile(l_invoice_name[1],"<033>&a3130h90V")
+  if ARScontrol2:AGENT_PRODUCER <> "" then
+    {
+      Writefile(l_invoice_name[1],"%s",trun(arscontrol2:AGENT_PRODUCER))
+    }
+  else
+    {
+      Writefile(l_invoice_name[1],"%s","Agent: ")
+    }
+
+  Writefile(l_invoice_name[1],"%s",Str(ARSINVWORK:AGENT_NO,"ZZZZ")+"<NL>")
+  Writefile(l_invoice_name[1],"%s<NL>",L_ARIAL)
+
+  L_LOOP_CTR = 0
+  L_V_POSITION = 90
+  For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the name
+  Begin
+      If SFSAGENT:NAME[L_LOOP_CTR] <> "" Then
+        {
+          L_V_POSITION = L_V_POSITION + 120
+          Writefile(l_invoice_name[1],"%s","<033>&a3130h" + Trun(Str(L_V_POSITION)+"V"))
+          Writefile(l_invoice_name[1],"%s",SFSAGENT:NAME[L_LOOP_CTR] + "<NL>")
+        }
+  End
+
+  For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the address
+  Begin
+      If SFSAGENT:ADDRESS[L_LOOP_CTR] <> "" Then
+      {
+          L_V_POSITION = L_V_POSITION + 120
+          Writefile(l_invoice_name[1],"%s","<033>&a3130h" + Trun(Str(L_V_POSITION)+"V"))
+          Writefile(l_invoice_name[1],"%s",SFSAGENT:ADDRESS[L_LOOP_CTR] + "<NL>")
+      }
+  End
+
+  L_V_POSITION = L_V_POSITION + 120
+  Writefile(l_invoice_name[1],"%s","<033>&a3130h" + Trun(Str(L_V_POSITION)+"V"))
+
+  If (Val(sfsagent:STR_ZIPCODE[6,9]) = 0) Then
+     {
+         l_agent_zip = sfsagent:STR_ZIPCODE[1,5]
+     }
+     Else
+     {
+         l_agent_zip = sfsagent:STR_ZIPCODE[1,5] + "-" + sfsagent:STR_ZIPCODE[6,9]
+     }
+
+  Writefile(l_invoice_name[1],"%s",Trun(SFSAGENT:CITY) + ", " +
+                                Trun(SFSAGENT:STR_STATE) + "  " +
+                                l_agent_zip + "<NL>")
+
+  L_V_POSITION = L_V_POSITION + 120
+  Writefile (l_invoice_name[1],"%s","<033>&a3130h" + Trun(Str(L_V_POSITION) + "V"))
+  Writefile (l_invoice_name[1],"%s",Str(Val(SFSAGENT:TELEPHONE[1]),"(999) 999-9999") + "<NL>")
+
+  /* copy literal */
+  --access arscontrol2,
+  --   set arscontrol2:company_id = L_COMPANY
+  Switch(L_HOLD_COPY_CTR)
+      Case 1  : L_COPY_LIT = "Payor's Copy       "
+      Case 2  : if ARScontrol2:AGENT_PRODUCER <> "" then
+                  {
+                    L_COPY_LIT = trun((arscontrol2:AGENT_PRODUCER)+"Copy")
+                  }
+                Else
+                  {
+                    L_COPY_LIT = "Agent's Copy         "
+                  }
+      Case 3  : L_COPY_LIT = "Home Office Copy   "
+      Default : if sfpname:company_id = "LEBINS" then
+                    L_COPY_LIT = "Insured's Copy     "  -- new logic added to print Insured's Copy instead of just copy for lebanon dap
+                else
+                    L_COPY_LIT = "Copy               "
+  End
+
+  if l_portal_copy = 1 then 
+  {
+     l_copy_lit = ""
+  }
+
+  L_V_POSITION = 0
+  Writefile (l_invoice_name[1],"%s","<033>&a4860h" + Trun(Str(L_V_POSITION) + "V"))
+  Writefile (l_invoice_name[1],"%s<NL>",Trun(L_COPY_LIT))
+
+
+  /* bottom of invoce name and address */
+
+  If L_HOLD_COPY_CTR <= 3 Or
+     ARSCONTROL:PRINT_PAYOR_ON_AGENTS_COPY  One Of 1 Then
+  Begin
+
+  L_LOOP_CTR = 0
+  L_V_POSITION = 6390
+  --L_H_POSITION = 540
+  -- per JD's need to move 7/16 of inch
+  L_H_POSITION = 855
+
+  /* using new arscontrol file as of 08/13/2002 */
+  If ARSCONTROL:INVOICE_BOTTOM_V_POSITION <>  0 And
+     ARSCONTROL:INVOICE_BOTTOM_H_POSITION <> 0 Then
+     Begin
+         L_V_POSITION = ARSCONTROL:INVOICE_BOTTOM_V_POSITION
+         L_H_POSITION = ARSCONTROL:INVOICE_BOTTOM_H_POSITION
+     End
+
+  If L_HOLD_COPY_CTR = 1 Or
+     ARSCONTROL:PRINT_PAYOR_ON_AGENTS_COPY One Of 1 Then
+  Begin
+
+  For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the name
+  Begin
+      If L_PAYOR_NAME[L_LOOP_CTR] <> "" Then
+      {
+          L_V_POSITION = L_V_POSITION + 90 --120
+          Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+          i_name=""
+          I_NAME=L_PAYOR_NAME[L_LOOP_CTR]
+          Do REVERSE_NAME
+          Writefile(l_invoice_name[1],"%s",I_REV_NAME + "<NL>")
+          i_rev_name = ""
+      }
+  End
+
+  For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the address
+  Begin
+      If L_PAYOR_ADDRESS[L_LOOP_CTR] <> "" Then
+      {
+          L_V_POSITION = L_V_POSITION + 90 -- 120
+          Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+          Writefile(l_invoice_name[1],"%s",L_PAYOR_ADDRESS[L_LOOP_CTR] + "<NL>")
+      }
+  End
+
+  If (Val(l_payor_zipcode[6,9]) = 0) Then
+     {
+         l_sfpname_zip = l_payor_ZIPCODE[1,5]
+     }
+     Else
+     {
+         l_sfpname_zip = l_payor_ZIPCODE[1,5] + "-" +   l_payor_ZIPCODE[6,9]
+     }
+
+  L_V_POSITION = L_V_POSITION + 90 -- 120
+  -- Writefile(l_invoice_name[1],"%s","<033>&a540h" + Trun(Str(L_V_POSITION)+"V"))
+  Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+  Writefile(l_invoice_name[1],"%s",Trun(L_PAYOR_CITY) + ", " +
+                                Trun(L_PAYOR_STATE) + "  " +
+                                l_sfpname_zip + "<NL>")
+
+  End -- end of if l_hold_copy_ctr = 1
+
+  -- --------------------------------------
+  Else If L_HOLD_COPY_CTR > 1 And
+          L_HOLD_COPY_CTR  <= 3 And
+          ARSCONTROL:PRINT_PAYOR_ON_AGENTS_COPY  Not One Of 1 Then
+  Begin
+  For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the name
+  Begin
+      If SFPNAME:NAME[L_LOOP_CTR] <> "" Then
+      {
+          L_V_POSITION = L_V_POSITION + 90 --120
+          Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+          I_NAME=SFPNAME:NAME[L_LOOP_CTR]
+          Do REVERSE_NAME
+          Writefile(l_invoice_name[1],"%s",I_REV_NAME + "<NL>")
+      }
+  End
+
+  For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the address
+  Begin
+      If SFPNAME:ADDRESS[L_LOOP_CTR] <> "" Then
+      {
+          L_V_POSITION = L_V_POSITION + 90 -- 120
+  --        Writefile(l_invoice_name[1],"%s","<033>&a540h" + Trun(Str(L_V_POSITION)+"V"))
+          Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+          Writefile(l_invoice_name[1],"%s",SFPNAME:ADDRESS[L_LOOP_CTR] + "<NL>")
+      }
+  End
+
+  L_V_POSITION = L_V_POSITION + 90 --120
+  -- Writefile(l_invoice_name[1],"%s","<033>&a540h" + Trun(Str(L_V_POSITION)+"V"))
+
+  If (Val(SFPNAME:STR_ZIPCODE[6,9]) = 0) Then
+     {
+       l_sfpname_zip = SFPNAME:STR_ZIPCODE[1,5]
+     }
+     Else
+     {
+         l_sfpname_zip = SFPNAME:STR_ZIPCODE[1,5] + "-" +   SFPNAME:STR_ZIPCODE[6,9]
+     }
+
+
+  Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+  Writefile(l_invoice_name[1],"%s",Trun(SFPNAME:CITY) + ", " +
+                                Trun(SFPNAME:STR_STATE) + "  " +
+                                l_sfpname_zip)
+  --                              Str(Val(SFPNAME:STR_ZIPCODE),"99999-9999"))
+
+  End -- end of if l_hold_copy_ctr > 1 and <= 3
+
+  /* Print policy Number on return Invoice */
+
+  L_V_POSITION = 5940
+  L_H_POSITION = 180
+
+  Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+  Writefile(l_invoice_name[1],"Policy Number: <NL>")
+
+  L_H_POSITION = L_H_POSITION + 720
+  Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+
+  if arscontrol2:no_alpha_invoices = 1 then
+   {
+    Writefile(l_invoice_name[1],"%s", Str(Val(Str(ARSINVWORK:POLICY_NO,"ZZZZZZZZZ")))+"<NL>")
+   }
+  else
+   {
+    Writefile(l_invoice_name[1],"%s", Trun(SFSLINE:ALPHA) + Str(Val(Str(ARSINVWORK:POLICY_NO,"ZZZZZZZZZ")))+"<NL>")
+   }
+
+  End
+
+  -- new type of form indicator
+  -- always print  -  if no indicator is to print then the control
+  -- file value needs to be spaces
+
+  access arscontrol2, set arscontrol2:company_id = arsinvwork:company_id
+
+  if arscontrol2:invoice_indicator <> "" then
+   {
+      L_V_POSITION = arscontrol2:indicator_v_position
+      L_H_POSITION = arscontrol2:indicator_h_position
+
+      Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+      Writefile(l_invoice_name[1],"%s%s",arscontrol2:invoice_indicator,"<NL>")
+   }
+
+  -- new logic for MD
+
+  l_state3 = 000
+
+  access arsmaster, set arsmaster:company_id = arsinvwork:company_id,
+                        arsmaster:policy_no  = arsinvwork:policy_no, approximate
+
+                        while arsmaster:company_id  = arsinvwork:company_id and
+                              arsmaster:policy_no   = arsinvwork:policy_no and
+                              l_state3              = 000
+                              begin
+                              if arsmaster:trans_exp = arsinvwork:exp_date and
+                                 arsmaster:state   <> 000 then
+                                 begin
+                                     l_state3      = arsmaster:state
+                                 end
+                              next arsmaster
+                              end
+
+  l_company_id3       = arsinvwork:company_id
+  l_line_of_business3 = arsinvwork:line_of_business
+  l_county3           = 999
+  l_subline3          = "00"
+
+  access sfsstate, set sfsstate:company_id = l_company_id3,
+                       sfsstate:state      = l_state3,
+                       sfsstate:county     = l_county3
+
+  access sfsline, set sfsline:company_id       = l_company_id3,
+                      sfsline:line_of_business = l_line_of_business3,
+                      sfsline:lob_subline      = l_subline3
+
+
+/*  if sfsstate:print_expiring_premiums_wording one of 1 and
+     sfsline:print_expiring_premiums_wording one of 1 and
+     l_expiring_premium <> 0 then
+     {
+       access arscontrol2, set arscontrol2:company_id = l_company_id3
+
+       Writefile(l_invoice_name[1],"%s<NL>",L_arial_12)
+       L_V_POSITION = arscontrol2:renewal_premium_v_pos
+       L_H_POSITION = arscontrol2:renewal_premium_h_pos
+       Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+       Writefile(l_invoice_name[1],"%s%s%s",trun(arscontrol2:renewal_premium_wording),"    ",Trun(Str(arsinvwork:total_annual,"($$$,$$$,$$$.99)")))
+       Writefile(l_invoice_name[1],"%s",L_arial_12)
+       L_V_POSITION = arscontrol2:expiring_premium_v_pos
+       L_H_POSITION = arscontrol2:expiring_premium_h_pos
+       Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+       Writefile(l_invoice_name[1],"%s%s%s%s",trun(arscontrol2:expiring_premium_wording)," ",Trun(Str(L_expiring_premium,"($$$,$$$,$$$.99)")),"<NL>")
+     }
+*/
+--     {
+       access arscontrol2, set arscontrol2:company_id = l_company_id3
+
+      if sfsstate:state one of 19 and
+         sfsline:line_of_business one of 32,35,36,37,38,41,43,45,46 and
+         arsinvwork:billing_ctr = 1  then
+         {
+
+          if l_expiring_premium <> 0 then
+           {
+             Writefile(l_invoice_name[1],"%s<NL>",L_arial_12)
+             L_V_POSITION = arscontrol2:renewal_premium_v_pos
+             L_H_POSITION = arscontrol2:renewal_premium_h_pos
+             Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+  --           Writefile(l_invoice_name[1],"%s%s%s",trun(arscontrol2:renewal_premium_wording),"    ",Trun(Str(arsinvwork:total_annual,"($$$,$$$,$$$.99)")))
+             Writefile(l_invoice_name[1],"%s",L_arial_12)
+             L_V_POSITION = arscontrol2:expiring_premium_v_pos
+             L_H_POSITION = arscontrol2:expiring_premium_h_pos
+             Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+--             Writefile(l_invoice_name[1],"%s%s%s%s",trun(arscontrol2:expiring_premium_wording)," ",Trun(Str(L_expiring_premium,"($$$,$$$,$$$.99)")),"<NL>")
+           }
+
+          Writefile(l_invoice_name[1],"%s<NL>",L_arial_12)
+--          L_V_POSITION = arscontrol2:md_claim_history_wording_v_pos
+  --        L_H_POSITION = arscontrol2:md_claim_history_wording_h_pos
+          Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+          for l_ctr3 = 1 to 5
+           {
+    --         Writefile(l_invoice_name[1],"%s%s",trun(arscontrol2:md_claim_history_literal[l_ctr3]),"<NL>")
+             L_V_POSITION = l_v_position + 120
+             L_H_POSITION = l_h_position + 0
+             Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+           }
+         }
+         else
+         if sfsstate:print_claims_notice_wording one of 1 and
+            sfsline:print_claims_notice_wording one of 1 and
+            arsinvwork:billing_ctr = 1  then
+         {
+
+           if l_expiring_premium <> 0 then
+            {
+              Writefile(l_invoice_name[1],"%s<NL>",L_arial_12)
+              L_V_POSITION = arscontrol2:renewal_premium_v_pos
+              L_H_POSITION = arscontrol2:renewal_premium_h_pos
+              Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+              Writefile(l_invoice_name[1],"%s%s%s",trun(arscontrol2:renewal_premium_wording),"    ",Trun(Str(arsinvwork:total_annual,"($$$,$$$,$$$.99)")))
+              Writefile(l_invoice_name[1],"%s",L_arial_12)
+              L_V_POSITION = arscontrol2:expiring_premium_v_pos
+              L_H_POSITION = arscontrol2:expiring_premium_h_pos
+              Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+              Writefile(l_invoice_name[1],"%s%s%s%s",trun(arscontrol2:expiring_premium_wording)," ",Trun(Str(L_expiring_premium,"($$$,$$$,$$$.99)")),"<NL>")
+            }
+
+           Writefile(l_invoice_name[1],"%s<NL>",L_arial_12)
+           L_V_POSITION = arscontrol2:claim_history_wording_v_pos
+           L_H_POSITION = arscontrol2:claim_history_wording_h_pos
+           Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+           for l_ctr3 = 1 to 5
+           {
+             Writefile(l_invoice_name[1],"%s%s",trun(arscontrol2:claim_history_literal[l_ctr3]),"<NL>")
+             L_V_POSITION = l_v_position + 120
+             L_H_POSITION = l_h_position + 0
+             Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+           }
+         }
+--     }
+
+  -- printing agent number at the bottom of the invoice
+
+  if arscontrol2:print_agent_no_on_stub one of 1 then
+    {
+       Writefile(l_invoice_name[1],"%s<NL>",L_arial_8)
+       L_V_POSITION = arscontrol2:agent_no_on_stub_v_pos
+       L_H_POSITION = arscontrol2:agent_no_on_stub_h_pos
+       Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+       Writefile(l_invoice_name[1],"%s%s%s%s","Agent:"," ",trun(str(arsinvwork:agent_no,"ZZZZ")),"<NL>")
+    } -- end of printing the agent number on the invoice
+ } -- end of skip form
+End
+
+procedure check_arsinvwork_for_first_installment
+BEGIN
+
+l_billing_ctr_1 = "Y"
+
+Access ARSINVWORK_ALIAS, Set ARSINVWORK_ALIAS:COMPANY_ID = ARSINVWORK:COMPANY_ID,
+                             ARSINVWORK_ALIAS:POLICY_NO  = ARSINVWORK:POLICY_NO, Approximate
+
+while ARSINVWORK_ALIAS:COMPANY_ID = ARSINVWORK:COMPANY_ID and
+      ARSINVWORK_ALIAS:POLICY_NO  = ARSINVWORK:POLICY_NO
+    begin
+      if arsinvwork_alias:billing_ctr > 1 and
+         l_billing_ctr_1 = "Y" then
+         {
+          l_billing_ctr_1 = "N"
+         }
+
+    next arsinvwork_alias
+    end
+END
+
+
+
+Procedure PRINT_TOTAL_DUE
+Begin
+
+L_SFS_CODE = "SFS"
+Access SFSDEFAULT, Set SFSDEFAULT:SFS_CODE = L_SFS_CODE
+Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = SFSDEFAULT:COMPANY_ID
+
+L_V_POSITION = L_V_POSITION + 240
+Writefile(l_invoice_name[1],"%s<NL>",L_LETTER_GOTHIC_12)
+L_H_POSITION = 2970
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+
+If ARSCONTROL2:TOTAL_DUE_LITERAL_FACE <> "" Then
+Begin
+    Writefile (l_invoice_name[1],"%s%s",Trun(ARSCONTROL2:TOTAL_DUE_LITERAL_FACE),"<NL>")
+End
+Else
+Begin
+    Writefile(l_invoice_name[1],"%s","TOTAL DUE<NL> ")
+End
+
+L_H_POSITION = 4590
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"%s%s",Trun(Str(L_TOTAL_AMOUNT_DUE,"($ZZ,ZZZ,ZZZ.99)")),"<NL>")
+
+Writefile(l_invoice_name[1],"%s<NL>",L_ARIAL_BOLD_14)
+
+/* print the pay this amount field on the bottom on the invoice */
+L_V_POSITION = 5310
+L_H_POSITION = 3060
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+
+Writefile(l_invoice_name[1],"%s<NL>",ARSCONTROL:INVOICE_PAY_AMOUNT)
+
+L_H_POSITION = L_H_POSITION + 1440 -- 2.0" to the right
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"%s<NL>",Str(L_TOTAL_AMOUNT_DUE,"($ZZ,ZZZ,ZZZ.99)"))
+--Writefile(l_invoice_name[1],"%s<NL>",Str(ARSINVWORK:NET_AMOUNT_DUE,"($ZZ,ZZZ,ZZZ.99)"))
+--*****************************   Pay this amount
+/*
+if l_sub = 1 then
+{
+l_credit_card_total_due = l_credit_card_total_due + l_total_amount_due
+}
+*/
+-- print run date at the bottom of the invoice
+
+If ARSCONTROL2:PRINT_RUN_DATE_ON_INVOICE One Of 1 Then
+Begin
+    Writefile (l_invoice_name[1],"%s<NL>",L_ARIAL_8)
+    L_V_POSITION = ARSCONTROL2:DATE_ON_INVOICE_V_POSITION
+    L_H_POSITION = ARSCONTROL2:DATE_ON_INVOICE_H_POSITION
+    Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+    Writefile(l_invoice_name[1],"%s",Str(TODAYSDATE,"MM/DD/YYYY")+ " - Inv")
+End
+
+-- new OCR printing on the bottom of the invoice
+
+-- house cleaning
+l_check_scan_policy_no          = ""
+l_check_scan_due_date           = ""
+l_check_scan_due_date           = ""
+l_check_scan_total_due          = ""
+l_check_scan_check_digit        = ""
+l_check_scan_line               = ""
+l_check_scan_amount             = 0
+l_check_digit_weight            = 0
+l_check_digit_total             = 0
+
+for l_check_digit_sub = 1 to 100
+begin
+   l_check_digit_amount[l_check_digit_sub] = 0
+end
+
+/*  end of house cleaning */
+
+if arscontrol2:check_scan one of 1 then
+begin
+   l_v_position = arscontrol2:check_scan_v_position
+   l_h_position = arscontrol2:check_scan_h_position
+
+   if arscontrol2:check_scan_policy_no one of 1 then
+   begin
+       l_check_scan_policy_no = str(arsinvwork:policy_no,"999999999")
+   end
+   else
+   begin
+       l_check_scan_policy_no = ""
+   end
+
+   if arscontrol2:check_scan_due_date one of 1 then
+   begin
+       l_check_scan_due_date = str(arsinvwork:due_date,"MMDDYYYY")
+   end
+   else
+   begin
+       l_check_scan_due_date = ""
+   end
+
+   if arscontrol2:check_scan_current_due one of 1 then
+   begin
+       l_check_scan_amount      = l_total_amount_due * 100
+       l_check_scan_current_due = str(l_check_scan_amount,"99999999")
+       l_check_scan_amount      = 0
+   end
+   else
+   begin
+       l_check_scan_due_date = ""
+   end
+
+   if arscontrol2:check_scan_total_due one of 1 then
+   begin
+       l_check_scan_amount    = l_total_annual_net * 100
+       l_check_scan_total_due = str(l_check_scan_amount,"99999999")
+       l_check_scan_amount    = 0
+   end
+   else
+   begin
+       l_check_scan_total_due = ""
+   end
+
+l_check_scan_line = l_check_scan_policy_no   +
+                    l_check_scan_due_date    +
+                    l_check_scan_current_due +
+                    l_check_scan_total_due
+
+/* calculate the check digit here */
+for l_check_digit_sub = 1 to len(l_check_scan_line)
+begin
+   l_check_digit_weight = (l_check_digit_sub mod arscontrol2:check_digit_weight) + 1
+   l_check_digit_amount[l_check_digit_sub] =
+   val(l_check_scan_line[l_check_digit_sub]) * l_check_digit_weight
+end
+
+for l_check_digit_sub = 1 to len(l_check_scan_line)
+begin
+   l_check_digit_total = l_check_digit_total +
+                         l_check_digit_amount[l_check_digit_sub]
+end
+
+l_check_digit_number = (l_check_digit_total div arscontrol2:check_digit_divisor)
+l_check_digit_raw  = l_check_digit_number * arscontrol2:check_digit_divisor
+l_check_digit_final = l_check_digit_total - l_check_digit_raw
+
+l_check_digit_final_str = str(l_check_digit_final,"999")
+l_check_scan_line = trun(l_check_scan_line) + l_check_digit_final_str
+
+
+-- removed <NL> after the %s - testing this
+
+Writefile(l_invoice_name[1],"%s",L_pop)
+Writefile(l_invoice_name[1],"%s",L_ocr_a)
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"%s",trun(l_check_scan_line))
+Writefile(l_invoice_name[1],"%s",L_push)
+--Writefile(l_invoice_name[1],"%s<NL>",L_arial_12)
+
+end -- end of check_scan switch
+
+End
+
+Procedure PRINT_DETAIL_LINE
+Begin
+
+L_TOTAL_AMOUNT_DUE = 0
+I_NAME = SFPNAME:NAME[1]
+
+Include "sfsrevname7.pro"
+
+Writefile(l_invoice_name[1],"%s<NL>",L_LETTER_GOTHIC_12)
+
+Access ARSINVWORK_ALIAS, Set ARSINVWORK_ALIAS:COMPANY_ID = ARSINVWORK:COMPANY_ID,
+                             ARSINVWORK_ALIAS:POLICY_NO  = ARSINVWORK:POLICY_NO, Approximate
+
+While ARSINVWORK_ALIAS:COMPANY_ID = ARSINVWORK:COMPANY_ID And
+      ARSINVWORK_ALIAS:POLICY_NO  = ARSINVWORK:POLICY_NO
+      Begin
+
+Switch(ARSINVWORK_ALIAS:TRANS_CODE)
+    Case 10,60           : L_TRANSACTION = "New Policy     "
+    Case 11,61           : L_TRANSACTION = "Cancellation   "
+    Case 12,13,62,63,72  : L_TRANSACTION = "Endorsement    "
+    Case 14,64           : L_TRANSACTION = "Renewal        "
+    Case 15              : L_TRANSACTION = "Audit Premium  "
+    Case 16,66           : L_TRANSACTION = "Reinstatement  "
+    Case 18,28,68        : L_TRANSACTION = "Transaction    "
+    Case 19,22,23,29,69  : L_TRANSACTION = "Transaction    "
+    Case 75              : L_TRANSACTION = "Transaction    "
+    Default              : L_TRANSACTION = "Transaction    "
+End
+
+If ARSINVWORK_alias:PAYMENT_PLAN <> 1 and
+   arsinvwork_alias:trans_code not one of 12,13,22,23,15,72,75 Then
+ {
+    L_TRANSACTION = Trun(L_TRANSACTION) + " - Installment # " + Str(ARSINVWORK_ALIAS:BILLING_CTR,"ZZZZ") + "   "
+ }
+Else
+ {
+-- march 17, 2002
+-- annual policies should not note which installment #
+  If ARSINVWORK_alias:PAYMENT_PLAN = 1 and
+     arsinvwork_alias:trans_code <> 75  Then -- annual payment
+   {
+    L_TRANSACTION = "Annual Policy Premium            "
+   }
+ }
+
+If ARSINVWORK_alias:TRANS_CODE One Of 12,13,22,23 Then
+ Begin
+    L_TRANSACTION = "Endorsement"
+ End
+
+If ARSINVWORK_ALIAS:PAST_DUE = "Y" Then
+ Begin
+    L_TRANSACTION = "Amount is Past Due               "
+ End
+
+--If arsinvwork_alias:trans_code = 12 Or
+  -- arsinvwork_alias:trans_code = 13 Then
+--   Begin
+  --     L_TRANSACTION = "Endorsement                      "
+--   End
+
+If arsinvwork_alias:trans_code one of 15 then
+{
+    l_transaction = "Audit Premium                  "
+}
+
+if arsinvwork_alias:company_id = "LEBINS" and
+   arsinvwork_alias:line_of_business = 9 and
+   arsinvwork_alias:trans_code = 12 and
+   arsinvwork_alias:reversed_premium = 1 and
+   arsinvwork_alias:consent_order <> 5 then
+    {
+    L_TRANSACTION = "POLICY " + " - Installment # " + Str(ARSINVWORK_ALIAS:BILLING_CTR,"ZZZZ") + "   "
+    }
+else
+if arsinvwork_alias:company_id = "LEBINS" and
+   arsinvwork_alias:line_of_business = 9 and
+   arsinvwork_alias:trans_code = 12 and
+   arsinvwork_alias:reversed_premium = 1 and
+   arsinvwork_alias:consent_order = 5 then
+    {
+     L_TRANSACTION = "Endorsement"
+    }
+
+
+If ARSINVWORK_ALIAS:TRANS_TYPE = "P" Then
+Begin
+    L_TRANSACTION = "Payment Received " + "- Check No. " + Trun(ARSINVWORK_ALIAS:CHECK_NO)
+End
+Else If ARSINVWORK_ALIAS:TRANS_TYPE = "R" Then
+Begin
+    L_TRANSACTION = "Re-bill for Returned Check " + "- Check No. " + Trun(ARSINVWORK_ALIAS:CHECK_NO)
+End
+Else If ARSINVWORK_ALIAS:TRANS_TYPE = "X" Then
+Begin
+    L_TRANSACTION = "Returned Check Charge "
+End
+
+L_V_POSITION = L_V_POSITION + 120
+
+-- If ARSINVWORK_ALIAS:TRANS_TYPE  "I" Then
+If ARSINVWORK_ALIAS:TRANS_TYPE One Of "I", "R", "X" Then
+Begin
+   if arscontrol:include_install_crg_for_premium = 1 then
+    {
+--     L_TOTAL_AMOUNT_DUE = L_TOTAL_AMOUNT_DUE + (ARSINVWORK_ALIAS:NET_AMOUNT_DUE + arsinvwork_alias:installment_charge)
+     L_TOTAL_AMOUNT_DUE = L_TOTAL_AMOUNT_DUE + (ARSINVWORK_ALIAS:installment_amount + arsinvwork_alias:installment_charge - arsinvwork_alias:total_amount_paid)
+    }
+   else
+    {
+     L_TOTAL_AMOUNT_DUE = L_TOTAL_AMOUNT_DUE + (ARSINVWORK_ALIAS:NET_AMOUNT_DUE - arsinvwork_alias:total_amount_paid)
+    }
+End
+
+If ARSINVWORK_ALIAS:TRANS_TYPE One Of "I" Then
+Begin
+Writefile(l_invoice_name[1],"%s","<033>&a210h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(l_invoice_name[1],"%s<NL>",Trun(Str(ARSINVWORK_ALIAS:EFF_DATE,"MM/DD/YYYY")))
+Writefile(l_invoice_name[1],"%s","<033>&a930h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(l_invoice_name[1],"%s<NL>",Trun(Str(ARSINVWORK_ALIAS:EXP_DATE,"MM/DD/YYYY")))
+Writefile(l_invoice_name[1],"%s","<033>&a1620h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(l_invoice_name[1],"%s<NL>",L_TRANSACTION)
+Writefile(l_invoice_name[1],"%s","<033>&a4000h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(l_invoice_name[1],"%s<NL>",Trun(Str(ARSINVWORK_ALIAS:DUE_DATE,"MM/DD/YYYY")))
+Writefile(l_invoice_name[1],"%s","<033>&a4590h" + Trun(Str(L_V_POSITION) + "V"))
+--Writefile(l_invoice_name[1],"%s<NL>",Trun(Str(ARSINVWORK_ALIAS:NET_AMOUNT_DUE,"($ZZ,ZZZ,ZZZ.99)")))
+
+if arscontrol:print_net_on_detail_line one of 1 then
+{
+--    Writefile(l_invoice_name[1],"%s<NL>",Trun(Str(((ARSINVWORK_ALIAS:INSTALLMENT_AMOUNT + ARSINVWORK_ALIAS:INSTALLMENT_CHARGE)-ARSINVWORK_ALIAS:TOTAL_AMOUNT_PAID),"($ZZ,ZZZ,ZZZ.99)")))
+--    Writefile(l_invoice_name[1],"%s<NL>",Trun(Str(((ARSINVWORK_ALIAS:INSTALLMENT_AMOUNT)-ARSINVWORK_ALIAS:TOTAL_AMOUNT_PAID),"($ZZ,ZZZ,ZZZ.99)")))
+--    Writefile(l_invoice_name[1],"%s<NL>",Trun(Str(((ARSINVWORK_ALIAS:net_amount_due + ARSINVWORK_ALIAS:INSTALLMENT_CHARGE)-ARSINVWORK_ALIAS:TOTAL_AMOUNT_PAID),"($ZZ,ZZZ,ZZZ.99)")))
+    Writefile(l_invoice_name[1],"%s<NL>",Trun(Str(ARSINVWORK_ALIAS:net_amount_due,"($ZZ,ZZZ,ZZZ.99)")))
+}
+else
+{
+   if arscontrol:include_install_crg_for_premium = 1 then
+   {
+
+    Writefile(l_invoice_name[1],"%s<NL>",Trun(Str(ARSINVWORK_ALIAS:INSTALLMENT_AMOUNT + ARSINVWORK_ALIAS:INSTALLMENT_CHARGE-ARSINVWORK_ALIAS:TOTAL_AMOUNT_PAID,"($ZZ,ZZZ,ZZZ.99)")))
+   }
+   else
+   {
+    Writefile(l_invoice_name[1],"%s<NL>",Trun(Str(ARSINVWORK_ALIAS:INSTALLMENT_AMOUNT - ARSINVWORK_ALIAS:TOTAL_AMOUNT_PAID,"($ZZ,ZZZ,ZZZ.99)")))
+   }
+}
+End
+
+If ARSINVWORK_ALIAS:TRANS_TYPE One Of "R","X" Then
+Begin
+Writefile(l_invoice_name[1],"%s","<033>&a210h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(l_invoice_name[1],"%s<NL>",Trun(Str(ARSINVWORK_ALIAS:BILLED_DATE,"MM/DD/YYYY")))
+Writefile(l_invoice_name[1],"%s","<033>&a930h" + Trun(Str(L_V_POSITION) + "V"))
+--Writefile(l_invoice_name[1],"%s<NL>",Trun(ARSINVWORK_ALIAS:CHECK_NO))
+--Writefile(l_invoice_name[1],"%s","<033>&a1620h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(l_invoice_name[1],"%s<NL>",L_TRANSACTION)
+Writefile(l_invoice_name[1],"%s","<033>&a4590h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(l_invoice_name[1],"%s<NL>",Trun(Str(ARSINVWORK_ALIAS:NET_AMOUNT_DUE,"($ZZ,ZZZ,ZZZ.99)")))
+End
+
+-- if this is the first invoice and there is a deposit premium
+-- then show the check information, otherwise do not print
+-- any check information
+If ARSINVWORK_ALIAS:TRANS_TYPE One Of "P" And
+   ARSINVWORK_ALIAS:BILLING_CTR = 0 And
+   G_TRANS_CODE One Of 10,14 Then
+--   ARSINVWORK_ALIAS:TRANS_CODE One Of 10  Then
+Begin
+
+Writefile(l_invoice_name[1],"%s","<033>&a210h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(l_invoice_name[1],"%s<NL>",Trun(Str(ARSINVWORK_ALIAS:BILLED_DATE,"MM/DD/YYYY")))
+Writefile(l_invoice_name[1],"%s","<033>&a930h" + Trun(Str(L_V_POSITION) + "V"))
+--Writefile(l_invoice_name[1],"%s<NL>",Trun(ARSINVWORK_ALIAS:CHECK_NO))
+--Writefile(l_invoice_name[1],"%s","<033>&a1620h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(l_invoice_name[1],"%s<NL>",L_TRANSACTION)
+Writefile(l_invoice_name[1],"%s","<033>&a4590h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(l_invoice_name[1],"%s<NL>",Trun(Str(ARSINVWORK_ALIAS:INSTALLMENT_AMOUNT,"($ZZ,ZZZ,ZZZ.99)")))
+End
+
+L_LINES_PRINTED = L_LINES_PRINTED + 1
+If L_LINES_PRINTED >= 29 Then
+{
+   Do EJECT_PAGE
+   Do PRINT_FORM
+   L_LINES_PRINTED = 0
+   L_PAGES_CTR = L_PAGES_CTR + 1
+   L_V_POSITION = 1800
+}
+
+Next ARSINVWORK_ALIAS
+
+End
+
+--L_V_POSITION = 5310
+--L_H_POSITION = 4500
+--Writefile(l_invoice_name[1],"%s<NL>",L_ARIAL_BOLD_14)
+--Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+--Writefile(l_invoice_name[1],"%s<NL>",Str(L_TOTAL_AMOUNT_DUE,"($ZZ,ZZZ,ZZZ.99)"))
+
+End
+
+Procedure PRINT_POLICY_INSTALLMENTS
+Begin
+
+L_FUTURE_TOTAL_DUE = 0
+
+/* draw the box around the form */
+
+Writefile (l_invoice_name[1],"<FF>")
+
+-- 09/15/2006 - because OCR was being used
+Writefile(l_invoice_name[1],"%s",L_ARIAL_BOLD)
+
+Writefile(l_invoice_name[1],"<033>&a0h0V<NL>") --CAP
+Writefile(l_invoice_name[1],"<033>&a90h0V<033>*c5a3000b0P<NL>")
+Writefile(l_invoice_name[1],"<033>&a5670h0V<033>*c5a3000b0P")
+Writefile(l_invoice_name[1],"<033>&a0h0V<NL>") -- CAP
+
+     -- top and bottom horizontal lines --
+Writefile(l_invoice_name[1],"<033>&a90h0V<033>*c5580h5v0P<NL>")
+-- was 6960
+Writefile(l_invoice_name[1],"<033>&a90h7200V<033>*c5580h5v0P")
+Writefile(l_invoice_name[1],"<033>&a0h0V<NL>") -- CAP
+
+Writefile(l_invoice_name[1],"<033>&a1750h150V")
+Writefile(l_invoice_name[1],"Future Installments for Your Policy")
+
+Writefile(l_invoice_name[1],"%s",L_ARIAL_BOLD)
+
+/* draw lines within the form */
+Writefile(l_invoice_name[1],"<033>&a90h300V<033>*c5580h5v0P<NL>") -- 2nd line
+Writefile(l_invoice_name[1],"<033>&a90h480V<033>*c5580h5v0P<NL>") -- 3rd line
+-- was 5390
+Writefile(l_invoice_name[1],"<033>&a90h5040V<033>*c5580h5v0P<NL>") -- 4th line
+Writefile(l_invoice_name[1],"<033>&a90h300V<033>*c2325a75b5g2P<NL>") -- shading
+
+/* draw small verticle lines in headings */
+Writefile(l_invoice_name[1],"<033>&a810h300V<033>*c5a80b0P<NL>")  -- 1st line
+Writefile(l_invoice_name[1],"<033>&a1530h300V<033>*c5a80b0P<NL>") -- 2nd line
+Writefile(l_invoice_name[1],"<033>&a3780h300V<033>*c5a80b0P<NL>") -- 3rd line
+Writefile(l_invoice_name[1],"<033>&a4680h300V<033>*c5a80b0P<NL>") -- 4th line
+
+/* draw separator line between credit payments and change of address */
+Writefile(l_invoice_name[1],"<033>&a2880h5040V<033>*c5a900b0P")
+
+/* print the change of address information first */
+
+L_H_POSITION = 720
+L_V_POSITION = 5220
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"Change of Address<NL>")
+
+Writefile(l_invoice_name[1],"%s",L_LETTER_GOTHIC_10)
+
+L_V_POSITION = L_V_POSITION + 180
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+if arscontrol2:no_alpha_invoices = 1 then
+ {
+  Writefile(l_invoice_name[1],"Policy No.: %s", Str(Val(Str(ARSINVWORK:POLICY_NO,"ZZZZZZZZZ")))+"<NL>")
+ }
+else
+ {
+  Writefile(l_invoice_name[1],"Policy No.: %s", Trun(SFSLINE:ALPHA) + Str(Val(Str(ARSINVWORK:POLICY_NO,"ZZZZZZZZZ")))+"<NL>")
+ }
+
+L_H_POSITION = 720
+L_V_POSITION = L_V_POSITION + 180
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"Your New Address is:<NL>")
+
+L_H_POSITION = 180
+
+For L_CTR = 1 To 6
+Begin
+L_V_POSITION = L_V_POSITION + 180
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h"
+                 + Trun(Str(L_V_POSITION)) + "V" + "<033>*c2665h5v0P<NL>")
+End
+
+L_H_POSITION = 180
+L_V_POSITION = L_V_POSITION + 240
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"Phone No.:")
+L_H_POSITION = L_H_POSITION + 720
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h"
+                 + Trun(Str(L_V_POSITION)) + "V" + "<033>*c1845h5v0P<NL>")
+
+/* end of change of address form */
+
+/* print the credit slip information first */
+
+If ARSCONTROL:PRINT_CREDIT_SLIP_ON_INVOICE = 1 Then
+Begin
+
+Writefile(l_invoice_name[1],"%s",L_ARIAL_BOLD)
+
+L_H_POSITION = 3060
+L_V_POSITION = 5220
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"Credit Card Payment Slip (Visa / Mastercard)<NL>")
+
+Writefile(l_invoice_name[1],"%s",L_LETTER_GOTHIC_10)
+
+L_H_POSITION = 3060
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"%s",Trun(ARSCONTROL:INVOICE_PAYMENT_OPTIONS))
+
+L_H_POSITION = 3060
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"Credit Card Number")
+
+L_V_POSITION = L_V_POSITION + 180
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h"
+                 + Trun(Str(L_V_POSITION)) + "V" + "<033>*c2485h5v0P<NL>")
+
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"Expiration Date")
+
+L_V_POSITION = L_V_POSITION + 180
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h"
+                 + Trun(Str(L_V_POSITION)) + "V" + "<033>*c2485h5v0P<NL>")
+
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"Name as it Appears on the Card")
+
+L_V_POSITION = L_V_POSITION + 180
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h"
+                 + Trun(Str(L_V_POSITION)) + "V" + "<033>*c2485h5v0P<NL>")
+
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"Cardholder's Signature")
+
+L_V_POSITION = L_V_POSITION + 240
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h"
+                 + Trun(Str(L_V_POSITION)) + "V" + "<033>*c2485h5v0P<NL>")
+
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"Phone Number:")
+
+L_V_POSITION = L_V_POSITION + 90
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h"
+                 + Trun(Str(L_V_POSITION)) + "V" + "<033>*c2485h5v0P<NL>")
+
+L_V_POSITION = L_V_POSITION + 180
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"Full Annual Premium")
+--writefile(l_invoice_name[1],"%s",str(arsinvwork:total_annual,"$$$,$$$.99-"))
+
+writefile(l_invoice_name[1],"%s",str(l_credit_card_total_due,"$$$,$$$.99-"))
+--writefile(l_invoice_name[1],"%s",l_push)
+--push to print credit card total after it calculates
+
+End
+/* end of credit Payment */
+
+L_V_POSITION = 420
+
+Writefile(l_invoice_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"Trans Eff<NL>")
+
+Writefile(l_invoice_name[1],"%s","<033>&a910h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"Trans Exp<NL>")
+
+Writefile(l_invoice_name[1],"%s","<033>&a2100h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"Description")
+
+Writefile(l_invoice_name[1],"%s","<033>&a3990h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"Due Date<NL>")
+
+Writefile(l_invoice_name[1],"%s","<033>&a4920h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_invoice_name[1],"Amount Due<NL>")
+
+Writefile(l_invoice_name[1],"%s",L_LETTER_GOTHIC_12)
+
+L_H_POSITION = 0
+L_V_POSITION = L_V_POSITION + 60
+L_FUTURE_TOTAL_DUE = 0.00
+
+Access ARSINVWORK2, Set ARSINVWORK2:COMPANY_ID = ARSINVWORK:COMPANY_ID,
+                        ARSINVWORK2:POLICY_NO  = ARSINVWORK:POLICY_NO, Approximate
+
+While ARSINVWORK2:COMPANY_ID = ARSINVWORK:COMPANY_ID And
+      ARSINVWORK2:POLICY_NO  = ARSINVWORK:POLICY_NO
+      Begin
+
+      Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = ARSINVWORK2:COMPANY_ID
+
+      L_FUTURE_TOTAL_DUE = L_FUTURE_TOTAL_DUE + ARSINVWORK2:INSTALLMENT_AMOUNT
+      L_H_POSITION = 180
+      L_V_POSITION = L_V_POSITION + 120
+      Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+      Writefile(l_invoice_name[1],"%s<NL>",Str(ARSINVWORK2:TRANS_EFF,"MM/DD/YYYY"))
+
+      L_H_POSITION = 910
+      Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+      Writefile(l_invoice_name[1],"%s<NL>",Str(ARSINVWORK2:TRANS_EXP,"MM/DD/YYYY"))
+
+      L_H_POSITION = 2100
+      Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+      Writefile(l_invoice_name[1],"    Installment<NL>")
+
+      L_H_POSITION = 3999
+      Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+      Writefile(l_invoice_name[1],"%s<NL>",Str(ARSINVWORK2:RDUE_DATE,"MM/DD/YYYY"))
+
+      L_H_POSITION = 4920
+      Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+      L_FUTURE_AMOUNT_DUE = ARSINVWORK2:INSTALLMENT_AMOUNT
+      Writefile(l_invoice_name[1],"%s<NL>",Str(L_FUTURE_AMOUNT_DUE,"$ZZZ,ZZZ.99-"))
+
+      Next ARSINVWORK2
+
+      End
+
+L_SFS_CODE = "SFS"
+Access SFSDEFAULT, Set SFSDEFAULT:SFS_CODE = L_SFS_CODE
+Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = SFSDEFAULT:COMPANY_ID
+
+      L_V_POSITION = L_V_POSITION + 240
+      Writefile(l_invoice_name[1],"%s<NL>",L_LETTER_GOTHIC_12)
+      L_H_POSITION = 2970
+      Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+
+      If ARSCONTROL2:TOTAL_BALANCE_LIT <> "" Then
+      Begin
+          Writefile(l_invoice_name[1],"%s%s",Trun(ARSCONTROL2:TOTAL_BALANCE_LIT),"<nl>")
+      End
+      Else
+      Begin
+          Writefile(l_invoice_name[1],"%s","TOTAL BALANCE DUE<NL> ")
+      End
+
+      L_H_POSITION = 4920
+      Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+      Writefile(l_invoice_name[1],"%s<NL>",Str(L_FUTURE_TOTAL_DUE,"$ZZZ,ZZZ.99-"))
+--to accumulate the total amuont due correctly including any prior amounts that are due.
+/*
+      if l_sub = 1 then
+      {
+      l_credit_card_total_due = l_credit_card_total_due + l_future_total_due
+      }
+      if l_credit_card_total_due <> l_total_annual_net and
+         l_total_annual_net <> 0 then
+         {
+          if (l_credit_card_total_due - l_total_annual_net) = 7.00 then
+             {
+               l_credit_card_total_due = l_total_annual_net
+             }
+         }
+*/
+L_V_POSITION = L_V_POSITION + 240
+L_H_POSITION = 740 -- was 1140
+Writefile(l_invoice_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+--Writefile(l_invoice_name[1],"%s%s%s","Future Installments Do not Include the ",Str(ARSPAYPLAN:INSTALLMENT_CHARGE_RATE,"$$.99")," Per Installment Charge")
+Writefile(l_invoice_name[1],"%s%s%s","The above future installments do not reflect the ",trun(Str(ARSPAYPLAN:INSTALLMENT_CHARGE_RATE,"$$$$$.99"))," Per Installment Charge")
+--Writefile(l_invoice_name[1],"%s",l_pop)
+--writefile(l_invoice_name[1],"%s",str(l_credit_card_total_due,"$$$,$$$.99-"))
+
+
+End   -- end of print policy installments
+
+
+Procedure EJECT_PAGE
+Begin
+
+-- put reset first on march 28, 2002
+--    Writefile(l_invoice_name[1],"%s",L_RESET + "<NL>")
+    Writefile(l_invoice_name[1],"%s",L_FORMFEED+"<NL>")
+--    Writefile(l_invoice_name[1],"%s",L_RESET + "<NL>")
+--warning arscontrol:company_id + str(arscontrol:print_future_installments) + str(ARSCONTROL:PRINT_CREDIT_SLIP_ON_INVOICE)
+-- set to long edge duplexing if the following is true
+    If ARSCONTROL:PRINT_FUTURE_INSTALLMENTS = 1 Or
+       ARSCONTROL:PRINT_CREDIT_SLIP_ON_INVOICE = 1 Then
+       Begin
+           Writefile (l_invoice_name[1],"%s<NL>",L_LEDUP)
+       End
+
+-- options are:
+--     1 = Executive
+--     2 = Letter
+--     3 = Legal
+--     4 = A4
+--     5 = Monarch
+--     6 = Commercial 10
+--     7 = International DL
+--     8 = International C5
+
+-- dont set form type march 28, 2002
+--Writefile(l_invoice_name[1],"<033>&l2A")   -- set the printer to Letter, see above
+
+    L_PAGES_CTR = L_PAGES_CTR + 1
+
+End
+
+Procedure REVERSE_NAME
+Begin
+
+Include "sfsrevname7.pro"
+
+End
+
+Procedure ADD_ARSINVWORK
+Begin
+--Read (23,1,"add arsinvwork --Press Enter to Continue ",L_ENTER,1)
+
+-- if arsbilling:due_date not = to the prior arsbillign due date then
+--L_TOTAL_ANNUAL = 0
+
+L_TRANS_TYPE = "I"
+If ARSBILLING:TRANS_CODE = ARSCONTROL:RETURNED_CHECK_REBILL_TRANS Then
+    Begin
+    L_TRANS_TYPE = "R"
+    End
+Else
+If ARSBILLING:TRANS_CODE = ARSCONTROL:RETURNED_CHECK_TRANS_CODE Then
+    Begin
+    L_TRANS_TYPE = "X"
+    End
+
+L_PAYMENT_CTR = 1                      -- for this type always 1, only increments for checks
+L_MAXIMUM_BILLING_CTR = 0
+
+Access ARSINVWORK,
+   Set ARSINVWORK:COMPANY_ID  = ARSBILLING:COMPANY_ID,
+       ARSINVWORK:POLICY_NO   = ARSBILLING:POLICY_NO,
+       ARSINVWORK:DUE_DATE    = ARSBILLING:DUE_DATE,
+       ARSINVWORK:TRANS_TYPE  = L_TRANS_TYPE,
+       ARSINVWORK:PAYMENT_CTR = L_PAYMENT_CTR, Approximate
+
+If ARSINVWORK:COMPANY_ID  <> ARSBILLING:COMPANY_ID Or
+   ARSINVWORK:POLICY_NO   <> ARSBILLING:POLICY_NO Or
+   ARSINVWORK:DUE_DATE    <> ARSBILLING:DUE_DATE Or
+   ARSINVWORK:TRANS_TYPE  <> L_TRANS_TYPE Or
+   ARSINVWORK:PAYMENT_CTR <> L_PAYMENT_CTR Then
+    Begin
+    Add ARSINVWORK
+        Begin
+        ARSINVWORK:COMPANY_ID            = ARSBILLING:COMPANY_ID
+        ARSINVWORK:POLICY_NO             = ARSBILLING:POLICY_NO
+        ARSINVWORK:TRANS_TYPE            = L_TRANS_TYPE
+        ARSINVWORK:DUE_DATE              = ARSBILLING:DUE_DATE
+        ARSINVWORK:PAYMENT_CTR           = L_PAYMENT_CTR
+        ARSINVWORK:STATUS                = ARSBILLING:STATUS
+        ARSINVWORK:BILLED_DATE           = TODAYSDATE
+        ARSINVWORK:EFF_DATE              = ARSBILLING:TRANS_EFF
+        ARSINVWORK:EXP_DATE              = ARSBILLING:TRANS_EXP
+        ARSINVWORK:TRANS_CODE            = ARSBILLING:TRANS_CODE
+        ARSINVWORK:BILLING_CTR           = ARSBILLING:BILLING_CTR
+        ARSINVWORK:reversed_premium      = ARSBILLING:reversed_premium
+        -- here we are using consent order for workerscomp reverse when all the due
+        -- dates are paid and an endorsement is done so the wording on the
+        -- invoice is "Endorsement" NOT "Installment #"
+        arsinvwork:consent_order         = arsbilling:consent_order
+
+        If ARSBILLING:BILLING_CTR > L_MAXIMUM_BILLING_CTR Then
+            Begin
+            L_MAXIMUM_BILLING_CTR = ARSBILLING:BILLING_CTR
+            End
+
+        -- added 70 t/c dap 3/7/2007 dap
+        If ARSBILLING:TRANS_CODE One Of 10,11,12,13,14,15,16,19,22,21,23,25,29,50,60,61,62,63,64,66,69,70,72,75,76 Then
+            Begin
+            ARSINVWORK:INSTALLMENT_AMOUNT    = ARSBILLING:INSTALLMENT_AMOUNT
+            End
+        Else
+            Begin
+            ARSINVWORK:INSTALLMENT_AMOUNT    = 0.00
+            End
+
+
+        If ARSBILLING:TRANS_CODE One Of 18, 28, 68 Then
+            Begin
+            ARSINVWORK:INSTALLMENT_CHARGE    = ARSBILLING:INSTALLMENT_AMOUNT
+            End
+        ARSINVWORK:TOTAL_AMOUNT_PAID     = ARSBILLING:TOTAL_AMOUNT_PAID
+        ARSINVWORK:WRITE_OFF_AMOUNT      = ARSBILLING:WRITE_OFF_AMOUNT
+
+        If ARSBILLING:TRANS_CODE not One Of 18, 28, 68,65 Then
+         {
+            ARSINVWORK:NET_AMOUNT_DUE        = (ARSBILLING:INSTALLMENT_AMOUNT -   -- +
+--                                              ARSBILLING:INSTALLMENT_CHARGE -
+                                               (ARSBILLING:TOTAL_AMOUNT_PAID +
+                                               ARSBILLING:WRITE_OFF_AMOUNT))
+         }
+        l_company_id5   = arsbilling:company_id
+        l_policy5   = arsbilling:policy_no
+        access sfpname, set sfpname:policy_no     = ARSBILLING:POLICY_NO,
+                            sfpname:pol_year      = ARSBILLING:POL_YEAR,
+                            sfpname:end_sequence  = ARSBILLING:END_SEQUENCE, GENERIC
+
+        if sfpname:status = "EXPIRED" then
+        {
+         l_trans_eff = dateadd(arsbilling:trans_eff,0,1)
+         l_trans_exp = dateadd(arsbilling:trans_exp,0,1)
+        }
+        else
+        {
+         l_trans_eff = arsbilling:trans_eff
+         l_trans_exp = arsbilling:trans_exp
+        }
+        Do GET_TOTAL_ANNUAL
+
+
+        ARSINVWORK:TOTAL_ANNUAL          = L_TOTAL_ANNUAL
+        ARSINVWORK:PAST_DUE              = "N"
+        ARSINVWORK:PAYMENT_PLAN          = ARSBILLING:PAYMENT_PLAN
+        ARSINVWORK:AGENT_NO              = ARSBILLING:AGENT_NO
+        ARSINVWORK:LINE_OF_BUSINESS      = ARSBILLING:LINE_OF_BUSINESS
+        ARSINVWORK:LOB_SUBLINE           = ARSBILLING:LOB_SUBLINE
+        ARSINVWORK:COMM_RATE             = ARSBILLING:COMM_RATE
+        ARSINVWORK:RETURN_CHECK_CTR      = ARSBILLING:RETURN_CHECK_CTR
+        ARSINVWORK:CHECK_NO              = ARSBILLING:CHECK_NO
+        -- was arsbilling:due_date < g_starting_date
+        -- this was wrong as an advanced due date would be considered past due
+        If ARSBILLING:DUE_DATE < TODAYSDATE Then
+            Begin
+            ARSINVWORK:PAST_DUE          = "Y"
+            End
+        Else
+            Begin
+            ARSINVWORK:PAST_DUE          = "N"
+            End
+        End  --end of ADD
+
+    End  -- end of if
+Else
+    Change ARSINVWORK
+        Begin
+        -- 02/10/2002 - if there was an endorsement done the same day as the
+        --  renewal was done then there would be no amount accumulated
+            l_total_annual = 0
+            l_company_id5   = arsbilling:company_id
+            l_policy5 = arsbilling:policy_no
+            access sfpname, set sfpname:policy_no = ARSBILLING:POLICY_NO,
+                            sfpname:pol_year      = ARSBILLING:POL_YEAR,
+                            sfpname:end_sequence  = ARSBILLING:END_SEQUENCE, GENERIC
+
+            if sfpname:status = "EXPIRED" then
+             {
+              l_trans_eff = dateadd(arsbilling:trans_eff,0,1)
+              l_trans_exp = dateadd(arsbilling:trans_exp,0,1)
+             }
+            else
+             {
+              l_trans_eff = arsbilling:trans_eff
+              l_trans_exp = arsbilling:trans_exp
+             }
+            if arsbilling:trans_code one of 15 then
+              l_trans_exp = dateadd(l_trans_exp,0,1)
+            Do GET_TOTAL_ANNUAL
+
+
+            ARSINVWORK:TOTAL_ANNUAL = L_TOTAL_ANNUAL
+        -- added 70 t/c dap 3/7/2007 dap
+
+        If ARSBILLING:TRANS_CODE One Of 10,11,12,13,14,15,16,19,22,21,23,25,29,50,60,61,62,63,64,65,66,69,70,72,75,76 Then
+            Begin
+            ARSINVWORK:INSTALLMENT_AMOUNT    = ARSINVWORK:INSTALLMENT_AMOUNT +
+                                               ARSBILLING:INSTALLMENT_AMOUNT
+        -- added the if statement because the last trans code in arsinvwork was trans code 19
+        -- and the middle invoice wording would not print dap 03/15/2010
+        --    if arsbilling:trans_code not one of 19, 22, 23, 29 then
+        -- changed back 3/16/2010 need to check with Cindy first
+            if arsinvwork:trans_code not one of 15 then
+              {
+               if arsinvwork:trans_code not one of 10,14,16 then
+                {
+                 arsinvwork:trans_code            = arsbilling:trans_code
+                }
+              }
+            End
+        -- added 2/10/2002 - if an endorsement and 14 were done on the same day
+        -- then the invoice would refect the endorsement not the 14
+        If ARSBILLING:TRANS_CODE One Of 10, 14 Then
+            Begin
+            ARSINVWORK:TRANS_CODE = ARSBILLING:TRANS_CODE
+            End
+        Else
+        If ARSBILLING:TRANS_CODE One Of 18,28,68 Then
+            Begin
+            ARSINVWORK:INSTALLMENT_CHARGE    = ARSINVWORK:INSTALLMENT_CHARGE +
+                                               ARSBILLING:INSTALLMENT_AMOUNT
+            End
+
+
+        ARSINVWORK:TOTAL_AMOUNT_PAID     = ARSINVWORK:TOTAL_AMOUNT_PAID +
+                                           ARSBILLING:TOTAL_AMOUNT_PAID
+        ARSINVWORK:WRITE_OFF_AMOUNT      = ARSINVWORK:WRITE_OFF_AMOUNT +
+                                           ARSBILLING:WRITE_OFF_AMOUNT
+
+        -- removed 3/17/2010 dap the net amount due was not adding the installment fee
+        -- if arsbilling:trans_code not one of 18,28,68 then
+
+        if arsinvwork:trans_code not one of 18,28,68 and
+           sfsline:lob_code not one of "WORK" then
+         {
+          ARSINVWORK:NET_AMOUNT_DUE        = ARSINVWORK:NET_AMOUNT_DUE +
+                                            (ARSBILLING:INSTALLMENT_AMOUNT -    -- +
+--                                            ARSBILLING:INSTALLMENT_CHARGE -
+                                            (ARSBILLING:TOTAL_AMOUNT_PAID +
+                                             ARSBILLING:WRITE_OFF_AMOUNT))
+         }
+        else
+        if arsbilling:trans_code not one of 18,28,68 and
+           sfsline:lob_code one of "WORK" then
+         {
+          ARSINVWORK:NET_AMOUNT_DUE        = ARSINVWORK:NET_AMOUNT_DUE +
+                                            (ARSBILLING:INSTALLMENT_AMOUNT -   -- +
+--                                            ARSBILLING:INSTALLMENT_CHARGE -
+                                            (ARSBILLING:TOTAL_AMOUNT_PAID +
+                                             ARSBILLING:WRITE_OFF_AMOUNT))
+         }
+        else
+         {
+         if arsbilling:trans_code not one of 18,28,68 then
+          {
+          ARSINVWORK:NET_AMOUNT_DUE        = ARSINVWORK:NET_AMOUNT_DUE -     -- +
+--                                            (ARSBILLING:INSTALLMENT_CHARGE -
+                                            (ARSBILLING:TOTAL_AMOUNT_PAID +
+                                             ARSBILLING:WRITE_OFF_AMOUNT)     -- )
+          }
+         }
+
+        -- dlp - 09/16/2003 -
+        -- force the billing_ctr to be the last billing ctr encountered to properly
+        -- display the type of invoice to be printed.
+        ARSINVWORK:BILLING_CTR = ARSBILLING:BILLING_CTR
+
+--  in case the first trans code that is being add is a 18 which would not have
+-- a reversed premium then check for others.
+        if arsinvwork:reversed_premium <> 1 then
+           arsinvwork:reversed_premium = arsbilling:reversed_premium
+
+        End
+End -- end of procedure
+
+Procedure BUILD_INVOICE_WORK_FILE2
+Begin
+
+L_WORK_HOLD_POLICY_NO = 0
+
+Access ARSINVWORK_ALIAS, Set ARSINVWORK_ALIAS:COMPANY_ID = ARSCONTROL:COMPANY_ID, Approximate
+
+While ARSINVWORK_ALIAS:COMPANY_ID <> ""
+Begin
+
+If L_WORK_HOLD_POLICY_NO <> ARSINVWORK_ALIAS:POLICY_NO Then
+Begin
+
+L_WORK_HOLD_POLICY_NO = ARSINVWORK_ALIAS:POLICY_NO
+
+Access ARSBILLING, Set ARSBILLING:COMPANY_ID = ARSINVWORK_ALIAS:COMPANY_ID,
+                       ARSBILLING:POLICY_NO  = ARSINVWORK_ALIAS:POLICY_NO, Approximate
+
+While ARSBILLING:COMPANY_ID = ARSINVWORK_ALIAS:COMPANY_ID And
+      ARSBILLING:POLICY_NO  = ARSINVWORK_ALIAS:POLICY_NO
+Begin
+
+If ARSBILLING:STATUS = "O" Then
+Begin
+
+L_REVERSE_DATE = ARSBILLING:DUE_DATE
+
+    Access ARSINVWORK2, Set ARSINVWORK2:COMPANY_ID = ARSBILLING:COMPANY_ID,
+                            ARSINVWORK2:POLICY_NO  = ARSBILLING:POLICY_NO,
+                            ARSINVWORK2:RDUE_DATE  = L_REVERSE_DATE
+
+    If ARSINVWORK2:COMPANY_ID <> ARSBILLING:COMPANY_ID Or
+       ARSINVWORK2:POLICY_NO  <> ARSBILLING:POLICY_NO Or
+       ARSINVWORK2:RDUE_DATE  <> L_REVERSE_DATE Then
+       Begin
+       Add ARSINVWORK2
+       Begin
+       ARSINVWORK2:COMPANY_ID           = ARSBILLING:COMPANY_ID
+       ARSINVWORK2:POLICY_NO            = ARSBILLING:POLICY_NO
+       ARSINVWORK2:RDUE_DATE            = L_REVERSE_DATE
+       ARSINVWORK2:TRANS_EFF            = ARSBILLING:TRANS_EFF
+       ARSINVWORK2:TRANS_EXP            = ARSBILLING:TRANS_EXP
+       ARSINVWORK2:TRANS_CODE           = ARSBILLING:TRANS_CODE
+       If ARSBILLING:TRANS_CODE One Of 10,11,12,13,14,15,16,19,22,21,23,29,50,60,61,62,63,64,66,69,70,72,75,76 Then
+         {
+           ARSINVWORK2:INSTALLMENT_AMOUNT   = ARSBILLING:INSTALLMENT_AMOUNT -
+                                             (ARSBILLING:TOTAL_AMOUNT_PAID +
+                                              ARSBILLING:WRITE_OFF_AMOUNT)
+         }
+       End
+       End
+       Else
+       Begin
+       Change ARSINVWORK2
+       Begin
+       If ARSBILLING:TRANS_CODE One Of 10,11,12,13,14,15,16,19,22,21,23,29,50,60,61,62,63,64,66,69,70,72,75,76 Then
+         {
+          ARSINVWORK2:INSTALLMENT_AMOUNT = ARSINVWORK2:INSTALLMENT_AMOUNT +
+          (ARSBILLING:INSTALLMENT_AMOUNT - (ARSBILLING:TOTAL_AMOUNT_PAID +
+                                               ARSBILLING:WRITE_OFF_AMOUNT))
+         }
+-- if there is an endorsement on an installment we want the installment trans code to take top order.
+       if arsbilling:trans_code one of 10,14,16 then
+          arsinvwork2:trans_code = arsbilling:trans_code
+
+
+       End
+
+       End
+
+       End
+
+       Next ARSBILLING
+
+       End
+
+       End
+
+       Next ARSINVWORK_ALIAS
+
+       End
+
+End
+
+Procedure UPDATE_ARSBILLING
+Begin
+
+access sfpname, set sfpname:policy_no = arsbilling:policy_no,
+                    sfpname:pol_year  = arsbilling:pol_year,
+                    sfpname:end_sequence = arsbilling:end_sequence, generic
+
+if sfpname:line_of_business = 99 then
+ {
+   l_lob = 99
+ }
+ else
+ {
+   l_lob = arsbilling:line_of_business
+ }
+
+
+Access ARSPAYPLAN, Set ARSPAYPLAN:COMPANY_ID       = ARSBILLING:COMPANY_ID,
+                       ARSPAYPLAN:LINE_OF_BUSINESS = l_LOB,
+                       ARSPAYPLAN:PAYMENT_PLAN     = ARSBILLING:PAYMENT_PLAN
+
+If L_CREATED_INSTALLMENT_CHARGE Not One Of 1 Then
+Begin
+    If (ARSPAYPLAN:INSTALLMENT_CHARGE_RATE <> 0 And
+        ARSBILLING:TRANS_CODE One Of 10,14,16 And
+        ARSBILLING:BILLING_CTR > 1 And
+        ARSBILLING:STATUS One Of "O") Or
+
+       (ARSPAYPLAN:INSTALLMENT_CHARGE_RATE <> 0 And
+        ARSBILLING:TRANS_CODE One Of 10,14,16 And
+        ARSBILLING:BILLING_CTR = 1 And
+        G_RUN_MODE = 6) or
+
+       (ARSPAYPLAN:INSTALLMENT_CHARGE_RATE <> 0 And
+        arsbilling:reversed_premium = 1 and
+        arsbilling:trans_code one of 12 and
+        arsbilling:billing_ctr > 1 and
+        arsbilling:status one of "O") Then -- first one is done in arsup001
+    Begin
+       Do CREATE_INSTALLMENT_CHARGE
+       L_CREATED_INSTALLMENT_CHARGE = 1
+    End
+End -- end of checking for installment charge already created
+
+Access ARSBILLING_ALIAS, Set ARSBILLING_ALIAS:COMPANY_ID = ARSBILLING:COMPANY_ID,
+                             ARSBILLING_ALIAS:POLICY_NO  = ARSBILLING:POLICY_NO,
+                             ARSBILLING_ALIAS:TRANS_DATE = ARSBILLING:TRANS_DATE,
+                             ARSBILLING_ALIAS:TRANS_EFF  = ARSBILLING:TRANS_EFF,
+                             ARSBILLING_ALIAS:TRANS_EXP  = ARSBILLING:TRANS_EXP,
+                             ARSBILLING_ALIAS:TRANS_CODE = ARSBILLING:TRANS_CODE,
+                             ARSBILLING_ALIAS:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS,
+                             ARSBILLING_ALIAS:COMM_RATE  = ARSBILLING:COMM_RATE,
+                             ARSBILLING_ALIAS:SUB_CODE   = ARSBILLING:SUB_CODE,
+                             ARSBILLING_ALIAS:BILLING_CTR = ARSBILLING:BILLING_CTR,
+                             ARSBILLING_ALIAS:RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR
+
+If ARSBILLING_ALIAS:STATUS = "O" Or
+  (ARSBILLING_ALIAS:STATUS One Of "B", "O" And
+   G_RUN_MODE = 2) Then
+Begin
+Change ARSBILLING_ALIAS
+Begin
+    ARSBILLING_ALIAS:STATUS      = "B"
+    ARSBILLING_ALIAS:BILLED_DATE = TODAYSDATE
+    ARSBILLING_ALIAS:STATUS_DATE = TODAYSDATE
+    ARSBILLING_ALIAS:PRINTED     = 1 -- can not update again
+    L_UPDATE_CTR = L_UPDATE_CTR + 1
+--    Write ("%c%s%n",20001,"Records Updated ",L_UPDATE_CTR )
+End
+End
+
+End -- end of procedure
+
+Procedure CREATE_INSTALLMENT_CHARGE
+Begin
+
+L_TRANS_CODE = 18 -- installment charge trans code
+L_BILLING_CTR = ARSBILLING:BILLING_CTR
+
+Access ARSBILLING_ALIAS, Set ARSBILLING_ALIAS:COMPANY_ID = ARSBILLING:COMPANY_ID,
+                             ARSBILLING_ALIAS:POLICY_NO  = ARSBILLING:POLICY_NO,
+                             ARSBILLING_ALIAS:TRANS_DATE = ARSBILLING:TRANS_DATE,
+                             ARSBILLING_ALIAS:TRANS_EFF  = ARSBILLING:TRANS_EFF,
+                             ARSBILLING_ALIAS:TRANS_EXP  = ARSBILLING:TRANS_EXP,
+                             ARSBILLING_ALIAS:TRANS_CODE = L_TRANS_CODE,
+                             ARSBILLING_ALIAS:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS,
+                             ARSBILLING_ALIAS:COMM_RATE  = ARSBILLING:COMM_RATE,
+                             ARSBILLING_ALIAS:SUB_CODE   = ARSBILLING:SUB_CODE,
+                             ARSBILLING_ALIAS:BILLING_CTR = ARSBILLING:BILLING_CTR,
+                             ARSBILLING_ALIAS:RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR
+
+If ARSBILLING_ALIAS:COMPANY_ID <> ARSBILLING:COMPANY_ID Or
+   ARSBILLING_ALIAS:POLICY_NO  <> ARSBILLING:POLICY_NO Or
+   ARSBILLING_ALIAS:TRANS_DATE <> ARSBILLING:TRANS_DATE Or
+   ARSBILLING_ALIAS:TRANS_EFF  <> ARSBILLING:TRANS_EFF Or
+   ARSBILLING_ALIAS:TRANS_EXP  <> ARSBILLING:TRANS_EXP Or
+   ARSBILLING_ALIAS:TRANS_CODE <> L_TRANS_CODE Or
+   ARSBILLING_ALIAS:LINE_OF_BUSINESS <> ARSBILLING:LINE_OF_BUSINESS Or
+   ARSBILLING_ALIAS:COMM_RATE  <> ARSBILLING:COMM_RATE Or
+   ARSBILLING_ALIAS:SUB_CODE   <> ARSBILLING:SUB_CODE Or
+   ARSBILLING_ALIAS:BILLING_CTR <> ARSBILLING:BILLING_CTR Or
+   ARSBILLING_ALIAS:RETURN_CHECK_CTR <> ARSBILLING:RETURN_CHECK_CTR Then
+   Begin
+   Add ARSBILLING_ALIAS
+   Begin
+       ARSBILLING_ALIAS:COMPANY_ID              = ARSBILLING:COMPANY_ID
+       ARSBILLING_ALIAS:POLICY_NO               = ARSBILLING:POLICY_NO
+       ARSBILLING_ALIAS:TRANS_DATE              = TODAYSDATE
+       ARSBILLING_ALIAS:TRANS_EFF               = ARSBILLING:TRANS_EFF
+       ARSBILLING_ALIAS:TRANS_EXP               = ARSBILLING:TRANS_EXP
+       ARSBILLING_ALIAS:TRANS_CODE              = L_TRANS_CODE
+       ARSBILLING_ALIAS:LINE_OF_BUSINESS        = ARSBILLING:LINE_OF_BUSINESS
+       ARSBILLING_ALIAS:COMM_RATE               = 0.00
+       ARSBILLING_ALIAS:SUB_CODE                = ARSBILLING:SUB_CODE
+       ARSBILLING_ALIAS:BILLING_CTR             = L_BILLING_CTR
+       ARSBILLING_ALIAS:RETURN_CHECK_CTR        = ARSBILLING:RETURN_CHECK_CTR
+       ARSBILLING_ALIAS:AGENT_NO                = ARSBILLING:AGENT_NO
+       ARSBILLING_ALIAS:BILLED_DATE             = TODAYSDATE
+       ARSBILLING_ALIAS:DUE_DATE                = ARSBILLING:DUE_DATE
+       ARSBILLING_ALIAS:INSTALLMENT_AMOUNT      = ARSPAYPLAN:INSTALLMENT_CHARGE_RATE
+       ARSBILLING_ALIAS:STATUS                  = "B"
+       ARSBILLING_ALIAS:STATUS_DATE             = TODAYSDATE
+       ARSBILLING_ALIAS:TOTAL_AMOUNT_PAID       = 0.00
+       ARSBILLING_ALIAS:BILL_PLAN               = ARSBILLING:BILL_PLAN
+       ARSBILLING_ALIAS:PAYMENT_PLAN            = ARSBILLING:PAYMENT_PLAN
+       ARSBILLING_ALIAS:INSTALLMENT_CHARGE      = 0
+       ARSBILLING_ALIAS:USER_CONSOLE            = TERMINAL
+       ARSBILLING_ALIAS:USER                    = USERNAME
+       ARSBILLING_ALIAS:PRINTED                 = 1
+       ARSBILLING_ALIAS:WRITE_OFF               = 0
+       ARSBILLING_ALIAS:WRITE_OFF_AMOUNT        = 0
+       ARSBILLING_ALIAS:WRITE_OFF_DATE          = 00.00.0000
+       arsbilling_alias:pol_year                = arsbilling:pol_year
+End  -- end of adding to arsbilling_alias
+End
+
+L_TRANS_TYPE = "I"
+
+Access ARSINVWORK_ALIAS,
+   Set ARSINVWORK_ALIAS:COMPANY_ID = ARSBILLING_ALIAS:COMPANY_ID,
+       ARSINVWORK_ALIAS:POLICY_NO  = ARSBILLING_ALIAS:POLICY_NO,
+       ARSINVWORK_ALIAS:DUE_DATE   = ARSBILLING_ALIAS:DUE_DATE,
+       ARSINVWORK_ALIAS:TRANS_TYPE = L_TRANS_TYPE,
+       ARSINVWORK_ALIAS:PAYMENT_CTR = L_PAYMENT_CTR
+
+If ARSINVWORK_ALIAS:COMPANY_ID <> ARSBILLING_ALIAS:COMPANY_ID Or
+   ARSINVWORK_ALIAS:POLICY_NO  <> ARSBILLING_ALIAS:POLICY_NO Or
+   ARSINVWORK_ALIAS:DUE_DATE   <> ARSBILLING_ALIAS:DUE_DATE Or
+   ARSINVWORK_ALIAS:TRANS_TYPE <> L_TRANS_TYPE Or
+   ARSINVWORK_ALIAS:PAYMENT_CTR <> L_PAYMENT_CTR Then
+   Begin
+
+/* add this record to the invoice work file */
+   Add ARSINVWORK_ALIAS
+   Begin
+       ARSINVWORK_ALIAS:COMPANY_ID            = ARSBILLING_ALIAS:COMPANY_ID
+       ARSINVWORK_ALIAS:POLICY_NO             = ARSBILLING_ALIAS:POLICY_NO
+       ARSINVWORK_ALIAS:TRANS_TYPE            = L_TRANS_TYPE
+       ARSINVWORK_ALIAS:PAYMENT_CTR           = L_PAYMENT_CTR
+       ARSINVWORK_ALIAS:DUE_DATE              = ARSBILLING_ALIAS:DUE_DATE
+       ARSINVWORK_ALIAS:STATUS                = ARSBILLING_ALIAS:STATUS
+       ARSINVWORK_ALIAS:BILLED_DATE           = TODAYSDATE
+       ARSINVWORK_ALIAS:EFF_DATE              = ARSBILLING_ALIAS:TRANS_EFF
+       ARSINVWORK_ALIAS:EXP_DATE              = ARSBILLING_ALIAS:TRANS_EXP
+       ARSINVWORK_ALIAS:TRANS_CODE            = ARSBILLING_ALIAS:TRANS_CODE
+       ARSINVWORK_ALIAS:BILLING_CTR           = L_BILLING_CTR
+       ARSINVWORK_ALIAS:INSTALLMENT_AMOUNT    = 0
+       ARSINVWORK_ALIAS:INSTALLMENT_CHARGE    = ARSBILLING_ALIAS:INSTALLMENT_AMOUNT
+       ARSINVWORK_ALIAS:TOTAL_AMOUNT_PAID     = ARSBILLING_ALIAS:TOTAL_AMOUNT_PAID
+       ARSINVWORK_ALIAS:WRITE_OFF_AMOUNT      = ARSBILLING_ALIAS:WRITE_OFF_AMOUNT
+       ARSINVWORK_ALIAS:TOTAL_ANNUAL          = ARSBILLING_ALIAS:INSTALLMENT_AMOUNT
+       ARSINVWORK_ALIAS:PAST_DUE              = "N"
+       ARSINVWORK_ALIAS:PAYMENT_PLAN          = ARSBILLING_ALIAS:PAYMENT_PLAN
+       ARSINVWORK_ALIAS:AGENT_NO              = ARSBILLING_ALIAS:AGENT_NO
+       ARSINVWORK_ALIAS:LINE_OF_BUSINESS      = ARSBILLING_ALIAS:LINE_OF_BUSINESS
+       ARSINVWORK_ALIAS:LOB_SUBLINE           = ARSBILLING_ALIAS:LOB_SUBLINE
+       ARSINVWORK_ALIAS:COMM_RATE             = ARSBILLING_ALIAS:COMM_RATE
+       ARSINVWORK_ALIAS:RETURN_CHECK_CTR      = ARSBILLING_ALIAS:RETURN_CHECK_CTR
+       ARSINVWORK_ALIAS:reversed_premium      = ARSBILLING_ALIAS:reversed_premium
+
+   End -- end of adding to arsinvwork
+   End
+   Else
+   Begin
+   Change ARSINVWORK_ALIAS
+   Begin
+      ARSINVWORK_ALIAS:INSTALLMENT_AMOUNT = ARSINVWORK_ALIAS:INSTALLMENT_AMOUNT + 0
+      ARSINVWORK_ALIAS:INSTALLMENT_CHARGE = ARSINVWORK_ALIAS:INSTALLMENT_CHARGE + ARSBILLING_ALIAS:INSTALLMENT_AMOUNT
+   End
+   End
+
+End
+
+Procedure CHECK_FOR_UNDERWRITING_CX
+Begin
+
+L_UNDERWRITING_CX = "N"
+
+Access SFSCANCEL, Set SFSCANCEL:COMPANY_ID = ARSBILLING:COMPANY_ID,
+                      SFSCANCEL:POLICY_NO  = ARSBILLING:POLICY_NO, Approximate
+
+While SFSCANCEL:COMPANY_ID = ARSBILLING:COMPANY_ID And
+      SFSCANCEL:POLICY_NO  = ARSBILLING:POLICY_NO
+      Begin
+          If SFSCANCEL:STATUS not one of "CURRENT", "REINSTATED", "NONRENEW"
+          and sfscancel:cancellation_code <> 100
+          Then
+          {
+           L_UNDERWRITING_CX = "Y"
+           if sfscancel:company_id = "FARMERS" and
+              sfscancel:coverage_only = 1 then
+               {
+                L_UNDERWRITING_CX = "N"
+               }
+          }
+          Next SFSCANCEL
+      End
+
+/*
+Access SFPNAME, Set SFPNAME:POLICY_NO = ARSBILLING:POLICY_NO,
+                    SFPNAME:POL_YEAR  = L_POL_YEAR,
+                    SFPNAME:END_SEQUENCE = L_END_SEQUENCE
+
+While SFPNAME:POLICY_NO = ARSBILLING:POLICY_NO And
+      SFPNAME:POL_YEAR  = L_POL_YEAR And
+      SFPNAME:END_SEQUENCE = L_END_SEQUENCE
+      Begin
+          If SFPNAME:STATUS not one of "ACTIVE", "CURRENT" Then
+          Begin
+              L_UNDERWRITING_CX = "Y"
+          End
+      Next SFPNAME
+End  -- end of sfpname loop
+*/
+
+End
+
+Procedure CHECK_FOR_NON_PAY
+Begin
+
+L_NON_PAY_NOTICE = "N"
+
+Access ARSCANCEL, Set ARSCANCEL:COMPANY_ID = ARSBILLING:COMPANY_ID,
+                      ARSCANCEL:POLICY_NO  = ARSBILLING:POLICY_NO, Approximate
+
+While ARSCANCEL:COMPANY_ID = ARSBILLING:COMPANY_ID And
+      ARSCANCEL:POLICY_NO  = ARSBILLING:POLICY_NO
+      Begin
+          If ARSCANCEL:CX_STATUS One Of "P", "C" Then
+          Begin
+              L_NON_PAY_NOTICE = "Y"
+          End
+          Next ARSCANCEL
+      End
+
+End
+
+Procedure GET_CURRENT_SFPNAME
+Begin
+
+
+--L_POL_YEAR     = Year(ARSINVWORK:EXP_DATE) - 1
+--l_pol_year       = year(l_hold_exp_date) - 1
+L_POLICY_NO      = ARSINVWORK:POLICY_NO
+L_POL_YEAR       = Year(L_HOLD_EFF_DATE)
+
+L_END_SEQUENCE = 0
+
+If Year(ARSINVWORK:EXP_DATE) - Year(ARSINVWORK:EFF_DATE) > 1 Then
+Begin
+   Access SFPCURRENT, Set SFPCURRENT:POLICY_NO = ARSINVWORK:POLICY_NO
+   L_POL_YEAR = SFPCURRENT:POL_YEAR
+End
+
+/* Access SFPNAME, Set SFPNAME:POLICY_NO = ARSINVWORK:POLICY_NO,
+                    SFPNAME:POL_YEAR  = L_POL_YEAR, Approximate
+
+While SFPNAME:POLICY_NO = ARSINVWORK:POLICY_NO And
+      SFPNAME:POL_YEAR  = L_POL_YEAR
+      Begin
+          L_POLICY_NO    = SFPNAME:POLICY_NO
+          L_END_SEQUENCE = SFPNAME:END_SEQUENCE
+          Next SFPNAME
+      End
+*/
+-- lets check to see if a valid name was found
+--If L_POLICY_NO <> ARSINVWORK:POLICY_NO Or
+--   L_POLICY_NO = 0 Then
+--Begin
+  -- bad name record, lets pick the last one on file
+  Access SFPNAME, Set SFPNAME:POLICY_NO = ARSINVWORK:POLICY_NO, Approximate
+
+  While SFPNAME:POLICY_NO = ARSINVWORK:POLICY_NO
+  Begin
+      L_POLICY_NO = SFPNAME:POLICY_NO
+      L_POL_YEAR  = SFPNAME:POL_YEAR
+      L_END_SEQUENCE = SFPNAME:END_SEQUENCE
+      Next SFPNAME
+  End
+
+--End -- end of sfpname valid checking
+
+End  -- end of get_current_sfpname procedure
+
+Procedure GET_NUMBER_OF_COPIES
+Begin
+
+L_COPY_CTR = 2
+
+If G_RUN_MODE = 1 Then -- invoice from customer service
+Begin
+   L_COPY_CTR = 1
+End
+
+Do GET_PAYOR_COPY
+
+End  -- end of get_number_of_copies
+
+Procedure GET_PAYOR_COPY
+Begin
+
+L_SFPNAME_LOOP_CTR = 0
+L_PAYOR_FOUND = "N"
+
+For L_CTR = 1 To 3
+    Begin
+    L_PAYOR_NAME[L_CTR]    = ""
+    L_PAYOR_ADDRESS[L_CTR] = ""
+    End
+L_PAYOR_CITY           = ""
+L_PAYOR_STATE          = ""
+L_PAYOR_ZIPCODE        = ""
+L_PAYOR_TYPE           = ""
+
+Access SFPSUPP, Set SFPSUPP:POLICY_NO = L_POLICY_NO,
+                    SFPSUPP:POL_YEAR  = L_POL_YEAR, Approximate
+
+While SFPSUPP:POLICY_NO = L_POLICY_NO And
+      SFPSUPP:POL_YEAR  = L_POL_YEAR And
+      L_PAYOR_FOUND  <> "Y"
+        Begin
+        If SFPSUPP:END_SEQUENCE = L_END_SEQUENCE Then
+            {
+            if sfpsupp:agent_payor = 1 then
+                begin
+                L_PAYOR_FOUND = "Y"
+                L_PAYOR_TYPE  = "G"
+
+                access sfsagent, set sfsagent:company_id = sfpname:company_id,
+                                     sfsagent:agent_no   = sfpname:agent_no, generic
+
+                For L_CTR = 1 To 3
+                    Begin
+                    L_PAYOR_NAME[L_CTR]    = sfsagent:NAME[L_CTR]
+                    L_PAYOR_ADDRESS[L_CTR] = sfsagent:ADDRESS[L_CTR]
+                    End
+
+                L_PAYOR_CITY               = sfsagent:CITY
+                L_PAYOR_STATE              = sfsagent:STR_STATE
+
+                If (Val(sfsagent:STR_ZIPCODE[6,9]) = 0) Then
+                    {
+                    l_sfpname_zip = sfsagent:STR_ZIPCODE[1,5]
+                    }
+                Else
+                    {
+                    l_sfpname_zip = sfsagent:str_zipcode
+                    }
+
+                L_PAYOR_ZIPCODE           = l_sfpname_zip
+                end
+            else
+            If SFPSUPP:MORTGAGE_TYPE_1 One Of "B","C","F","P" Then
+                Begin
+                L_PAYOR_FOUND = "Y"
+                L_PAYOR_TYPE = SFPSUPP:MORTGAGE_TYPE_1
+
+                If SFPSUPP:MORTGAGE_ID = "" And
+                   SFPSUPP:NAME[1] <> "" Then
+                    Begin
+                    For L_CTR = 1 To 3
+                        Begin
+                        L_PAYOR_NAME[L_CTR]    = SFPSUPP:NAME[L_CTR]
+                        L_PAYOR_ADDRESS[L_CTR] = SFPSUPP:ADDRESS[L_CTR]
+                        End
+                    L_PAYOR_CITY              = SFPSUPP:CITY
+                    L_PAYOR_STATE             = SFPSUPP:STR_STATE
+
+                    If (Val(SFPsupp:STR_ZIPCODE[6,9]) = 0) Then
+                        {
+                        l_sfpname_zip = SFPsupp:STR_ZIPCODE[1,5]
+                        }
+                    Else
+                        {
+                        l_sfpname_zip = sfpsupp:str_zipcode
+                        }
+                    L_PAYOR_ZIPCODE           = l_sfpname_zip
+                    End  -- end of sfpsupp:mortgage_id = ""
+                Else -- sfpsupp:mortgage_id <> ""
+                    Begin
+                    Access SFSMORT, Set SFSMORT:COMPANY_ID = L_HOLD_COMPANY_ID,
+                                        SFSMORT:MORTGAGE_ID = SFPSUPP:MORTGAGE_ID
+                    For L_CTR = 1 To 3
+                        Begin
+                        L_PAYOR_NAME[L_CTR]       = SFSMORT:NAME[L_CTR]
+                        L_PAYOR_ADDRESS[L_CTR]    = SFSMORT:ADDRESS[L_CTR]
+                        End
+                    L_PAYOR_CITY                 = SFSMORT:CITY
+                    L_PAYOR_STATE                = SFSMORT:STR_STATE
+
+                    If (Val(sfsmort:STR_ZIPCODE[6,9]) = 0) Then
+                        {
+                        l_sfpname_zip = Sfsmort:STR_ZIPCODE[1,5]
+                        }
+                    Else
+                        {
+                        l_sfpname_zip = sfsmort:str_zipcode
+                        }
+                    L_PAYOR_ZIPCODE              = l_sfpname_zip
+                    End -- end of sfsmort hit
+                End -- end of one of "B","C","F"
+            }   -- end of end sequence hit
+
+        Next SFPSUPP
+        End -- end of policy number hit on sfpsupp
+
+Access SFPSUPP1, Set SFPSUPP1:POLICY_NO = L_POLICY_NO,
+                     SFPSUPP1:POL_YEAR  = L_POL_YEAR, Approximate
+
+While SFPSUPP1:POLICY_NO = L_POLICY_NO And
+      SFPSUPP1:POL_YEAR  = L_POL_YEAR And
+      L_PAYOR_FOUND  <> "Y"
+        Begin
+        If SFPSUPP1:END_SEQUENCE = L_END_SEQUENCE Then
+            {
+            if sfpsupp1:agent_payor = 1 then
+                begin
+                L_PAYOR_FOUND = "Y"
+                L_PAYOR_TYPE  = "G"
+
+                access sfsagent, set sfsagent:company_id = sfpname:company_id,
+                                     sfsagent:agent_no   = sfpname:agent_no, generic
+
+                For L_CTR = 1 To 3
+                    Begin
+                    L_PAYOR_NAME[L_CTR]    = sfsagent:NAME[L_CTR]
+                    L_PAYOR_ADDRESS[L_CTR] = sfsagent:ADDRESS[L_CTR]
+                    End
+
+                L_PAYOR_CITY               = sfsagent:CITY
+                L_PAYOR_STATE              = sfsagent:STR_STATE
+
+                If (Val(sfsagent:STR_ZIPCODE[6,9]) = 0) Then
+                    {
+                    l_sfpname_zip = sfsagent:STR_ZIPCODE[1,5]
+                    }
+                Else
+                    {
+                    l_sfpname_zip = sfsagent:str_zipcode
+                    }
+
+                L_PAYOR_ZIPCODE           = l_sfpname_zip
+                end
+            else
+            If SFPSUPP1:MORTGAGE_TYPE_1 One Of "B","C","F","P" Then
+                Begin
+                L_PAYOR_FOUND = "Y"
+                L_PAYOR_TYPE = SFPSUPP1:MORTGAGE_TYPE_1
+
+                If SFPSUPP1:MORTGAGE_ID = "" And
+                   SFPSUPP1:NAME[1] <> "" Then
+                    Begin
+                    For L_CTR = 1 To 3
+                        Begin
+                        L_PAYOR_NAME[L_CTR]    = SFPSUPP1:NAME[L_CTR]
+                        L_PAYOR_ADDRESS[L_CTR] = SFPSUPP1:ADDRESS[L_CTR]
+                        End
+                    L_PAYOR_CITY              = SFPSUPP1:CITY
+                    L_PAYOR_STATE             = SFPSUPP1:STR_STATE
+
+                    If (Val(SFPsupp1:STR_ZIPCODE[6,9]) = 0) Then
+                        {
+                        l_sfpname_zip = SFPsupp1:STR_ZIPCODE[1,5]
+                        }
+                    Else
+                        {
+                        l_sfpname_zip = sfpsupp1:str_zipcode
+                        }
+                    L_PAYOR_ZIPCODE           = l_sfpname_zip
+                    End  -- end of sfpsupp:mortgage_id = ""
+                Else -- sfpsupp:mortgage_id <> ""
+                    Begin
+                    Access SFSMORT, Set SFSMORT:COMPANY_ID = L_HOLD_COMPANY_ID,
+                                        SFSMORT:MORTGAGE_ID = SFPSUPP1:MORTGAGE_ID
+
+                    For L_CTR = 1 To 3
+                        Begin
+                        L_PAYOR_NAME[L_CTR]       = SFSMORT:NAME[L_CTR]
+                        L_PAYOR_ADDRESS[L_CTR]    = SFSMORT:ADDRESS[L_CTR]
+                        End
+                    L_PAYOR_CITY                 = SFSMORT:CITY
+                    L_PAYOR_STATE                = SFSMORT:STR_STATE
+                    If (Val(sfsmort:STR_ZIPCODE[6,9]) = 0) Then
+                        {
+                        l_sfpname_zip = Sfsmort:STR_ZIPCODE[1,5]
+                        }
+                    Else
+                        {
+                        l_sfpname_zip = sfsmort:str_zipcode
+                        }
+                    L_PAYOR_ZIPCODE              = l_sfpname_zip
+                    End -- end of sfsmort hit
+                End -- end of one of "B","C","F"
+            }   -- end of end sequence hit
+
+        Next SFPSUPP1
+        End -- end of policy number hit on sfpsupp
+
+If L_PAYOR_FOUND <> "Y" Then
+    Begin
+    L_PAYOR_FOUND = "Y"
+    L_PAYOR_TYPE  = "I"
+
+    Access SFPCURRENT, Set SFPCURRENT:POLICY_NO = L_POLICY_NO
+
+    Access SFPNAME, Set SFPNAME:POLICY_NO = SFPCURRENT:POLICY_NO,
+                        SFPNAME:POL_YEAR  = SFPCURRENT:POL_YEAR,
+                        SFPNAME:END_SEQUENCE = SFPCURRENT:END_SEQUENCE
+
+    For L_CTR = 1 To 3
+        Begin
+        L_PAYOR_NAME[L_CTR]         = SFPNAME:NAME[L_CTR]
+        L_PAYOR_ADDRESS[L_CTR]      = SFPNAME:ADDRESS[L_CTR]
+        End
+    L_PAYOR_CITY                   = SFPNAME:CITY
+    L_PAYOR_STATE                  = SFPNAME:STR_STATE
+
+    If (Val(SFPNAME:STR_ZIPCODE[6,9]) = 0) Then
+        {
+        l_sfpname_zip = SFPNAME:STR_ZIPCODE[1,5]
+        }
+    Else
+        {
+        l_sfpname_zip = sfpname:str_zipcode
+        }
+    L_PAYOR_ZIPCODE                = l_sfpname_zip
+    End
+
+End
+
+/* ***************************** */
+Procedure GET_MORT_COPY
+Begin
+
+L_SFPNAME_LOOP_CTR = 0
+L_MORT_FOUND = "N"
+
+For L_CTR = 1 To 3
+Begin
+    L_MORT_NAME[L_CTR]    = ""
+    L_MORT_ADDRESS[L_CTR] = ""
+End
+
+L_MORT_CITY           = ""
+L_MORT_STATE          = ""
+L_MORT_ZIPCODE        = ""
+L_MORT_TYPE           = ""
+L_MORT_TELEPHONE      = ""
+L_MORT_ACCOUNT        = ""
+
+Access SFPSUPP, Set SFPSUPP:POLICY_NO = L_POLICY_NO,
+                    SFPSUPP:POL_YEAR  = L_POL_YEAR, Approximate
+
+While SFPSUPP:POLICY_NO = L_POLICY_NO And
+      SFPSUPP:POL_YEAR  = L_POL_YEAR And
+      L_MORT_FOUND  <> "Y"
+      Begin
+          If SFPSUPP:END_SEQUENCE = L_END_SEQUENCE and
+             sfpsupp:agent_payor = 0 Then
+          {
+           If SFPSUPP:MORTGAGE_TYPE_1 One Of "B","C","F","M","P" Then
+           Begin
+
+              L_MORT_FOUND = "Y"
+              L_MORT_TYPE = SFPSUPP:MORTGAGE_TYPE_1
+
+              If SFPSUPP:MORTGAGE_ID = "" Then
+              Begin
+                 For L_CTR = 1 To 3
+                 Begin
+                    L_MORT_NAME[L_CTR]    = SFPSUPP:NAME[L_CTR]
+                    L_MORT_ADDRESS[L_CTR] = SFPSUPP:ADDRESS[L_CTR]
+                 End
+                 L_MORT_CITY              = SFPSUPP:CITY
+                 L_MORT_STATE             = SFPSUPP:STR_STATE
+
+
+                 If (Val(SFPsupp:STR_ZIPCODE[6,9]) = 0) Then
+                  {
+                   l_sfpname_zip = SFPsupp:STR_ZIPCODE[1,5]
+                  }
+                 Else
+                  {
+            --       l_sfpname_zip = SFPsupp:STR_ZIPCODE[1,5] + "-" +   SFPsupp:STR_ZIPCODE[6,9]
+                   l_sfpname_zip = sfpsupp:str_zipcode
+                  }
+
+                     L_MORT_ZIPCODE           = l_sfpname_zip
+                     L_MORT_TELEPHONE         = SFPSUPP:TELEPHONE[1]
+              End  -- end of sfpsupp:mortgage_id = ""
+              Else -- sfpsupp:mortgage_id <> ""
+              Begin
+                  Access SFSMORT, Set SFSMORT:COMPANY_ID = L_HOLD_COMPANY_ID,
+                                      SFSMORT:MORTGAGE_ID = SFPSUPP:MORTGAGE_ID, Approximate
+                  For L_CTR = 1 To 3
+                  Begin
+                     L_MORT_NAME[L_CTR]       = SFSMORT:NAME[L_CTR]
+                     L_MORT_ADDRESS[L_CTR]    = SFSMORT:ADDRESS[L_CTR]
+                  End
+                  L_MORT_CITY                 = SFSMORT:CITY
+                  L_MORT_STATE                = SFSMORT:STR_STATE
+
+                  If (Val(SFsmort:STR_ZIPCODE[6,9]) = 0) Then
+                   {
+                     l_sfpname_zip = SFsmort:STR_ZIPCODE[1,5]
+                   }
+                  Else
+                   {
+                --       l_sfpname_zip = SFsmort:STR_ZIPCODE[1,5] + "-" +   SFsmort:STR_ZIPCODE[6,9]
+                       l_sfpname_zip = sfsmort:str_zipcode
+                   }
+
+                  L_MORT_ZIPCODE              = l_sfpname_zip
+                  L_MORT_TELEPHONE            = SFSMORT:TELEPHONE[1]
+
+              End -- end of sfsmort hit
+           L_MORT_ACCOUNT              = SFPSUPP:ACCOUNT_NO
+
+           End -- end of one of "B","C","F"
+          }   -- end of end sequence hit
+
+      Next SFPSUPP
+      End -- end of policy number hit on sfpsupp
+
+
+End
+
+Procedure CHECK_FOR_MINIMUM_AMOUNTS
+Begin
+
+L_FIRST_TIME      = "Y"
+L_HOLD_POLICY_NO  = 0
+L_TOTAL_AMT_DUE   = 0.00
+L_COMPANY_id         = ""
+L_HOLD_COMPANY_ID = ""
+
+Access ARSINVWORK, Set ARSINVWORK:COMPANY_ID = L_COMPANY_id, Approximate
+
+While ARSINVWORK:COMPANY_ID <> "<0>"
+Begin
+
+    If L_FIRST_TIME = "Y" Then
+    Begin
+        L_FIRST_TIME = "N"
+        L_HOLD_COMPANY_ID = ARSINVWORK:COMPANY_ID
+        L_HOLD_POLICY_NO  = ARSINVWORK:POLICY_NO
+    End
+
+    If L_HOLD_COMPANY_ID <> ARSINVWORK:COMPANY_ID Then
+    Begin
+        If L_TOTAL_AMT_DUE <= ARSCONTROL:INVOICE_WAIVE_AMOUNT OR
+-- this will prevent zero amount due invoices from printing
+           L_TOTAL_AMT_DUE  <= 0.00 Then
+        Begin
+           Do DELETE_ARSINVWORK
+        End
+        L_HOLD_COMPANY_ID  = ARSINVWORK:COMPANY_ID
+        L_HOLD_POLICY_NO   = ARSINVWORK:POLICY_NO
+        L_TOTAL_AMT_DUE    = 0.00
+    End
+
+    If L_HOLD_POLICY_NO <> ARSINVWORK:POLICY_NO Then
+    Begin
+        If L_TOTAL_AMT_DUE <= ARSCONTROL:INVOICE_WAIVE_AMOUNT Or
+           L_TOTAL_AMT_DUE <= 0.00 Then
+        Begin
+            Do DELETE_ARSINVWORK
+        End
+        L_HOLD_POLICY_NO = ARSINVWORK:POLICY_NO
+        L_TOTAL_AMT_DUE  = 0.00
+    End
+
+    L_TOTAL_AMT_DUE = L_TOTAL_AMT_DUE + ARSINVWORK:NET_AMOUNT_DUE -- ARSINVWORK:INSTALLMENT_CHARGE)
+
+    Next ARSINVWORK
+    end
+
+    access arspayplan, set arspayplan:company_id       = arsinvwork:company_id,
+                           arspayplan:line_of_business = arsinvwork:line_of_business,
+                           arspayplan:payment_plan     = arsinvwork:payment_plan
+
+    If (L_TOTAL_AMT_DUE <= ARSCONTROL:CANCEL_WAIVE_AMOUNT Or
+        L_TOTAL_AMT_DUE <= ARSCONTROL:WAIVE_AMOUNT_DEBIT  Or
+        L_TOTAL_AMT_DUE  = 0.00) and
+-- changed 3/7/2007 dap, it was deleting arsinvwork
+        arsinvwork:billing_ctr = arspayplan:number_of_payments and
+        g_run_mode <> 1 then
+       Begin
+
+          Do DELETE_ARSINVWORK
+       End
+
+
+End
+
+Procedure DELETE_ARSINVWORK
+Begin
+
+Access ARSINVWORK_ALIAS, Set ARSINVWORK_ALIAS:COMPANY_ID = L_HOLD_COMPANY_ID,
+                             ARSINVWORK_ALIAS:POLICY_NO  = L_HOLD_POLICY_NO, Approximate
+
+While ARSINVWORK_ALIAS:COMPANY_ID = L_HOLD_COMPANY_ID And
+      ARSINVWORK_ALIAS:POLICY_NO  = L_HOLD_POLICY_NO
+      Begin
+          Delete ARSINVWORK_ALIAS
+          Next ARSINVWORK_ALIAS
+      End
+
+-- NEW LOGIC
+-- CHECKING TO SEE IF THE POLICY HAS NO MORE OPEN "O" BUCKETS TO BE BILLED
+-- IF NOT AND THE AMOUNT BILLED IS LESS THEN THE WAIVE AMOUNT THEN IT
+-- SHOULD BE AUTOMATICALLY WRITTEN OFF
+-- NEW ARSCONTROL FILE FIELD AUTO_WRITEOFF_BALANCE
+
+ACCESS ARSCONTROL, SET ARSCONTROL:COMPANY_ID = L_HOLD_COMPANY_ID
+
+IF ARSCONTROL:AUTO_WRITEOFF_BALANCE ONE OF 1 and
+   L_TOTAL_AMT_DUE <= ARSCONTROL:INVOICE_WAIVE_AMOUNT and
+   l_total_amt_due > 0.00 THEN
+{
+   DO WRITE_OFF_ARSBILLING_RECORDS
+}
+
+End
+
+PROCEDURE WRITE_OFF_ARSBILLING_RECORDS
+BEGIN
+
+ACCESS ARSBILLING_ALT2, SET ARSBILLING_ALT2:COMPANY_ID = L_HOLD_COMPANY_ID,
+                            ARSBILLING_ALT2:POLICY_NO  = L_HOLD_POLICY_NO, APPROXIMATE
+
+-- CHECKING FOR OPEN BUCKETS
+L_OPEN_BUCKETS = 0 -- SET TO NO AT THIS TIME
+
+WHILE ARSBILLING_ALT2:COMPANY_ID = L_HOLD_COMPANY_ID AND
+      ARSBILLING_ALT2:POLICY_NO  = L_HOLD_POLICY_NO
+      {
+      IF ARSBILLING_ALT2:STATUS ONE OF "O" and
+         ARSBILLING_ALT2:DUE_DATE > G_ENDING_DATE THEN
+      {
+          L_OPEN_BUCKETS = 1
+      }
+
+      NEXT ARSBILLING_ALT2
+
+      }
+ACCESS ARSBILLING_ALT2, SET ARSBILLING_ALT2:COMPANY_ID = L_HOLD_COMPANY_ID,
+                            ARSBILLING_ALT2:POLICY_NO  = L_HOLD_POLICY_NO, APPROXIMATE
+
+WHILE ARSBILLING_ALT2:COMPANY_ID = L_HOLD_COMPANY_ID AND
+      ARSBILLING_ALT2:POLICY_NO  = L_HOLD_POLICY_NO AND
+      L_OPEN_BUCKETS         ONE OF 0
+      {
+
+      if ARSBILLING_ALT2:STATUS ONE OF "B","O" then
+      {
+      CHANGE ARSBILLING_ALT2
+      {
+        ARSBILLING_ALT2:WRITE_OFF        = 1
+        ARSBILLING_ALT2:WRITE_OFF_AMOUNT = ARSBILLING_ALT2:INSTALLMENT_AMOUNT -
+                                          (ARSBILLING_ALT2:TOTAL_AMOUNT_PAID +
+                                           ARSBILLING_ALT2:WRITE_OFF_AMOUNT)
+        ARSBILLING_ALT2:WRITE_OFF_DATE   = TODAYSDATE
+        ARSBILLING_ALT2:AUTO_WRITE_OFF   = 90 -- 90 IS FOR INVOICE PROGRAM
+                                              -- 91 IS FOR CX PROGRAM
+                                              -- 99 IS FOR BATCH PROCESSING
+       }
+       }
+
+       NEXT ARSBILLING_ALT2
+
+       }
+
+END -- END OF PROCEDURE
+
+Procedure GET_TOTAL_ANNUAL
+Begin
+access arscontrol, set arscontrol:company_id = l_company
+
+Access ARSBILLING_ALT1, Set ARSBILLING_ALT1:COMPANY_ID = l_COMPANY_ID5,
+                           ARSBILLING_ALT1:POLICY_NO  = l_POLICY5, Approximate
+
+   L_TOTAL_ANNUAL = 0.00
+
+While ARSBILLING_ALT1:COMPANY_ID = l_COMPANY_ID5 And
+      ARSBILLING_ALT1:POLICY_NO  = l_POLICY5
+      Begin
+      If arsbilling_alt1:TRANS_EXP  <= l_TRANS_EXP then
+         {
+           if (ARSBILLING_alt1:BILLING_CTR One Of 1 And
+               ARSBILLING_ALT1:STATUS One Of "O","B" And
+               ARSBILLING_ALT1:TRANS_CODE One Of 10,12,13,14,15,16,19,25,60,64,66,62,63,50,69) Or
+              (ARSBILLING_alt1:BILLING_CTR Not One Of 1 And
+               ARSBILLING_ALT1:STATUS One Of "O","B" And
+               ARSBILLING_ALT1:TRANS_CODE One Of 10,12,13,14,15,16,19,22,23,25,29,60,64,66,62,63,50,69) Then
+              Begin
+               L_TOTAL_ANNUAL = L_TOTAL_ANNUAL + (ARSBILLING_ALT1:INSTALLMENT_AMOUNT
+                                               -  ARSBILLING_ALT1:TOTAL_AMOUNT_PAID )
+
+              End
+         }
+      Next ARSBILLING_ALT1
+
+      End
+
+End
+
+Procedure GET_TOTAL_ANNUAL_installments
+Begin
+  l_billing_ctr_annual_total = 0
+  Access ARSBILLING_ALT3, Set ARSBILLING_ALT3:COMPANY_ID = l_COMPANY_ID5_install,
+                              ARSBILLING_ALT3:POLICY_NO  = l_POLICY5_install, Approximate
+
+  While ARSBILLING_ALT3:COMPANY_ID = l_COMPANY_ID5_install And
+        ARSBILLING_ALT3:POLICY_NO  = l_POLICY5_install
+        Begin
+             if (ARSBILLING_alt3:BILLING_CTR One Of 1 And
+                 ARSBILLING_ALt3:STATUS One Of "B" And
+                 ARSBILLING_ALt3:TRANS_CODE One Of 18, 68, 70) and
+                 l_billing_ctr_annual_total = 0  then
+                  {
+                   l_billing_ctr_annual_total = 0
+                  }
+             else
+               if (ARSBILLING_alt3:BILLING_CTR Not One Of 1 And
+                 ARSBILLING_ALt3:STATUS One Of "O","B" And
+                 ARSBILLING_ALt3:TRANS_CODE One Of 18, 68, 70) Then
+                  {
+                   L_billing_ctr_annual_total = l_billing_ctr_annual_total + 1
+                  }
+
+        Next ARSBILLING_ALT3
+
+        End
+
+  if l_billing_ctr_annual_total > 0 then
+   {
+    Access ARSBILLING_ALT4, Set ARSBILLING_ALT4:COMPANY_ID = l_COMPANY_ID5_install,
+                                ARSBILLING_ALT4:POLICY_NO  = l_POLICY5_install, Approximate
+
+    While ARSBILLING_ALT4:COMPANY_ID = l_COMPANY_ID5_install And
+          ARSBILLING_ALT4:POLICY_NO  = l_POLICY5_install
+          Begin
+          If arsbilling_alt4:TRANS_EXP  <= l_TRANS_EXP_install then
+             {
+
+               if (ARSBILLING_alt4:BILLING_CTR One Of 1 And
+                 ARSBILLING_ALt4:STATUS One Of "O","B" And
+                 ARSBILLING_ALt4:TRANS_CODE One Of 18, 68,  70) Or
+                (ARSBILLING_alt4:BILLING_CTR Not One Of 1 And
+                 ARSBILLING_ALt4:STATUS One Of "O","B" And
+                 ARSBILLING_ALt4:TRANS_CODE One Of 18, 68, 70) Then
+                Begin
+                 L_TOTAL_ANNUAL_installments = L_TOTAL_ANNUAL_installments + (ARSBILLING_ALT4:INSTALLMENT_AMOUNT
+                                                 -  ARSBILLING_ALT4:TOTAL_AMOUNT_PAID )
+                End
+             }
+          Next ARSBILLING_ALT4
+          End
+   }
+  else
+   {   -- first installment
+      l_total_annual_installments = 0
+   }
+
+End
+
+Procedure GET_TOTAL_ANNUAL_installments_past_due
+Begin
+    Access ARSBILLING_ALT4, Set ARSBILLING_ALT4:COMPANY_ID = l_COMPANY_ID5_install,
+                                ARSBILLING_ALT4:POLICY_NO  = l_POLICY5_install, Approximate
+
+    While ARSBILLING_ALT4:COMPANY_ID = l_COMPANY_ID5_install And
+          ARSBILLING_ALT4:POLICY_NO  = l_POLICY5_install
+          Begin
+          If arsbilling_alt4:due_date <= todaysdate then
+             {
+               if (ARSBILLING_ALt4:STATUS One Of "B" And
+                   ARSBILLING_ALt4:TRANS_CODE One Of 18, 68, 70) Then
+                Begin
+                 L_TOTAL_ANNUAL_installments = L_TOTAL_ANNUAL_installments + (ARSBILLING_ALT4:INSTALLMENT_AMOUNT
+                                                 -  ARSBILLING_ALT4:TOTAL_AMOUNT_PAID )
+                End
+             }
+          Next ARSBILLING_ALT4
+          End
+
+End
+
+Procedure PROCESS_PAYMENTS_RECEIVED
+Begin
+
+   L_PRIOR_BILLING_DATE   = 00.00.0000
+   L_CURRENT_BILLING_DATE = 00.00.0000
+
+   Access ARSINVWORK, Set ARSINVWORK:COMPANY_ID = L_COMPANY,
+                          ARSINVWORK:POLICY_NO  = G_POLICY_NO, Approximate
+
+   While ARSINVWORK:COMPANY_ID = L_COMPANY And
+         ARSINVWORK:POLICY_NO  = G_POLICY_NO
+   Begin
+        If L_CURRENT_BILLING_DATE = 00.00.0000 Then
+        Begin
+            L_CURRENT_BILLING_DATE = ARSINVWORK:BILLED_DATE
+        End
+        If L_CURRENT_BILLING_DATE > ARSINVWORK:BILLED_DATE  Then
+        Begin
+            L_CURRENT_BILLING_DATE = ARSINVWORK:BILLED_DATE
+        End
+        Next ARSINVWORK
+   End
+
+   Access ARSBILLING, Set ARSBILLING:COMPANY_ID = L_COMPANY,
+                          ARSBILLING:POLICY_NO  = G_POLICY_NO, Approximate
+
+   While ARSBILLING:COMPANY_ID = L_COMPANY And
+         ARSBILLING:POLICY_NO  = G_POLICY_NO
+         Begin
+         If L_PRIOR_BILLING_DATE = 00.00.0000 And
+            ARSBILLING:BILLED_DATE < L_CURRENT_BILLING_DATE Then
+         Begin
+              L_PRIOR_BILLING_DATE = ARSBILLING:BILLED_DATE
+         End
+         If ARSBILLING:TRANS_CODE One Of 10,12,13,14,16 And
+            ARSBILLING:TOTAL_AMOUNT_PAID = 0.00 Then
+         Begin
+             L_SKIP_PAYMENT = "Y"
+         End
+         Else
+         Begin
+            L_SKIP_PAYMENT = "N"
+         End
+         Next ARSBILLING
+   End
+
+   Access ARSCHKSU, Set ARSCHKSU:POLICY_NO = G_POLICY_NO, Using Fourth Index, Approximate
+
+L_PAYMENT_CTR = 0
+
+   While ARSCHKSU:POLICY_NO = G_POLICY_NO
+   Begin
+   If ((ARSCHKSU:POSTED_DATE > L_PRIOR_BILLING_DATE And
+       ARSCHKSU:POSTED_DATE <= L_CURRENT_BILLING_DATE) And
+       ARSCHKSU:TRANS_EFF >= ARSBILLING:TRANS_EFF) And
+       ARSBILLING:TRANS_CODE One Of 10 Then
+      Begin
+          L_PAYMENT_CTR = L_PAYMENT_CTR + 1
+          Do UPDATE_ARSINVWORK_PAYMENTS
+      End
+      Next ARSCHKSU
+   End
+
+End -- end of procedure
+
+Procedure UPDATE_ARSINVWORK_PAYMENTS
+Begin
+
+L_TRANS_TYPE = "P"
+
+Access ARSINVWORK, Set ARSINVWORK:COMPANY_ID  = ARSCHKSU:COMPANY_ID,
+                       ARSINVWORK:POLICY_NO   = ARSCHKSU:POLICY_NO,
+                       ARSINVWORK:TRANS_TYPE  = L_TRANS_TYPE,
+                       ARSINVWORK:DUE_DATE    = ARSCHKSU:POSTED_DATE,
+                       ARSINVWORK:PAYMENT_CTR = L_PAYMENT_CTR, Approximate
+
+If ARSINVWORK:COMPANY_ID  <> ARSCHKSU:COMPANY_ID Or
+   ARSINVWORK:POLICY_NO   <> ARSCHKSU:POLICY_NO Or
+   ARSINVWORK:TRANS_TYPE  <> L_TRANS_TYPE Or
+   ARSINVWORK:DUE_DATE    <> ARSCHKSU:POSTED_DATE Or
+   ARSINVWORK:PAYMENT_CTR <> L_PAYMENT_CTR Then
+   Begin
+   Add ARSINVWORK
+   Begin
+       ARSINVWORK:COMPANY_ID            = ARSCHKSU:COMPANY_ID
+       ARSINVWORK:POLICY_NO             = ARSCHKSU:POLICY_NO
+       ARSINVWORK:TRANS_TYPE            = L_TRANS_TYPE
+       ARSINVWORK:DUE_DATE              = 12.31.9999
+       ARSINVWORK:PAYMENT_CTR           = L_PAYMENT_CTR
+       ARSINVWORK:STATUS                = "P"
+       ARSINVWORK:BILLED_DATE           = ARSCHKSU:POSTED_DATE
+       ARSINVWORK:INSTALLMENT_AMOUNT    = ARSCHKSU:CHECK_AMOUNT * -1
+       ARSINVWORK:CHECK_NO              = ARSCHKSU:CHECK_NO
+       ARSINVWORK:AGENT_NO              = ARSCHKSU:AGENT_NO
+   End
+   End
+End
+
+procedure add_image_header
+
+begin
+
+  Access scipsimage,
+     Set scipsimage:COMPANY_ID = sfpname:company_id, Generic
+
+  L_DD = Day(TODAYSDATE)
+  L_MM = Month(TODAYSDATE)
+  L_YY = Year(TODAYSDATE)
+
+  If scipsimage:ZEROSUPPRESS_NUMBER = 1 Then
+    {
+      L_policy = Str(sfpname:policy_NO,"ZZZZZZZZZ")
+    }
+  Else
+    {
+      L_policy = Str(sfpname:policy_NO,"999999999")
+    }
+  If scipsimage:ALPHA_CHARACTER = 1 Then
+    Begin
+      If scipsimage:SPACE_BETWEEN_ALPHA_NUMBER = 0 Then
+        {
+          L_policy_str = Trun(SFSLINE:ALPHA) + trun(L_policy)
+        }
+      Else
+        {
+          L_policy_str = Trun(SFSLINE:ALPHA) + " " + trun(L_policy)
+        }
+    End
+  Else
+    {
+      L_policy_STR = Trun(L_policy)
+    }
+
+  L_FILE_NUMBER = Trun(scipsimage:FILE_NUMBER[1]) + Trun(L_policy_STR) +
+                  Trun(scipsimage:FILE_NUMBER[2])
+
+  I_NAME = sfpname:name[1]
+  Include "sfsrevname.pro"
+  If scipsimage:REVERSE_NAME = 1 Then
+    {
+      L_FILE_NAME = Trun(scipsimage:FILE_NAME[1]) + Trun(I_REV_NAME) +
+                    Trun(scipsimage:FILE_NAME[2])
+    }
+  else
+    {
+      L_FILE_NAME = Trun(scipsimage:FILE_NAME[1]) + Trun(sfpname:name[1]) +
+                    Trun(scipsimage:FILE_NAME[2])
+    }
+
+  Access SFSLINE,
+     Set SFSLINE:COMPANY_ID       = SFPNAME:COMPANY_ID,
+         SFSLINE:LINE_OF_BUSINESS = SFPNAME:LINE_OF_BUSINESS,
+         SFSLINE:LOB_SUBLINE      = L_LOB_SUBLINE
+
+  Access SFSLINE2,
+     Set SFSLINE2:COMPANY_ID       = SFPNAME:COMPANY_ID,
+         SFSLINE2:LINE_OF_BUSINESS = SFPNAME:LINE_OF_BUSINESS,
+         SFSLINE2:LOB_SUBLINE      = L_LOB_SUBLINE
+
+
+  if (sfsline:personal_commercial = "P") then  --if the line is Personal Lines then I need a different Drawer
+    {
+      L_DRAWER  = Trun(scipsimage:DRAWER[1]) +
+                  Trun(scipsimage:DRAWER_NAME_2[1]) +
+                  Trun(scipsimage:DRAWER[2])
+    }
+  else  --COMMERCIAL LINES HERE
+    {
+      L_DRAWER  = Trun(scipsimage:DRAWER[1]) +
+                  Trun(scipsimage:DRAWER_NAME) +
+                  Trun(scipsimage:DRAWER[2])
+    }
+
+  L_FOLDER_TYPE = Trun(scipsimage:FOLDER_TYPE[1]) +
+                  Trun(scipsimage:FOLDER_TYPES[10]) +
+                  Trun(scipsimage:FOLDER_TYPE[2])
+  L_DOC_TYPE    = Trun(scipsimage:DOC_TYPE[1]) +
+                  Trun(scipsimage:DOC_TYPES[10]) +
+                  Trun(scipsimage:DOC_TYPE[2])
+  L_DOC_DATE    = Trun(scipsimage:DOC_DATE[1]) +
+                  Str(L_YY,4) + Str(L_MM,2) + Str(L_DD,2) +
+                  Trun(scipsimage:DOC_DATE[2])
+
+  Deletefile(l_header_name)   --name for the header information to be added for imaging
+
+  If scipsimage:ZEROSUPPRESS_NUMBER = 1 Then
+    {
+      Writefile (l_header_name,"%s%n%s<nl>",Trun(scipsimage:FILE_NUMBER[1]),
+                               L_policy_no,Trun(scipsimage:FILE_NUMBER[2]))
+    }
+
+  Writefile (l_header_name,"%s<nl>",L_FILE_NUMBER)
+  Writefile (l_header_name,"%s<nl>",L_FILE_NAME)
+  Writefile (l_header_name,"%s<nl>",L_DRAWER)
+  Writefile (l_header_name,"%s<nl>",L_FOLDER_TYPE)
+  Writefile (l_header_name,"%s<nl>",L_DOC_TYPE)
+  Writefile (l_header_name,"%s<nl>",L_DOC_DATE)
+  Writefile (l_header_name,"%s<nl>",scipsimage:START_CAPTURE)
+  Writefile (l_header_name,"%s<ff>",scipsimage:END_CAPTURE)
+  Closefile (l_header_name)
+
+  Proc("cli joinit %s %s",l_invoice_name[1],l_header_name)  --this is because the sfpindex will need to go at the beginning
+
+  do get_unique_pcl_file
+  Proc("cli mv %s %s",l_header_name,L_invoice_PDF_1)/noconsole  --moving it to a unique file
+  --make sure we have a unique file name.
+
+  L_UNIX_PATH   = scipsimage:DIRECTORY_PATH/raw
+  Proc("cli mv %s %s",L_invoice_PDF_1,L_UNIX_PATH)/noconsole
+  Deletefile (L_header_name)
+  Deletefile (l_invoice_name[1])
+end
+
+procedure add_image_header1
+
+begin
+  Access scipsimage_version5,
+     Set scipsimage_version5:COMPANY_ID = sfpname:company_id, Generic
+
+  Access SFSLINE,
+     Set SFSLINE:COMPANY_ID       = SFPNAME:COMPANY_ID,
+         SFSLINE:LINE_OF_BUSINESS = SFPNAME:LINE_OF_BUSINESS,
+         SFSLINE:LOB_SUBLINE      = L_LOB_SUBLINE,exact
+
+  Access SFSLINE2,
+     Set SFSLINE2:COMPANY_ID       = SFPNAME:COMPANY_ID,
+         SFSLINE2:LINE_OF_BUSINESS = SFPNAME:LINE_OF_BUSINESS,
+         SFSLINE2:LOB_SUBLINE      = L_LOB_SUBLINE, exact
+
+  L_DD = Day(TODAYSDATE)
+  L_MM = Month(TODAYSDATE)
+  L_YY = Year(TODAYSDATE)
+
+  If scipsimage_version5:ZEROSUPPRESS_NUMBER = 1 Then
+    {
+      L_policy = Str(sfpname:policy_NO)   --got rid of the mask 10/21/2009
+    }
+  Else
+    {
+      L_policy = Str(sfpname:policy_NO,"999999999")
+    }
+
+  If scipsimage_version5:ALPHA_CHARACTER = 1 Then
+    Begin
+      If scipsimage_version5:SPACE_BETWEEN_ALPHA_NUMBER = 0 Then
+        {
+          if trun(sfsline2:ADDITIONAL_ALPHA_PREFIX) <> "" then
+            {
+
+              L_policy_str = Trun(SFSLINE2:ADDITIONAL_ALPHA_PREFIX) + l_policy
+            }
+          else
+            {
+              L_policy_str = Trun(SFSLINE:ALPHA) + L_policy
+            }
+        }
+      Else
+        {
+          if trun(sfsline2:ADDITIONAL_ALPHA_PREFIX) <> "" then
+            {
+              L_policy_str = Trun(SFSLINE2:ADDITIONAL_ALPHA_PREFIX) + L_policy
+            }
+          else
+            {
+              L_policy_str = Trun(SFSLINE:ALPHA) + " " + L_policy
+            }
+        }
+    End
+  Else
+    {
+      L_policy_STR = Trun(L_policy)
+    }
+
+  L_FILE_NUMBER = Trun(scipsimage_version5:FILE_NUMBER[1]) + Trun(L_policy_STR) +
+                  Trun(scipsimage_version5:FILE_NUMBER[2])
+
+  I_NAME = sfpname:name[1]
+  Include "sfsrevname.pro"
+  If scipsimage_version5:REVERSE_NAME = 1 Then
+    {
+      L_FILE_NAME = Trun(scipsimage_version5:FILE_NAME[1]) + Trun(I_REV_NAME) +
+                    Trun(scipsimage_version5:FILE_NAME[2])
+    }
+  else
+    {
+      L_FILE_NAME = Trun(scipsimage_version5:FILE_NAME[1]) + Trun(sfpname:name[1]) +
+                    Trun(scipsimage_version5:FILE_NAME[2])
+    }
+
+  Access SFSLINE,
+     Set SFSLINE:COMPANY_ID       = SFPNAME:COMPANY_ID,
+         SFSLINE:LINE_OF_BUSINESS = SFPNAME:LINE_OF_BUSINESS,
+         SFSLINE:LOB_SUBLINE      = L_LOB_SUBLINE
+
+  if (sfsline:personal_commercial = "P") then  --if the line is Personal Lines then I need a different Drawer
+    {
+      L_DRAWER  = Trun(scipsimage_version5:DRAWER[1]) +
+                  Trun(scipsimage_version5:DRAWER_NAME[9]) +
+                  Trun(scipsimage_version5:DRAWER[2])
+    }
+  else  --COMMERCIAL LINES HERE
+    {
+      L_DRAWER  = Trun(scipsimage_version5:DRAWER[1]) +
+                  Trun(scipsimage_version5:DRAWER_NAME[9]) +
+                  Trun(scipsimage_version5:DRAWER[2])
+    }
+
+  L_FOLDER_TYPE = Trun(scipsimage_version5:FOLDER_TYPE[1]) +
+                  Trun(scipsimage_version5:FOLDER_TYPES[9]) +
+                  Trun(scipsimage_version5:FOLDER_TYPE[2])
+
+  l_file_type =  Trun(scipsimage_version5:File_type[1]) +
+                 Trun(scipsimage_version5:file_types[9]) +
+                 Trun(scipsimage_version5:file_type[2])
+
+
+  L_DOC_TYPE    = Trun(scipsimage_version5:DOC_TYPE[1]) +
+                  Trun(scipsimage_version5:DOC_TYPES[9]) +
+                  Trun(scipsimage_version5:DOC_TYPE[2])
+
+  L_DOC_DATE    = Trun(scipsimage_version5:DOC_DATE[1]) +
+                  Str(L_MM,2) + "-" + Str(L_DD,2) + "-" + Str(L_YY,4) +
+                  Trun(scipsimage_version5:DOC_DATE[2])
+
+  L_py_policy_year = Trun(scipsimage_version5:py_year[1]) + trun(str(sfpname:pol_year)) +
+                     Trun(scipsimage_version5:py_year[2])
+
+  Deletefile(l_header_name)   --name for the header information to be added for imaging
+
+
+
+  Writefile (l_header_name,"%s<nl>",L_FILE_NUMBER)
+  Writefile (l_header_name,"%s<nl>",L_FILE_NAME)
+  Writefile (l_header_name,"%s<nl>",L_DRAWER)
+  Writefile (l_header_name,"%s<nl>",L_FOLDER_TYPE)
+  Writefile (l_header_name,"%s<nl>",L_DOC_TYPE)
+  Writefile (l_header_name,"%s<nl>",L_DOC_DATE)
+  Writefile (l_header_name,"%s<nl>",trun(L_file_type))
+  Writefile (l_header_name,"%s<nl>",trun(L_py_policy_year))
+  Writefile (l_header_name,"%s<nl>",scipsimage_version5:START_CAPTURE)
+  Writefile (l_header_name,"%s<ff>",scipsimage_version5:END_CAPTURE)
+  Closefile (l_header_name)
+
+  Proc("cli joinit %s %s",l_invoice_name[1],l_header_name)  --this is because the sfpindex will need to go at the beginning
+
+  do get_unique_pcl_file
+  Proc("cli mv %s %s",l_header_name,L_invoice_PDF_1)/noconsole  --moving it to a unique file
+  --make sure we have a unique file name.
+
+  L_UNIX_PATH   = scipsimage_version5:DIRECTORY_PATH/raw
+  Proc("cli mv %s %s",L_invoice_PDF_1,L_UNIX_PATH)/noconsole
+  Deletefile (L_header_name)
+  Deletefile (l_invoice_name[1])
+end
+
+Procedure get_unique_pcl_file
+
+BEGIN
+  I_CSEXEC_APPLICATION = "PRINT                    "/raw
+  Include "sfscsexec.pro"
+  L_invoice_PDF_1 = programid+"_"+Str(I_CSEXEC_NUMBER)+".pcl"
+END
+
+PROCEDURE GET_EXPIRING_PREMIUM
+BEGIN
+
+L_EXPIRING_PREMIUM = 0.00
+
+ACCESS PRSMASTER, SET PRSMASTER:COMPANY_ID = L_HOLD_COMPANY_ID,
+                      PRSMASTER:POLICY_NO  = L_HOLD_POLICY_NO, APPROXIMATE
+
+WHILE PRSMASTER:COMPANY_ID = L_HOLD_COMPANY_ID AND
+      PRSMASTER:POLICY_NO  = L_HOLD_POLICY_NO
+      BEGIN
+
+      IF PRSMASTER:TRANS_EXP = l_sfpname_exp_date AND
+         PRSMASTER:TRANS_CODE < 17 THEN
+         BEGIN
+             L_EXPIRING_PREMIUM = L_EXPIRING_PREMIUM + PRSMASTER:PREMIUM
+         END
+
+      NEXT PRSMASTER
+
+      END
+
+END -- END OF PROCEDURE
+
+End

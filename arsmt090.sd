@@ -1,0 +1,82 @@
+%%
+Screen
+        Name = "arsmt090" ;
+        Type = "Detail" ;
+        padcharacter = space ;
+        Windowtitle  = "%a     %s  Credit Card Type Maintenance - Version 7.00    %m";
+        Screensize = "dynamic" ;
+        highlite = underscore ;
+        iconline = 0;
+
+        Global String G_COMPANY_ID[10] ;
+        Global String G_CARD_TYPE[1] ;
+        Global String g_lib_1[10];
+
+        string l_continue_1[50];
+
+        Access ARSCARD,
+           Set ARSCARD:COMPANY_ID = G_COMPANY_ID ,
+               ARSCARD:CARD_TYPE = G_CARD_TYPE ;
+
+
+        Include "STDKEYS7.INC"
+
+Style Definition
+    include "styles.inc"
+
+Functions
+    include "stdfunc7.inc"
+    include "arsfunc7.inc"
+
+Menu Definition
+    include "stdmenu7.inc"
+    Separator
+    include "arsmenu7.inc"
+}
+
+ToolBar Definition
+    include "stdtoolbar7.inc"
+}
+Screen
+Properties
+    {
+    LayOutType      = Column
+    }
+{
+
+Panel Tagged Header_pl
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = AsNeeded
+    }
+{
+%%
+                                                       ____________
+*------------------------------------------------------------------------------*
+| Company Id:             __________ _______________________________________   |
+| Card Type:              __                                                   |
+| Description:            ________________________________________             |
+| Minimum Account Length: __                                                   |
+*------------------------------------------------------------------------------*
+%%
+
+Components
+
+Fields
+        FUNCTION/noecho/showasguidetext ;
+0301    ARSCARD:COMPANY_ID                      Mandatory
+        include "companyhlp.inc"
+0302    sfscompany:name[1] ;
+0401    ARSCARD:CARD_TYPE/upper                       Mandatory;
+0501    ARSCARD:DESCRIPTION;
+0601    ARSCARD:MINIMUM_ACCOUNT_LENGTH;
+}
+}
+
+Screen Exit
+        If ARSCARD:COMPANY_ID > "" Then G_COMPANY_ID = ARSCARD:COMPANY_ID ;
+        If ARSCARD:CARD_TYPE > "" Then G_CARD_TYPE = ARSCARD:CARD_TYPE ;
+
+
+End

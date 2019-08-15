@@ -1,0 +1,542 @@
+%%
+Program
+        Name = "arsup610"
+        Type = "file" ;
+        Padcharacter = space ;
+        Domain = "sfpcurrent" ;
+/*
+        FOR Salem MOB customer inport file
+*/
+
+        local string l_policy_no[12]="",
+                     l_record_creation_date[14],
+                     l_group_no[5],
+                     l_record_type[2]="",
+                     l_filename[24],
+                     l_company_id[10] = "LEBINS",
+                     l_first_name[20],
+                     l_last_name[30],
+                     l_enter[1],
+                     l_status[1],
+                     l_address1[25],
+                     l_city[15],
+                     l_state[15],
+                     l_zipcode[9],
+                     l_mortgage[1] = "N" ;
+
+        local wdate l_starting_date ;
+
+        local unsigned ascii number l_policy_no_1[9],
+                                    l_pol_length[2]=0,
+                                    l_pol_count[2]=0,
+                                    l_rec_date[14],
+                                    l_prem_no[4]=0,
+                                    l_build_no[4] = 0,
+                                    l_sub_code[4]=0,
+                                    l_pos[2],
+                                    l_pos1[2],
+                                    l_pos2[2],
+                                    l_pos3[2],
+                                    i_length_1[2],
+                                    i_length_2[2],
+                                    i_length_3[2],
+                                    i_total_length[3],
+                                    i_total_length_150[3],
+                                    i_found_deliminator,
+                                    l_total_days[3] ,
+                                    l_sub[3];
+
+        String I_NAME[90]="",
+               I_FIRST_NAME[90]="",
+               I_LAST_NAME[90]="",
+               I_REV_NAME[90]="",
+               i_rev_name_1[90]="",
+               i_rev_name_2[90]="",
+               i_rev_name_3[90]="",
+               i_rev_name_first_90[90]="",
+               i_rev_name_second_90[90]="" ,
+               i_rev_name_third_90[90]="",
+               i_rev_name_150[150]="";
+
+
+initialisation
+l_filename = "CUSTAcctData" + str(todaysdate,"YYYYMMDD") + ".txt"
+deletefile(l_filename)
+
+update
+
+access sfpname, set sfpname:policy_no    = sfpcurrent:policy_no,
+                    sfpname:pol_year     = sfpcurrent:pol_year,
+                    sfpname:end_sequence = sfpcurrent:end_sequence, exact
+
+if sfpname:status = "CURRENT" then
+{
+ access sfscompany, set sfscompany:company_id = sfpname:company_id, generic
+
+ access custacctdata, set custacctdata:policy_no    = sfpname:policy_no,
+                          custacctdata:pol_year     = sfpname:pol_year,
+                          custacctdata:end_sequence = sfpname:end_sequence, generic
+/*
+if sfpname:policy_no = 1484 then
+{
+write ("<014>")
+write ("%c%s%n",2001,"sfpname pol nu      = ",sfpname:policy_no)
+write ("%c%s%n",3001,"sfpname pol year    = ",sfpname:pol_year)
+write ("%c%s%n",4001,"sfpname end         = ",sfpname:end_sequence)
+write ("%c%s%n",5001,"custacctdata pol nu = ",custacctdata:policy_no)
+write ("%c%s%n",6001,"cust pol year       = ",custacctdata:pol_year)
+write ("%c%s%n",7001,"cust end            = ",custacctdata:end_sequence)
+Read (23,1,"above add  Press Enter to Continue ",L_ENTER,1)
+}
+*/
+ if custacctdata:policy_no    <> sfpname:policy_no or
+    custacctdata:pol_year     <> sfpname:pol_year or
+    custacctdata:end_sequence <> sfpname:end_sequence then
+    begin
+    add custacctdata
+      begin
+/*
+if sfpname:policy_no = 1484 then
+{
+write ("<014>")
+write ("%c%s%n",2001,"sfpname pol nu   = ",sfpname:policy_no)
+write ("%c%s%n",3001,"sfpname pol year = ",sfpname:pol_year)
+write ("%c%s%n",4001,"sfpname end      = ",sfpname:end_sequence)
+write ("%c%s%n",5001,"custacctdata pol nu = ",custacctdata:policy_no)
+write ("%c%s%n",6001,"cust pol year   = ",custacctdata:pol_year)
+write ("%c%s%n",7001,"cust end          = ",custacctdata:end_sequence)
+Read (23,1,"in   add  Press Enter to Continue ",L_ENTER,1)
+}
+*/
+          custacctdata:policy_no    = sfpname:policy_no
+          custacctdata:pol_year     = sfpname:pol_year
+          custacctdata:end_sequence = sfpname:end_sequence
+
+          l_status = "A"
+
+          -- cust status
+          custacctdata:mob_status = l_status
+          writefile(l_filename,"%s%s",trun(l_status),"<tab>")
+
+          -- mob id
+          custacctdata:mob_id = 5500
+          writefile(l_filename,"%n%s",5500,"<tab>")
+
+          -- creation date
+          l_record_creation_date = " "
+          l_record_creation_date = str(todaysdate,"YYYYMMDD") + str(systemtime,"hhmmss")
+          l_rec_date = 0
+          l_rec_date = val(l_record_creation_date)
+          writefile(l_filename,"%n%s",l_rec_date,"<tab>")
+          custacctdata:creation_date = l_rec_date
+
+          -- cust acct number
+          l_policy_no = str(sfpcurrent:policy_no)
+          l_pol_length = 0
+          l_pol_count = 0
+          l_pol_length = len(trun(l_policy_no))
+          l_pol_count = (9 - l_pol_length)
+          switch(l_pol_count)
+           case 1   :  l_policy_no = '0000' + str(sfpcurrent:policy_no)
+           case 2   :  l_policy_no = '00000' + str(sfpcurrent:policy_no)
+           case 3   :  l_policy_no = '000000' + str(sfpcurrent:policy_no)
+           case 4   :  l_policy_no = '0000000' + str(sfpcurrent:policy_no)
+           case 5   :  l_policy_no = '00000000' + str(sfpcurrent:policy_no)
+           case 6   :  l_policy_no = '000000000' + str(sfpcurrent:policy_no)
+           case 7   :  l_policy_no = '0000000000' + str(sfpcurrent:policy_no)
+           default  :  l_policy_no = "000" + str(sfpcurrent:policy_no)
+          end
+
+          writefile(l_filename,"%s%s",l_policy_no,"<tab>")
+          custacctdata:cust_acct = l_policy_no
+
+          -- cust div/group number
+          custacctdata:cust_division_group = ""
+          writefile(l_filename,"%s%s","","<tab>")
+
+
+          i_last_name = ""
+          i_first_name = ""
+          i_rev_name = ""
+          i_name = trun(sfpname:name[1])
+          include "sfsrevname7.pro"
+          IF (pos("=",i_name)) <> 0 then
+            {
+              -- billing last name
+              writefile(l_filename,"%s%s",trun(i_last_name),"<tab>")
+              -- billing first name
+              writefile(l_filename,"%s%s",trun(i_first_name),"<tab>")
+              custacctdata:billing_last_name = i_last_name
+              custacctdata:billing_first_name = i_first_name
+
+            }
+         else
+            {
+              -- billing last name
+              writefile(l_filename,"%s%s","","<tab>")
+              -- billing first name
+              writefile(l_filename,"%s%s",trun(i_rev_name),"<tab>")
+              custacctdata:billing_last_name = ""
+              custacctdata:billing_first_name = i_rev_name
+
+            }
+
+          -- billing address1
+          writefile(l_filename,"%s%s",trun(sfpname:address[1]),"<tab>")
+          custacctdata:billing_address1 = sfpname:address[1]
+
+          -- billing address2
+          writefile(l_filename,"%s%s",trun(sfpname:address[2]),"<tab>")
+          custacctdata:billing_address2 = sfpname:address[2]
+
+          -- billing city
+          writefile(l_filename,"%s%s",trun(sfpname:city),"<tab>")
+          custacctdata:billing_city = sfpname:city
+
+          -- billing state
+          writefile(l_filename,"%s%s",trun(sfpname:str_state),"<tab>")
+          custacctdata:billing_state = sfpname:str_state
+
+          -- billing zipcode
+          writefile(l_filename,"%s%s",trun(sfpname:str_zipcode),"<tab>")
+          custacctdata:billing_zipcode = sfpname:str_zipcode
+
+          -- billing country
+          writefile(l_filename,"%s%s","USA","<tab>")
+          custacctdata:billing_country = "USA"
+
+
+      --service names
+          -- service last name
+          writefile(l_filename,"%s%s",trun(i_last_name),"<tab>")
+          custacctdata:service_last_name = i_last_name
+
+          -- service first name
+          writefile(l_filename,"%s%s",trun(i_first_name),"<tab>")
+          custacctdata:service_first_name = i_first_name
+
+
+      -- SERVICE address
+          access sfplocation, set sfplocation:policy_no    = sfpcurrent:policy_no,
+                                  sfplocation:pol_year     = sfpname:pol_year,
+                                  sfplocation:end_sequence = sfpname:end_sequence,generic
+
+          if sfplocation:policy_no    = sfpcurrent:policy_no and
+             sfplocation:pol_year     = sfpname:pol_year and
+             sfplocation:end_sequence = sfpname:end_sequence then
+              {
+                -- service address 1
+                if sfplocation:address <> "" then
+                 {
+                  l_address1 = trun(str(sfplocation:address))
+                 }
+                else
+                 {
+                  l_address1 = trun(str(sfplocation:st_number)) + " " + trun(sfplocation:st_direction) +
+                       " " + trun(sfplocation:street) + " " + trun(sfplocation:st_type)
+                 }
+
+                writefile(l_filename,"%s%s"," " + trun(l_address1),"<tab>")
+                custacctdata:service_address1 = l_address1
+
+                -- service address 2
+                writefile(l_filename,"%s%s","","<tab>")
+                custacctdata:service_address2 = ""
+
+                -- service city
+                writefile(l_filename,"%s%s",trun(sfplocation:city),"<tab>")
+                custacctdata:service_city = sfplocation:city
+
+                -- service state
+                writefile(l_filename,"%s%s",trun(sfplocation:str_state),"<tab>")
+                custacctdata:service_state = sfplocation:str_state
+
+                -- service zipcode
+                writefile(l_filename,"%s%s",trun(sfplocation:str_zipcode),"<tab>")
+                writefile(l_filename,"%s","<nl>")
+                custacctdata:service_zipcode = sfplocation:str_zipcode
+              }
+           else
+              {
+                -- service address 1
+                writefile(l_filename,"%s%s",trun(sfpname:address[1]),"<tab>")
+                custacctdata:service_address1 = sfpname:address[1]
+
+                -- service address 2
+                writefile(l_filename,"%s%s",trun(sfpname:address[2]),"<tab>")
+                custacctdata:service_address2 = sfpname:address[2]
+
+                -- service city
+                writefile(l_filename,"%s%s",trun(sfpname:city),"<tab>")
+                custacctdata:service_city = sfpname:city
+
+                -- service state
+                writefile(l_filename,"%s%s",trun(sfpname:str_state),"<tab>")
+                custacctdata:service_state = sfpname:str_state
+
+                -- service zip
+                writefile(l_filename,"%s",trun(sfpname:str_zipcode))
+                custacctdata:service_zipcode = sfpname:str_zipcode
+
+                writefile(l_filename,"%s","<nl>")
+              }
+
+      end
+    end
+    else
+    {
+/*
+if sfpname:policy_no = 1484 then
+{
+write ("<014>")
+write ("%c%s%n",2001,"sfpname pol nu   = ",sfpname:policy_no)
+write ("%c%s%n",3001,"sfpname pol year = ",sfpname:pol_year)
+write ("%c%s%n",4001,"sfpname end      = ",sfpname:end_sequence)
+write ("%c%s%n",5001,"custacctdata pol nu = ",custacctdata:policy_no)
+write ("%c%s%n",6001,"cust pol year   = ",custacctdata:pol_year)
+write ("%c%s%n",7001,"cust end          = ",custacctdata:end_sequence)
+Read (23,1,"above change Press Enter to Continue ",L_ENTER,1)
+}
+*/
+    if custacctdata:policy_no    = sfpname:policy_no and
+       custacctdata:pol_year     = sfpname:pol_year and
+       custacctdata:end_sequence = sfpname:end_sequence then
+        begin
+        change custacctdata
+          begin
+/*
+if sfpname:policy_no = 1484 then
+{
+write ("<014>")
+write ("%c%s%n",2001,"sfpname pol nu   = ",sfpname:policy_no)
+write ("%c%s%n",3001,"sfpname pol year = ",sfpname:pol_year)
+write ("%c%s%n",4001,"sfpname end      = ",sfpname:end_sequence)
+write ("%c%s%n",5001,"custacctdata pol nu = ",custacctdata:policy_no)
+write ("%c%s%n",6001,"cust pol year   = ",custacctdata:pol_year)
+write ("%c%s%n",7001,"cust end          = ",custacctdata:end_sequence)
+Read (23,1,"in change  Press Enter to Continue ",L_ENTER,1)
+}
+*/
+             l_status = "U"
+             -- cust status
+             custacctdata:mob_status = l_status
+             writefile(l_filename,"%s%s",trun(l_status),"<tab>")
+
+             -- mob id
+             custacctdata:mob_id = 2500
+             writefile(l_filename,"%n%s",2500,"<tab>")
+
+             -- creation date
+             l_record_creation_date = " "
+             l_record_creation_date = str(todaysdate,"YYYYMMDD") + str(systemtime,"hhmmss")
+             l_rec_date = 0
+             l_rec_date = val(l_record_creation_date)
+             writefile(l_filename,"%n%s",l_rec_date,"<tab>")
+             custacctdata:creation_date = l_rec_date
+
+             -- cust acct number
+             l_policy_no = str(sfpcurrent:policy_no)
+             writefile(l_filename,"%s%s",l_policy_no,"<tab>")
+             custacctdata:cust_acct = l_policy_no
+
+             -- cust div/group number
+             custacctdata:cust_division_group = ""
+             writefile(l_filename,"%s%s","","<tab>")
+
+
+             i_last_name = ""
+             i_first_name = ""
+             i_rev_name = ""
+             i_name = trun(sfpname:name[1])
+             include "sfsrevname7.pro"
+             IF (pos("=",i_name)) <> 0 then
+               {
+                 -- billing last name
+                 writefile(l_filename,"%s%s",trun(i_last_name),"<tab>")
+                 -- billing first name
+                 writefile(l_filename,"%s%s",trun(i_first_name),"<tab>")
+                 custacctdata:billing_last_name = i_last_name
+                 custacctdata:billing_first_name = i_first_name
+
+               }
+             else
+               {
+                 -- billing last name
+                 writefile(l_filename,"%s%s","","<tab>")
+                 -- billing first name
+                 writefile(l_filename,"%s%s",trun(i_rev_name),"<tab>")
+                 custacctdata:billing_last_name = ""
+                 custacctdata:billing_first_name = i_rev_name
+
+               }
+
+             -- billing address1
+             writefile(l_filename,"%s%s",trun(sfpname:address[1]),"<tab>")
+             custacctdata:billing_address1 = sfpname:address[1]
+
+             -- billing address2
+             writefile(l_filename,"%s%s",trun(sfpname:address[2]),"<tab>")
+             custacctdata:billing_address2 = sfpname:address[2]
+
+             -- billing city
+             writefile(l_filename,"%s%s",trun(sfpname:city),"<tab>")
+             custacctdata:billing_city = sfpname:city
+
+             -- billing state
+             writefile(l_filename,"%s%s",trun(sfpname:str_state),"<tab>")
+             custacctdata:billing_state = sfpname:str_state
+
+             -- billing zipcode
+             writefile(l_filename,"%s%s",trun(sfpname:str_zipcode),"<tab>")
+             custacctdata:billing_zipcode = sfpname:str_zipcode
+
+             -- billing country
+             writefile(l_filename,"%s%s","USA","<tab>")
+             custacctdata:billing_country = "USA"
+
+
+         --service names
+             -- service last name
+             writefile(l_filename,"%s%s",trun(i_last_name),"<tab>")
+             custacctdata:service_last_name = i_last_name
+
+             -- service first name
+             writefile(l_filename,"%s%s",trun(i_first_name),"<tab>")
+             custacctdata:service_first_name = i_first_name
+
+
+         -- SERVICE address
+             access sfplocation, set sfplocation:policy_no    = sfpcurrent:policy_no,
+                                     sfplocation:pol_year     = sfpname:pol_year,
+                                     sfplocation:end_sequence = sfpname:end_sequence,generic
+
+             if sfplocation:policy_no    = sfpcurrent:policy_no and
+                sfplocation:pol_year     = sfpname:pol_year and
+                sfplocation:end_sequence = sfpname:end_sequence then
+                 {
+                   -- service address 1
+                   if sfplocation:address <> "" then
+                    {
+                      l_address1 = trun(str(sfplocation:address))
+                    }
+                   else
+                    {
+                      l_address1 = trun(str(sfplocation:st_number)) + " " + trun(sfplocation:st_direction) +
+                         " " + trun(sfplocation:street) + " " + trun(sfplocation:st_type)
+                    }
+
+                   writefile(l_filename,"%s%s"," " + trun(l_address1),"<tab>")
+                   custacctdata:service_address1 = l_address1
+
+                   -- service address 2
+                   writefile(l_filename,"%s%s","","<tab>")
+                   custacctdata:service_address2 = ""
+
+                   -- service city
+                   writefile(l_filename,"%s%s",trun(sfplocation:city),"<tab>")
+                   custacctdata:service_city = sfplocation:city
+
+                   -- service state
+                   writefile(l_filename,"%s%s",trun(sfplocation:str_state),"<tab>")
+                   custacctdata:service_state = sfplocation:str_state
+
+                   -- service zipcode
+                   writefile(l_filename,"%s%s",trun(sfplocation:str_zipcode),"<tab>")
+                   writefile(l_filename,"%s","<nl>")
+                   custacctdata:service_zipcode = sfplocation:str_zipcode
+                 }
+              else
+                 {
+                   -- service address 1
+                   writefile(l_filename,"%s%s",trun(sfpname:address[1]),"<tab>")
+                   custacctdata:service_address1 = sfpname:address[1]
+
+                   -- service address 2
+                   writefile(l_filename,"%s%s",trun(sfpname:address[2]),"<tab>")
+                   custacctdata:service_address2 = sfpname:address[2]
+
+                   -- service city
+                   writefile(l_filename,"%s%s",trun(sfpname:city),"<tab>")
+                   custacctdata:service_city = sfpname:city
+
+                   -- service state
+                   writefile(l_filename,"%s%s",trun(sfpname:str_state),"<tab>")
+                   custacctdata:service_state = sfpname:str_state
+
+                   -- service zip
+                   writefile(l_filename,"%s",trun(sfpname:str_zipcode))
+                   custacctdata:service_zipcode = sfpname:str_zipcode
+
+                   writefile(l_filename,"%s","<nl>")
+                 }
+
+         end
+        end
+
+  }
+}
+
+screen exit
+closefile(l_filename)
+
+-- BILLING INFORMATION  saving this in case we need it
+/*
+       access sfpsupp, set sfpsupp:policy_no    = sfpname:policy_no,
+                           sfpsupp:pol_year     = sfpname:pol_year,
+                           sfpsupp:end_sequence = sfpname:end_sequence, generic
+
+       while sfpsupp:policy_no    = sfpname:policy_no and
+             sfpsupp:pol_year     = sfpname:pol_year and
+             sfpsupp:end_sequence = sfpname:end_sequence
+             {
+
+          if sfpsupp:mort_type_2 = "P", "F" then
+           {
+           if sfpsupp:mort_type_1 one of "C","B", "F" then
+             {
+               l_mortgagee = "Y"
+               if sfpsupp:mortgage_id <> 0 then
+                   {
+                     access sfsmort, set sfsmort:company_id = sfpname:company_id,
+                                         sfsmort:mortgage_id = sfpsupp:mortgage_id, exact
+                     i_name    = sfsmort:name
+                     l_address = sfsmort:address
+                     l_city    = sfsmort:city
+                     l_state   = sfsmort:str_state
+                     l_zipcode = sfsmort:str_zipcode
+
+                   }
+                else
+                   {
+                     i_name    = sfpsupp:name
+                     l_address = sfssupp:address
+                     l_city    = sfssupp:city
+                     l_state   = sfssupp:str_state
+                     l_zipcode = sfssupp:str_zipcode
+                   }
+             }
+            }
+          else
+            l_mortgagee = "N"
+
+        next sfpsupp
+        }
+       -- sfpname
+        if l_mortgagee = "N" then
+         {
+          i_name = trun(sfpname:name_key_1[1])
+          include "sfsrevname7.pro"
+          IF (pos("=",i_name)) <> 0 then
+            {
+              i_rev_name_1 = trun(i_rev_name)
+              l_pos = pos("=",i_name)
+              l_first_name = trun(i_name,(1,l_pos1))
+              l_last_name = trun(i_name,l_pos2,30)
+            }
+          else
+              i_rev_name_1 = i_name
+              l_first_name = i_name
+          }
+*/
+
+end

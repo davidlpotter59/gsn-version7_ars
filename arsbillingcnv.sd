@@ -1,0 +1,103 @@
+%%
+Program
+        Name = "arsbillingcnv" ;
+        Type = "File" ;
+        Domain = "ARSBILLING" ;
+
+
+        Number COUNTER = 0;
+        Wdate L_BILLED_DATE=00.00.0000 ;
+        String L_LOGFILE[20]="arsbillingcnv.log";
+        String L_ENTER ;
+
+        Screen Entry
+        Write ("<014>")
+        Read (23,1,"Enter Billed Date to Fix ",L_billed_date,10)
+        If L_billed_DATE = 00.00.0000 Then
+        Begin
+            L_billed_DATE = TODAYSDATE
+        End
+        L_ENTER = ""
+        Write ("%c%s%d",15001,"Billed Date to be Fixed ",L_billed_DATE)
+        Write ("%c%s",23001,"                                                    ")
+        Read (23,1,"Press Enter to Continue                            ",L_ENTER,1)
+
+
+-- for changing the status on installment fee from B to O when bills are run too
+-- far in advance.
+
+Update
+        COUNTER = COUNTER + 1
+
+If COUNTER = 1 Then
+Begin
+    Write ("<014>")
+End
+
+If COUNTER Mod 100 = 0 Then Begin
+        Write ("%c%s%n",02001,"Counter = ",COUNTER)
+End
+
+
+if arsbilling:billed_date = l_billed_date and
+   arsbilling:status = "B" and
+   arsbilling:billing_ctr > 1 then
+ {
+
+  Access ARSBILLING_ALIAS, Set ARSBILLING_ALIAS:COMPANY_ID   = ARSBILLING:COMPANY_ID,
+                               ARSBILLING_ALIAS:POLICY_NO    = ARSBILLING:POLICY_NO,
+                               ARSBILLING_ALIAS:TRANS_DATE   = ARSBILLING:TRANS_DATE,
+                               ARSBILLING_ALIAS:TRANS_EFF    = ARSBILLING:TRANS_EFF,
+                               ARSBILLING_ALIAS:TRANS_EXP    = ARSBILLING:TRANS_EXP,
+                               ARSBILLING_ALIAS:TRANS_CODE   = ARSBILLING:TRANS_CODE,
+                               ARSBILLING_ALIAS:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS,
+                               ARSBILLING_ALIAS:COMM_RATE    = ARSBILLING:COMM_RATE,
+                               ARSBILLING_ALIAS:SUB_CODE     = ARSBILLING:SUB_CODE,
+                               ARSBILLING_ALIAS:BILLING_CTR  = ARSBILLING:BILLING_CTR,
+                               ARSBILLING_ALIAS:RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR, Approximate
+
+  If ARSBILLING_ALIAS:COMPANY_ID       = ARSBILLING:COMPANY_ID And
+     ARSBILLING_ALIAS:POLICY_NO        = ARSBILLING:POLICY_NO And
+     ARSBILLING_ALIAS:TRANS_DATE       = ARSBILLING:TRANS_DATE And
+     ARSBILLING_ALIAS:TRANS_EFF        = ARSBILLING:TRANS_EFF And
+     ARSBILLING_ALIAS:TRANS_EXP        = ARSBILLING:TRANS_EXP And
+     ARSBILLING_ALIAS:TRANS_CODE       = ARSBILLING:TRANS_CODE And
+     ARSBILLING_ALIAS:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS And
+     ARSBILLING_ALIAS:COMM_RATE        = ARSBILLING:COMM_RATE And
+     ARSBILLING_ALIAS:SUB_CODE         = ARSBILLING:SUB_CODE And
+     ARSBILLING_ALIAS:BILLING_CTR      = ARSBILLING:BILLING_CTR And
+     ARSBILLING_ALIAS:RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR then
+    {
+     If arsbilling_alias:trans_code = 18 then
+      {
+       if ARSBILLING_ALIAS:status = "B" and
+          arsbilling_alias:billed_date = l_billed_date and
+          arsbilling_alias:billing_ctr > 1 then
+           {
+             delete arsbilling_alias
+           }
+      }
+     else
+     If ARSBILLING_ALIAS:STATUS = "B" And
+        ARSBILLING_ALIAS:BILLING_CTR > 1 And
+        ARSBILLING_ALIAS:BILLED_DATE = L_billed_DATE Then
+        {
+         Change ARSBILLING_ALIAS
+          {
+           ARSBILLING_ALIAS:BILLED_DATE  = 00.00.0000
+           ARSBILLING_ALIAS:STATUS       = "O"
+           ARSBILLING_ALIAS:EXPANSION    = "*"
+          }-- end of change
+
+        }-- end of due date check
+
+    } -- end of access
+
+
+ }  -- end of status
+
+
+Screen Exit
+Write ("%c%s%n",15001,"Update is Compete......",COUNTER)
+Closefile (L_LOGFILE)
+End

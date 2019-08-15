@@ -1,0 +1,62 @@
+%%
+Screen
+        Name = "arsmt032" ;
+        Type = "Detail" ;
+        Screensize = "dynamic" ;
+        Highlite = Underscore;
+        Padcharacter = Space ;
+        domain = "arsdisp" ;
+        Windowtitle ="%a     %s Check Disposition - Ver. 7.00     %m";
+--      resizeable = yes ;
+        iconline = 0 ;
+
+        Include "stdkeys7.inc"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        add/reuse  tagged add_fn;
+
+        Include "stdfunc7.inc"
+
+Menu Definition
+
+        Include "stdmenu7.inc"
+
+}
+
+Toolbar Definition
+
+        Include "stdtoolbar7.inc"
+}
+
+screen
+{
+%%
+                                                        _______________
+*------------------------------------------------------------------------------*
+| Company Id:  __________  ___________________________________________________ |
+| Disposition: _______                                                         |
+*------------------------------------------------------------------------------*
+| Description: ________________________________________                        |
+*------------------------------------------------------------------------------*
+
+
+%%
+
+components
+
+Fields
+        FUNCTION/noecho/showasguidetext;
+0301    ARSDISP:COMPANY_ID/uppercase                  Mandatory
+        include "companyhlp.inc"
+0302    sfscompany:name[1] ;
+0401    ARSDISP:DISPOSITION/upper                     Mandatory;
+0601    ARSDISP:DESCRIPTION/upper ;
+
+}
+
+End

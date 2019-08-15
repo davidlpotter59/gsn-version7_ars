@@ -1,0 +1,47 @@
+                                                       ____________
+            *---------------------------------------------------*
+            |                                                   |
+            |   Cancellation Notice Run Date: __________        |
+            |                                                   |
+            |   Cancellation Notice Due Date: __________        |
+            |                                                   |
+            |                                                   |
+            *---------------------------------------------------*
+%%
+Screen
+        Name = "Arspr952" ;
+        Type = "Detail" ;
+        Padcharacter=Space;
+        Highlite=Underscore;
+        Domain="ARSDATES";
+        Screensize = "dynamic";
+        Windowtitle="%a     %s - Purge CX Notice Date Options - Version 4.10   %m";
+
+        Global Mmddyyyy Date G_STARTING_DATE ;
+        Global Mmddyyyy Date G_ENDING_DATE ;
+        Global String G_COMPANY_ID[10];
+        Global Unsigned Ascii Number G_NO_COPIES[2];
+
+        Access ARSDATES, Set ARSDATES:COMPANY_ID = G_COMPANY_ID, Approximate ;
+
+        Include "STDKEYS7.INC"
+
+Functions
+
+        Include "STDFUNC7.INC"
+
+        -- include "SCIPSPRINT.FUN"
+
+Fields
+0101    FUNCTION ;
+0401    G_STARTING_DATE/mask="MM/DD/YYYY"/default { Mandatory } ;
+0601    G_ENDING_DATE/mask="MM/DD/YYYY"/default   { Mandatory }
+        ;
+
+Screen Exit
+        If ARSDATES:COMPANY_ID <> ""
+            Then G_COMPANY_ID = ARSDATES:COMPANY_ID;
+        Access ARSDATES_ALT, Set ARSDATES_ALT:COMPANY_ID = ARSDATES:COMPANY_ID
+        Delete ARSDATES_ALT -- cleans up file for next date entry
+
+End

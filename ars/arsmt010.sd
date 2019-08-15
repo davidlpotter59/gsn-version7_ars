@@ -1,0 +1,76 @@
+                                                                  ____________
+*---------------------------------------------------------------------------*
+| Company Id: __________ __________________________________________________ |
+|                                                                           |
+| Policy No:   _________ __________________________________________________ |
+|                                                                           |
+| Reason for Returning:  _________                                          |
+|                        ________________________________________           |
+|                                                                           |
+*---------------------------------------------------------------------------*
+%%
+Screen
+Name = "Arsmt010" ;
+Type = "Detail" ;
+Padcharacter = Space ;
+Highlight = Underscore ;
+Screensize = "dynamic";
+Windowtitle="%a    %s  Return Check Information and Options - Version 1.00  %m";
+iconline=0;
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_CHECK_REFERENCE[7];
+        Global Unsigned Ascii Number G_POLICY_NO[9];
+
+        Access ARSCHKSU,
+           Set ARSCHKSU:COMPANY_ID      = G_COMPANY_ID,
+               ARSCHKSU:CHECK_REFERENCE = G_CHECK_REFERENCE ;
+
+        Include "STDKEYS.INC"
+
+Functions
+
+          Change ;
+          Search ;
+"Back"    Return;
+"Exit"    Return;
+          Return;
+"Bye"     Stop;
+          Stop;
+
+Fields
+101     FUNCTION/noecho/showasguidetext ;
+301     Begin
+            Access SFSCOMPANY, Set SFSCOMPANY:COMPANY_ID = G_COMPANY_ID
+        End
+        ARSCHKSU:COMPANY_ID/displayonly
+        Error 1223 If SFSCOMPANY:COMPANY_ID = ""
+        Activehelp If SFSCOMPANY:USE = "N" Then "" Else SFSCOMPANY:COMPANY_ID,
+                   If SFSCOMPANY:USE = "N" Then "" Else SFSCOMPANY:NAME[1];
+302     SFSCOMPANY:NAME[1];
+0501    ARSCHKSU:POLICY_NO/displayonly ;
+0502    SFPNAME:NAME[1]/mask="X(50)";
+0701    Begin
+            Access ARSRETURN, Set ARSRETURN:COMPANY_ID    = G_COMPANY_ID,
+                                  ARSRETURN:RETURN_REASON = ARSCHKSU:RETURN_REASON, Generic
+        End
+        ARSCHKSU:RETURN_REASON
+        Error "No Valid Notices Selected" If
+        ARSRETURN:DESCRIPTION = ""
+        Activehelp ARSRETURN:RETURN_REASON,
+                   ARSRETURN:DESCRIPTION;
+0801    ARSRETURN:DESCRIPTION ;
+
+Preupdate
+
+If UPDATEOK = "YES" And
+   ABORT    = "NO" Then
+   Begin
+       ARSCHKSU:RETURN_DATE = TODAYSDATE
+   End
+
+Screen Exit
+        If ARSCHKSU:COMPANY_ID > ""
+        Then G_COMPANY_ID = ARSCHKSU:COMPANY_ID ;
+
+End

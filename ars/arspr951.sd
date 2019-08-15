@@ -1,0 +1,107 @@
+%%
+Screen
+        Name = "Arspr951" ;
+        Type = "Detail" ;
+        Padcharacter=Space;
+        Highlite=Underscore;
+        Domain="ARSDATES";
+        Screensize = "dynamic";
+        Windowtitle="%a     %s - A/R Date and Copies Entry - Version 7.00   %m";
+        iconline = 0;
+
+        Global Mmddyyyy Date G_STARTING_DATE ;
+        Global Mmddyyyy Date G_ENDING_DATE ;
+        Global String G_COMPANY_ID[10],
+                      l_continue_1[50];
+
+        Global Unsigned Ascii Number G_NO_COPIES[2];
+
+        Access ARSDATES, Set ARSDATES:COMPANY_ID = G_COMPANY_ID, Approximate ;
+
+        Include "STDKEYS7.INC"
+
+Style Definition
+    include "styles.inc"
+
+Functions
+
+        Include "STDFUNC7.INC"
+
+        -- include "SCIPSPRINT.FUN"
+
+Menu Definition
+    include "stdmenu7.inc"
+}
+
+ToolBar Definition
+    include "stdtoolbar7.inc"
+}
+
+
+Screen
+Properties
+    {
+    LayOutType      = Column
+    }
+{
+
+Panel Tagged Header_pl
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = AsNeeded
+    }
+{
+%%
+                                                       ____________
+            *----------------------------------------*
+            |                                        |
+            |       Starting Date: __________        |
+            |                                        |
+            |       Ending Date:   __________        |
+            |                                        |
+            |       No. of Copies:         __        |
+            *----------------------------------------*
+%%
+
+Components
+
+Fields
+101     FUNCTION/noecho/showasguidetext ;
+401     Begin
+        If G_STARTING_DATE = 00.00.0000 Then
+        Begin
+        G_STARTING_DATE = (Dateadd(01.01.2000,Month(TODAYSDATE) -1,
+                          Year(TODAYSDATE) Mod 100))
+        End
+        End
+        G_STARTING_DATE/mask="MM/DD/YYYY"/default { Mandatory } ;
+0601    Begin
+        If G_ENDING_DATE = 00.00.0000 Then
+        Begin
+        G_ENDING_DATE = Dateadd(01.01.2000,Month(G_STARTING_DATE),
+                        Year(G_STARTING_DATE) Mod 100) -1
+        End
+        End
+        G_ENDING_DATE/mask="MM/DD/YYYY"/default   { Mandatory }
+        Begin
+            Error "Ending Date Can Not be Less Than the Starting Date"
+            If G_ENDING_DATE < G_STARTING_DATE
+        End
+        ;
+801     Begin
+        If G_NO_COPIES = 0 Then
+        Begin
+            G_NO_COPIES = 1
+        End
+        End
+        G_NO_COPIES/default ;
+}
+}
+Screen Exit
+        If ARSDATES:COMPANY_ID <> ""
+            Then G_COMPANY_ID = ARSDATES:COMPANY_ID;
+        Access ARSDATES_ALT, Set ARSDATES_ALT:COMPANY_ID = ARSDATES:COMPANY_ID
+        Delete ARSDATES_ALT -- cleans up file for next date entry
+
+End

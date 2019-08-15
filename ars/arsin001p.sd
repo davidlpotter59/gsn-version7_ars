@@ -1,0 +1,297 @@
+                                                        _______________   
+ *-----------------------------------------------------------------------------*
+ |   Company:     __________           Bank:   _____________________________   |
+ |   Description: __________________   Branch: ___________________________     |
+ *-----------------------------------------------------------------------------*
+ |   Payor Type:[R _~Insured _~Mortgagee _~Billing _~Agent _~Credit _~Other R] |
+ *-----------------------------------------------------------------------------*
+ |~~~Policy~No.:~~_________~______________________________~~Money~Order:~_~~~~~|
+ |~~~Check~No.:~~~____________________~Post~Dated:~_~~Check~Date:~~__________~~|
+ |~~~Bank~No:~~~~~_______________~~~~~~Deposit~Date:~__________~~~~~~~~~~~~~~~~|
+ |~~~Trans~Date:~~__________~~~Status~:~______________________________________~|
+ |~~~Amount:~~~~~~___________~~Balance:~___________~Hold~Check:~_ Deposit:~_~~~|
+ |~~~Comments:~~~~___________________________________________________________~~|
+ *-----------------------------------------------------------*-----------------*
+ |                      Payor Information                    |    Total Due    |
+ |   Name:       _______________________________________     |    _________    |
+ |   Care of:    ______________________________              *-----------------*
+ |   Address:    _____________________________               |   Reference     |
+ |   City/State: _____________________________ __ _________  |     _______     |
+ *------------------------------------------------*----------*-----------------*
+ |~Total~Due~Net:~_________~Installment~Charges:~_________~Surcharge:~_________|
+ *-----------------------------------------------------------------------------*
+%%
+Screen
+     Name = "arsin001p" ;
+     Type = "Detail" ;
+     Padcharacter = Space ;
+     Highlight = Underscore ;
+--     Screensize="dynamic";
+     Domain="ARSCHKSU";
+     iconline=0;
+     Windowtitle = "%a     %s  Check Processing - Inquiry By Policy Number     %m";
+
+     Global Unsigned Ascii Number G_CHECK_REFERENCE[7],
+                                  G_POLICY_NO[9],
+                                  G_QUOTE_NO[8] ,
+                                  G_AGENT_NO[4] ;
+
+     Global String G_SUPP_NAME[30],
+                   G_CARE_OF[30],
+                   G_STREET[20],
+                   G_CITY_STATE[20],
+                   G_COMPANY[10],
+                   G_CHECK_NUMBER[20];
+
+     Global Signed Ascii Number G_TOTAL_DUE[9]/decimals=2,
+                                G_CHECK_AMOUNT[9]/decimals=2;
+
+     Global Unsigned Ascii Number G_ZIP_CODE[9] ;
+
+     Include "arsmenu.var"
+
+     Signed Ascii Number L_TOTAL[9]=0/dec=2,
+                         L_TOTAL_1[9]=0/dec=2,
+                         L_TOTAL_DUE[9]=0/decimals=2,
+                         L_BATCH[11]=0/decimals=2 ;
+
+     String L_APPLICATION_STR[30]="Application ";
+     String L_ENTER[1];
+
+     Wdate L_TRANS_DATE=00.00.0000;
+     /* these globals are needed for arsmt01d */
+     Global Signed Ascii Number G_TOTAL_DUE_NET[9]/decimals=2,
+                                G_INSTALLMENT_AMT[9]/decimals=2,
+                                G_TOTAL_PREMIUM[9]/decimals=2,
+                                G_TOTAL_SURCHARGE[9]/decimals=2,
+                                G_TOTAL_INSTALLMENT_CHARGE[9]/decimals=2;
+
+     Global String G_BANK_NO[15];
+     Global Unsigned Ascii Number G_APPLY_INSTALLMENT_CREDIT[1];
+
+     Access ARSCHKSU,
+            Set ARSCHKSU:policy_no = G_policy_no, generic,
+                                           using fourth index ;
+
+     Include "csexec.var"
+
+     Include "scipsprint.var"
+
+     Include "arsinqkeys.inc"
+
+
+Functions
+
+--     Include "arsmenu.inc"
+
+     Include "arsinqfunc.inc"
+
+--     Include "scipsprint.fun"
+
+Screen Entry
+
+Error "No Policy Selected" If G_POLICY_NO = 0
+
+If G_POLICY_NO = 0 Then
+Begin
+    FUNCTION = "RETURN"
+End
+
+L_TRANS_DATE = TODAYSDATE -- default this on entry
+
+Access Validation
+Error "No more checks for this Policy" If
+G_POLICY_NO <> ARSCHKSU:POLICY_NO
+
+
+Fields
+101     FUNCTION/noecho/showasguidetext;
+
+301  Begin
+     If SECURITY < 65 Then Begin
+     Activehelp()
+     End
+     If FUNCTION = "ADD" Then
+         Begin
+--             Access ARSCONTROL, Set ARSCONTROL:COMPANY_ID = "XXXXXXXXXX", Exact
+             ARSCHKSU:COMPANY_ID = ARSCONTROL:DEFAULT_COMPANY
+             If G_COMPANY <> "" Then
+             begin
+                 ARSCHKSU:COMPANY_ID = G_COMPANY
+             end
+             Access ARSCONTROL, Set ARSCONTROL:COMPANY_ID = "", Approximate
+             End
+     End
+
+     ARSCHKSU:COMPANY_ID/default/displayonly
+     If Len (ARSCHKSU:COMPANY_ID) < 3 Then Autocomplete ()
+
+     Begin
+     Error 5004
+     If ARSCHKSU:BALANCE <> ARSCHKSU:CHECK_AMOUNT And
+        FUNCTION = "CHANGE" Or
+        FUNCTION = "DELETE"
+     End
+     Begin
+         If ARSCHKSU:COMPANY_ID <> "" And
+            G_COMPANY = "" Then
+            { G_COMPANY = ARSCHKSU:COMPANY_ID }
+     End
+     Activehelp
+               If ARSCONTROL:USE = 1 Then ARSCONTROL:COMPANY_ID  Else NULL,
+               If ARSCONTROL:USE = 1 Then ARSCONTROL:BANK_ACCOUNT_NO Else NULL
+                 ;
+0301 ARSCHKSU:COMPANY_ID/displayonly
+     Error "Company ID is Not Valid" If SFSCOMPANY:NAME[1]="";
+401  Begin
+         G_COMPANY  = ARSCHKSU:COMPANY_ID
+     End
+     SFSCOMPANY:NAME[1]/displayonly/mask="X(18)"   ;
+302  ARSCONTROL:BANK_NAME/displayonly
+     Error 3001 If ARSCONTROL:BANK_NAME = "";
+402  ARSCONTROL:BANK_BRANCH/displayonly ;
+0601 ARSCHKSU:PAYOR_TYPE/button/values="I,M,B,A,C,O" {Nochange};
+801  ARSCHKSU:POLICY_NO/displayonly ;
+1602 L_TOTAL_DUE/displayonly;
+2101 G_TOTAL_DUE_NET/displayonly;
+2102 G_TOTAL_INSTALLMENT_CHARGE/displayonly;
+2103 G_TOTAL_SURCHARGE/displayonly;
+
+801  Begin
+         Access SFPNAME, Set SFPNAME:POLICY_NO = ARSCHKSU:POLICY_NO, Approximate
+     End
+     ARSCHKSU:POLICY_NO/displayonly
+     Warning "No Policy Number On File, Assuming Application - Press Cancel to Continue"
+     If SFPNAME:NAME[1] = "" Or FLEN = 0 ;
+801  L_APPLICATION_STR[1,3]/displayonly
+     Hide If SFPNAME:NAME[1] <> "";
+802  SFPNAME:NAME[1]/mask="X(30)";
+802  SFQNAME:NAME[1]
+     Hide If G_QUOTE_NO = 0 ;
+802  L_APPLICATION_STR/displayonly
+     Hide If SFPNAME:NAME[1] <> "" ;
+803  ARSCHKSU:MONEY_ORDER/displayonly/checkbox/values="0,1" ;
+901  ARSCHKSU:CHECK_NO/displayonly;
+902  ARSCHKSU:POST_DATED/displayonly/checkbox/values="0,1" ;
+903  ARSCHKSU:CHECK_DATE/displayonly ;
+1001 ARSCHKSU:BANK_NO/displayonly  {Mandatory} ;
+1101 ARSCHKSU:TRANS_DATE/displayonly  ;  -- allow changing but default
+1201 ARSCHKSU:CHECK_AMOUNT/displayonly;
+1301 ARSCHKSU:COMMENTS/displayonly  ;
+1202 ARSCHKSU:BALANCE/displayonly;
+1203 ARSCHKSU:CHECK_HOLD/displayonly/checkbox/values="0,1"  ;
+1204 ARSCHKSU:DEPOSIT_PREMIUM/displayonly/checkbox/values="0,1" ;
+1002 ARSCHKSU:DEPOSIT_DATE/displayonly ;
+1102 ARSDISP:DESCRIPTION/displayonly  ;
+1301 ARSCHKSU:COMMENTS/displayonly ;
+1601 ARSCHKSU:PAYOR_NAME/displayonly ;
+1601 ARSCHKSU:PAYOR_NAME/displayonly                          {Nochange};
+1701 ARSCHKSU:PAYOR_CARE_OF/displayonly                     {Nochange};
+1801 ARSCHKSU:PAYOR_ADDRESS/displayonly                       {Nochange};
+1901 ARSCHKSU:PAYOR_CITY/displayonly                    {Nochange};
+1902 ARSCHKSU:PAYOR_STR_STATE/displayonly ;
+1903 ARSCHKSU:PAYOR_ZIPCODE/mask="ZZZZZZZZZ"/displayonly     {Nochange};
+1904 ARSCHKSU:CHECK_REFERENCE/displayonly ;
+
+Screen Exit
+        If ARSCHKSU:COMPANY_ID <> ""
+        Then G_COMPANY = ARSCHKSU:COMPANY_ID
+
+        If ARSCHKSU:CHECK_REFERENCE > 0
+        Then G_CHECK_REFERENCE = ARSCHKSU:CHECK_REFERENCE ;
+
+        If ARSCHKSU:POLICY_NO > 0
+        Then G_POLICY_NO = ARSCHKSU:POLICY_NO;
+
+        If L_TOTAL_DUE <> 0
+        Then G_TOTAL_DUE = L_TOTAL_DUE;
+
+        If ARSCHKSU:CHECK_NO <> ""
+        Then G_CHECK_NUMBER = ARSCHKSU:CHECK_NO;
+
+        If ARSCHKSU:CHECK_AMOUNT <> 0
+        Then G_CHECK_AMOUNT = ARSCHKSU:CHECK_AMOUNT;
+
+Procedure Definition
+
+Procedure GET_BALANCE
+Begin
+     L_TOTAL = 0
+     L_TOTAL_1 = 0
+     Access ARSCHKSU_ALT, Set ARSCHKSU_ALT:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                              ARSCHKSU_ALT:CHECK_REFERENCE  = ARSCHKSU:CHECK_REFERENCE
+     While ARSCHKSU_ALT:COMPANY_ID      = ARSCHKSU:COMPANY_ID And
+           ARSCHKSU_ALT:CHECK_REFERENCE = ARSCHKSU:CHECK_REFERENCE
+     Begin
+     L_TOTAL = L_TOTAL + ARSCHKSU_ALT:CHECK_AMOUNT
+     Next ARSCHKSU_ALT
+     End
+     L_TOTAL_1 = ARSCHKSU:CHECK_AMOUNT - L_TOTAL
+     End
+
+Procedure GET_AMOUNT_DUE
+Begin
+
+    L_TOTAL_DUE                = 0
+    G_TOTAL_DUE_NET            = 0
+    G_TOTAL_INSTALLMENT_CHARGE = 0
+    G_TOTAL_SURCHARGE          = 0
+
+    Access ARSBILLING, Set ARSBILLING:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                           ARSBILLING:POLICY_NO = ARSCHKSU:POLICY_NO, Approximate
+
+/* put the company check here, arsbilling:company_id must = arschksu:company_id */
+
+    While ARSBILLING:COMPANY_ID = ARSCHKSU:COMPANY_ID And
+          ARSBILLING:POLICY_NO = ARSCHKSU:POLICY_NO
+    Begin
+    If ARSBILLING:STATUS = "B" Then
+    Begin
+        L_TOTAL_DUE = L_TOTAL_DUE + (ARSBILLING:INSTALLMENT_AMOUNT -
+                                     ARSBILLING:TOTAL_AMOUNT_PAID)
+    End
+
+    If (ARSBILLING:STATUS = "B" Or
+        ARSBILLING:STATUS = "O") And
+       ARSBILLING:TRANS_CODE <> ARSCONTROL:INSTALLMENT_CHARGE_TRANS_CODE Then
+       { G_TOTAL_DUE_NET = G_TOTAL_DUE_NET + (ARSBILLING:INSTALLMENT_AMOUNT -
+                                              ARSBILLING:TOTAL_AMOUNT_PAID) }
+
+    If (ARSBILLING:STATUS = "B" Or
+        ARSBILLING:STATUS = "O") And
+       ARSBILLING:TRANS_CODE = ARSCONTROL:INSTALLMENT_CHARGE_TRANS_CODE Then
+       { G_TOTAL_INSTALLMENT_CHARGE  = G_TOTAL_INSTALLMENT_CHARGE
+        + (ARSBILLING:INSTALLMENT_AMOUNT - ARSBILLING:TOTAL_AMOUNT_PAID) }
+
+    If (ARSBILLING:STATUS = "B" Or
+        ARSBILLING:STATUS = "O") And
+       ARSBILLING:TRANS_CODE = ARSCONTROL:SURCHARGE_TRANS_CODE Then
+       { G_TOTAL_SURCHARGE = G_TOTAL_SURCHARGE
+        + (ARSBILLING:INSTALLMENT_AMOUNT - ARSBILLING:TOTAL_AMOUNT_PAID) }
+
+    If (ARSBILLING:STATUS = "B" Or
+        ARSBILLING:STATUS = "O") And
+       (ARSBILLING:TRANS_CODE <> ARSCONTROL:INSTALLMENT_CHARGE_TRANS_CODE And
+        ARSBILLING:TRANS_CODE <> ARSCONTROL:SURCHARGE_TRANS_CODE) Then
+       { G_TOTAL_PREMIUM = G_TOTAL_PREMIUM
+        + (ARSBILLING:INSTALLMENT_AMOUNT - ARSBILLING:TOTAL_AMOUNT_PAID) }
+
+    Next ARSBILLING
+
+    End
+End
+
+Procedure SCIPS_MACRO
+Begin
+
+    I_SCIPS_SELECT = "Y"
+
+    If I_SCIPS_SELECT = "Y" Then
+    Begin
+        I_SCIPS_PARAM_NAME = Lowercase(Trun(PROGRAMID))+Trun(Str(PID))+".par"
+        Writefile (I_SCIPS_PARAM_NAME,"%n<NL>",ARSCHKSU:CHECK_REFERENCE)
+    End
+
+    Include "scipsprint.pro"
+
+End

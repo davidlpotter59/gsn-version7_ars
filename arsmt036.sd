@@ -1,0 +1,63 @@
+%% 
+Screen
+        Name = "arsmt036" ;
+        Type = "Detail" ;
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize="dynamic" ;
+        domain = "arsbptype" ;
+        Windowtitle="%a     %s Billing Type Descriptions - Ver. 7.00    %m";
+--      resizeable = yes ;
+        iconline = 0 ;
+
+        Include "stdkeys7.inc"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        add/reuse  tagged add_fn;
+
+        Include "stdfunc7.inc"
+
+Menu Definition
+
+        Include "stdmenu7.inc"
+
+}
+
+Toolbar Definition
+
+        Include "stdtoolbar7.inc"
+}
+
+screen
+{
+%%
+                                                        _______________
+*------------------------------------------------------------------------------*
+| Company Id:   __________  __________________________________________________ |
+| Billing Type: _____                                                          |
+*------------------------------------------------------------------------------*
+| Description:  ______________________________                                 |
+*------------------------------------------------------------------------------*
+
+
+
+%%
+
+components
+
+Fields
+        FUNCTION/noecho/showasguidetext;
+301     ARSBPTYPE:COMPANY_ID                    Mandatory
+        include "companyhlp.inc"
+302     sfscompany:name[1] ;
+401     ARSBPTYPE:BILLING_TYPE                  Mandatory;
+601     ARSBPTYPE:DESCRIPTION;
+
+}
+
+End

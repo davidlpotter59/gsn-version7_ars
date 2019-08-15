@@ -1,0 +1,428 @@
+%%                              
+Program
+       Name="arsup630x"
+       Type="file"
+       Domain="sfsdefault"
+--       padcharacter = space ;
+
+--  do not add padcharacter equals space it will crash this program
+
+/*
+       this program takes the file from MOB and update mobmaster using xml file
+*/
+
+       date l_registered_date,
+             l_paperless_date,
+             l_autopay_date ;
+
+       string l_mob_filename1[50],
+              l_company_id[10]="FARMERS   " ;
+
+       string l_mob_filename[50];
+       string l_mobread[10000] ;
+       string l_enter[1];
+       string l_header[50] ;
+       string l_header_1[50] ;
+       string l_char[1];
+       string l_result[55],
+              l_found[20],
+              l_result_1[55]="",
+              l_header_3[50],
+              l_header_4[50],
+              l_autopaytype[20],
+              l_directory[50],
+              l_mob_date[8] ;
+
+       unsigned ascii number l_header_2[2],
+                             l_policy_no[9],
+                             l_header_1_len[10],
+                             l_result_num[50],
+                             l_ending_pos[6] ;
+
+       unsigned ascii number l_position[8]=0,
+                             l_header_3_pos[8]=0 ;
+       unsigned ascii number l_position_1[8]=0;
+       unsigned ascii number l_position_2[8]=0,
+                             l_position_3[8]=0;
+
+
+Initialisation
+
+      access arscontrol2, set arscontrol2:company_id = sfsdefault:company_id, approximate
+
+      l_directory = arscontrol2:mob_input_location
+      l_mob_date =  str(todaysdate,"YYYYMMDD")
+      l_mob_filename = trun(arscontrol2:mob_input_name) + trun(l_mob_date)  + ".xml"
+      l_mob_filename1 = trun(l_directory) + trun(l_mob_filename)
+
+-- for testing
+--l_mob_filename1 = "/data/fos_debug/MOBacct20120523.xml"
+
+
+repeat
+{
+-- this is for reading in one char at a time to get the file account number in one read
+-- then add it to mobmaster,  then read in the next account one char at a time.
+-- because data file is too big to read in at once.
+
+ readfile(l_mob_filename1 , l_char, 1, "<NL>" )
+
+ if errornumber = 0 then
+  {
+   l_mobread = l_mobread + l_char
+   switch (l_char)
+   case "<"  :  l_found = l_char
+   case "/"  :  begin
+                 l_found = l_found + l_char
+                  if l_found <> "</" then
+                     l_found = ""
+                end
+   case "C"  :  begin
+                l_found = l_found + l_char
+                  if l_found <> "</C" then
+                     l_found = ""
+                end
+   case "u"  :  begin
+                  l_found = l_found + l_char
+                  if l_found <> "</Cu" then
+                     l_found = ""
+                end
+   case "s"  :  begin
+                  l_found = l_found + l_char
+                  if l_found <> "</Cus" then
+                     l_found = ""
+                end
+   case "t"  :  begin
+                  l_found = l_found + l_char
+                  if l_found <> "</Cust" then
+                     l_found = ""
+                end
+   case "o"  :  begin
+                 l_found = l_found + l_char
+                  if l_found <> "</Custo" then
+                     l_found = ""
+                end
+   case "m"  :  begin
+                 l_found = l_found + l_char
+                  if l_found <> "</Custom" then
+                     l_found = ""
+                end
+   case "e"  :  begin
+                 l_found = l_found + l_char
+                  if l_found <> "</Custome" then
+                     l_found = ""
+                end
+   case "r"  :  begin
+                 l_found = l_found + l_char
+                  if l_found <> "</Customer" then
+                     l_found = ""
+                end
+   case ">"  :  begin
+                  l_found = l_found + l_char
+                  if l_found = "</Customer>" then
+                   {
+                  do parse_get_response
+                    l_found = ""
+                    l_mobread = ""
+                   }
+                  else
+                   l_found = ""
+                end
+   default   :  l_found = ""
+
+   end
+  }
+} until errornumber <> 0
+
+
+Update
+
+screen exit
+closefile(l_mob_filename1)
+
+procedure definition
+
+
+procedure  parse_get_response
+Begin
+
+l_result = ""
+
+-- Account
+        l_header     = "<AccountNo>"
+        l_header_1   = "</AccountNo>"
+        l_position   = pos(trun(l_header),l_mobread)
+        l_position_1 = pos(trun(l_header_1),l_mobread)
+        l_result = l_mobread[l_position + len(trun(l_header)),l_position_1 - 1]
+
+        -- policy number
+        l_policy_no  = val(l_result)
+
+
+  access mobmaster,
+     set mobmaster:company_id = l_company_id,
+         mobmaster:policy_no = l_policy_no, generic
+
+if l_policy_no <> 0 then
+ {
+  if mobmaster:company_id = l_company_id and
+     mobmaster:policy_no = l_policy_no then
+     {
+      change mobmaster
+       {
+-- registered online
+        l_header     = '<Registration value="'
+        l_header_1   = '" dateTime="'
+        l_position   = pos(trun(l_header),l_mobread)
+        l_position_1 = pos(trun(l_header_1),l_mobread)
+        l_result     = l_mobread[l_position + len(trun(l_header)),l_position_1 - 1]
+
+        l_header_1_len = len(l_header_1)
+        l_position_2 = l_position + len(trun(l_header)) + len(trun(l_result)) + l_header_1_len
+
+        mobmaster:registered_online   =  val(l_result)
+
+-- registered date
+        l_header_1   = '" />'
+        l_position_1 = pos(trun(l_header_1),l_mobread)
+
+        l_header_1_len = len(l_header_1)
+        l_result = l_mobread[l_position_2,l_position_2 + 7]
+
+        l_result_num = val(l_result)
+
+        -- update file with registered date
+        l_registered_date = date(l_result_num,"INT")
+
+        mobmaster:registered_date   = l_registered_date
+--        l_starting_pos = (l_position_1 + l_header_1_len - 1)
+        l_ending_pos   = len(l_mobread)
+
+        l_mobread = l_mobread[l_position_2,l_ending_pos]
+
+-- paperless_invoicing
+        l_header     = '<Paperless value="'
+        l_header_1   = '" dateTime="'
+        l_position   = pos(trun(l_header),l_mobread)
+        l_position_1 = pos(trun(l_header_1),l_mobread)
+        l_result     = l_mobread[l_position + len(trun(l_header)),l_position_1 - 1]
+
+        l_header_1_len = len(l_header_1)
+        l_position_2 = l_position + len(trun(l_header)) + len(trun(l_result)) + l_header_1_len
+
+        -- update file with paperless invoicing
+        mobmaster:paperless_invoicing        =  val(l_result)
+
+-- paperless date
+        l_header_1   = '" />'
+        l_position_1 = pos(trun(l_header_1),l_mobread)
+
+        l_header_1_len = len(l_header_1)
+        l_result = l_mobread[l_position_2,l_position_2 + 7]
+
+        l_result_num = val(l_result)
+
+        -- update file with paperless date
+        l_paperless_date = date(l_result_num,"INT")
+
+        mobmaster:paperless_date    =  l_paperless_date
+
+        l_mobread = l_mobread[l_position_2,len(l_mobread)]
+
+-- auto pay
+        l_header     = '<AutoPay value="'
+        l_header_1   = '" dateTime="'
+        l_position   = pos(trun(l_header),l_mobread)
+        l_position_1 = pos(trun(l_header_1),l_mobread)
+        l_result     = l_mobread[l_position + len(trun(l_header)),l_position_1 - 1]
+
+        l_header_1_len = len(l_header_1)
+        l_position_2 = l_position + len(trun(l_header)) + len(trun(l_result)) + l_header_1_len
+
+        mobmaster:auto_pay = val(l_result)
+
+-- autopay  date
+        l_header_1   = '" />'
+        l_position_1 = pos(trun(l_header_1),l_mobread)
+
+        l_header_1_len = len(l_header_1)
+        l_result = l_mobread[l_position_2,l_position_2 + 7]
+
+        l_result_num = val(l_result)
+
+        -- update file with autopay date
+        l_autopay_date = date(l_result_num,"INT")
+
+        mobmaster:auto_date   = l_autopay_date
+
+        l_mobread = l_mobread[l_position_2,len(l_mobread)]
+-- autopay type
+        l_header     = "<AutoPayPaymentType>"
+        l_header_1   = "<AutoPayPaymentType/>"
+        l_header_3   = "</Customer>"
+        l_header_4   = "</AutoPayPaymentType>"
+        l_position   = pos(trun(l_header),l_mobread)
+        l_position_1 = pos(trun(l_header_1),l_mobread)
+        l_header_3_pos = pos(trun(l_header_3),l_mobread)
+        l_position_3 = pos(trun(l_header_4),l_mobread)
+
+-- skip if no autopaytype
+
+        if (l_position_1 = 0 and
+           l_position <> 0) or
+           (l_position < l_position_1 and
+           l_position_3 < l_position_1 and
+           l_position <> 0) then
+         {
+          l_result     = l_mobread[l_position + len(trun(l_header)),l_position_3 - 1]
+
+          l_header_1_len = len(l_header_1)
+          l_position_2 = l_position + len(trun(l_header)) + len(trun(l_result)) + l_header_1_len
+
+          mobmaster:autopay_type       = l_result
+         }
+        else
+         {
+          l_result = "                    "
+          mobmaster:autopay_type       = l_result
+         }
+
+        l_mobread = l_mobread[l_header_3_pos,len(l_mobread)]
+       } -- end of change
+    l_result_1     = l_mobread[1,len(l_mobread)]
+     }   -- end of =
+   else
+    {
+     add mobmaster
+      {
+        mobmaster:company_id = l_company_id/raw
+        mobmaster:policy_no  = l_policy_no
+
+-- registered online
+        l_header     = '<Registration value="'
+        l_header_1   = '" dateTime="'
+        l_position   = pos(trun(l_header),l_mobread)
+        l_position_1 = pos(trun(l_header_1),l_mobread)
+        l_result     = l_mobread[l_position + len(trun(l_header)),l_position_1 - 1]
+
+        l_header_1_len = len(l_header_1)
+        l_position_2 = l_position + len(trun(l_header)) + len(trun(l_result)) + l_header_1_len
+
+        mobmaster:registered_online   =  val(l_result)
+
+-- registered date
+        l_header_1   = '" />'
+        l_position_1 = pos(trun(l_header_1),l_mobread)
+
+        l_header_1_len = len(l_header_1)
+        l_result = l_mobread[l_position_2,l_position_2 + 7]
+
+        l_result_num = val(l_result)
+
+        -- update file with registered date
+        l_registered_date = date(l_result_num,"INT")
+
+        mobmaster:registered_date   = l_registered_date
+--        l_starting_pos = (l_position_1 + l_header_1_len - 1)
+        l_ending_pos   = len(l_mobread)
+
+        l_mobread = l_mobread[l_position_2,l_ending_pos]
+
+-- paperless_invoicing
+        l_header     = '<Paperless value="'
+        l_header_1   = '" dateTime="'
+        l_position   = pos(trun(l_header),l_mobread)
+        l_position_1 = pos(trun(l_header_1),l_mobread)
+        l_result     = l_mobread[l_position + len(trun(l_header)),l_position_1 - 1]
+
+        l_header_1_len = len(l_header_1)
+        l_position_2 = l_position + len(trun(l_header)) + len(trun(l_result)) + l_header_1_len
+
+        -- update file with paperless invoicing
+        mobmaster:paperless_invoicing        =  val(l_result)
+
+-- paperless date
+        l_header_1   = '" />'
+        l_position_1 = pos(trun(l_header_1),l_mobread)
+
+        l_header_1_len = len(l_header_1)
+        l_result = l_mobread[l_position_2,l_position_2 + 7]
+
+        l_result_num = val(l_result)
+
+        -- update file with paperless date
+        l_paperless_date = date(l_result_num,"INT")
+
+        mobmaster:paperless_date    =  l_paperless_date
+
+        l_mobread = l_mobread[l_position_2,len(l_mobread)]
+
+-- auto pay
+        l_header     = '<AutoPay value="'
+        l_header_1   = '" dateTime="'
+        l_position   = pos(trun(l_header),l_mobread)
+        l_position_1 = pos(trun(l_header_1),l_mobread)
+        l_result     = l_mobread[l_position + len(trun(l_header)),l_position_1 - 1]
+
+        l_header_1_len = len(l_header_1)
+        l_position_2 = l_position + len(trun(l_header)) + len(trun(l_result)) + l_header_1_len
+
+        mobmaster:auto_pay = val(l_result)
+
+-- autopay  date
+        l_header_1   = '" />'
+        l_position_1 = pos(trun(l_header_1),l_mobread)
+
+        l_header_1_len = len(l_header_1)
+        l_result = l_mobread[l_position_2,l_position_2 + 7]
+
+        l_result_num = val(l_result)
+
+        -- update file with paperless date
+        l_autopay_date = date(l_result_num,"INT")
+
+        mobmaster:auto_date   = l_autopay_date
+
+        l_mobread = l_mobread[l_position_2,len(l_mobread)]
+
+-- autopay type
+        l_header     = "<AutoPayPaymentType>"
+        l_header_1   = "<AutoPayPaymentType/>"
+        l_header_3   = "</Customer>"
+        l_header_4   = "</AutoPayPaymentType>"
+        l_position   = pos(trun(l_header),l_mobread)
+        l_position_1 = pos(trun(l_header_1),l_mobread)
+        l_header_3_pos = pos(trun(l_header_3),l_mobread)
+        l_position_3 = pos(trun(l_header_4),l_mobread)
+
+-- skip if no autopaytype
+        if l_position < l_position_1 and
+           l_position_3 < l_position_1 and
+           l_position <> 0 then
+         {
+          l_result     = l_mobread[l_position + len(trun(l_header)),l_position_3 - 1]
+
+          l_header_1_len = len(l_header_1)
+          l_position_2 = l_position + len(trun(l_header)) + len(trun(l_result)) + l_header_1_len
+
+          mobmaster:autopay_type       = l_result
+         }
+        else
+         {
+          l_result = " "
+          mobmaster:autopay_type       = l_result/raw
+         }
+
+        l_result = " "
+        l_mobread = l_mobread[l_header_3_pos,len(l_mobread)]
+
+      }  -- end of add
+
+
+    } --end of else
+    l_result_1     = l_mobread[1,len(l_mobread)]
+ } -- end if policy <> 0
+
+END
+
+End

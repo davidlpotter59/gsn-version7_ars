@@ -1,0 +1,155 @@
+                                                        ____________
+*------------------------------------------------------------------------------------------*
+| Policy Number: _________ ______________________________                                  |
+*------------------------------------------------------------------------------------------*
+| Billed        Due       Amount      Amount    Write-off   Net Amount     Transaction     |
+|  Date         Date       Due         Paid       Amount       Due         Description     |
+*------------------------------------------------------------------------------------------*
+|~__________~__________~___________~___________~___________~__________~___________________~|
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+*------------------------------------------------------------------------------------------*
+|~~~~~~Totals~~~~~~~~~~~___________~___________~___________~___________~~~~~~~~~~~~~~~~~~~~|
+|~~Disbursements~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~___________~~~~~~~~~~~~~~~~~~~~|
+*------------------------------------------------------------------------------------------*
+%%
+Screen
+        Name = "Arsin040" ;
+        Type = "Multiline" ;
+        Padcharacter = Space;
+        Highlite = Underscore;
+        Domain="ARSINQWRK2" ;
+        Screensize="dynamic";
+        Windowtitle = "%a     %s A/R Billing Inquiry     4.02 %m";
+        Repeat 0801 To 0807, 17 Times Down;
+
+        Global String G_COMPANY_ID[10];
+
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+
+        Global Wdate G_EFF_DATE;
+
+        String L_DESCRIPTION[20];
+        Signed Ascii Number L_TOTAL_INSTALLMENT_AMOUNT[11]=0/decimals=2,
+                            L_TOTAL_AMOUNT_PAID[11]=0/decimals=2,
+                            L_TOTAL_WRITE_OFF_AMOUNT[11]=0/decimals=2,
+                            L_TOTAL_NET_AMOUNT[11]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_DISBURSEMENTS[11]=0/decimals=2;
+
+        Access ARSINQWRK2,
+           Set ARSINQWRK2:COMPANY_ID = G_COMPANY_ID, Approximate
+--               ARSINQWRK2:POLICY_NO = G_POLICY_NO, Generic, Using First Index
+
+        Include "arsmenu.var"
+
+        Include "STDKEYS.INC"
+        !F8="T"/function/icon="Hist" ;
+
+Functions
+
+        Include "STDFUNC.INC"
+
+        -- include "SCIPSPRINT.FUN"
+
+        Include "arsmenu.inc"
+
+        "T" Display "arsin043";
+
+Screen Entry
+
+   Do GET_TOTALS
+
+Access Validation
+    If ARSINQWRK2:POLICY_NO <> G_POLICY_NO Then Error
+    "No More Records for This Policy" ;
+    Begin
+    Access ARSINQWRK2_ALIAS, Set ARSINQWRK2_ALIAS:COMPANY_ID = ARSINQWRK2:COMPANY_ID,
+                                 ARSINQWRK2_ALIAS:POLICY_NO  = ARSINQWRK2:POLICY_NO, Generic
+    Skip If ARSINQWRK2_ALIAS:TRANS_EFF_YYYY <> Year(G_EFF_DATE)
+    End
+
+Fields
+101     FUNCTION ;
+301     ARSINQWRK2:POLICY_NO/displayonly ;
+302     SFPNAME:NAME[1]/displayonly/mask="X(30)"  ;
+801     ARSINQWRK2:BILLED_DATE/displayonly;
+802     ARSINQWRK2:DUE_DATE/displayonly ;
+803     ARSINQWRK2:INSTALLMENT_AMOUNT/displayonly ;
+804     ARSINQWRK2:TOTAL_AMOUNT_PAID/displayonly;
+805     ARSINQWRK2:WRITE_OFF_AMOUNT/displayonly ;
+806     ARSINQWRK2:INSTALLMENT_AMOUNT -
+        (ARSINQWRK2:TOTAL_AMOUNT_PAID)/displayonly;
+807     ARSCODE:DESCRIPTION/displayonly/mask="X(19)";
+--        L_DESCRIPTION/DISPLAYONLY;
+2601    L_TOTAL_INSTALLMENT_AMOUNT/displayonly ;
+2602    L_TOTAL_AMOUNT_PAID - L_TOTAL_DISBURSEMENTS /displayonly ;
+2603    L_TOTAL_WRITE_OFF_AMOUNT/displayonly ;
+2604    L_TOTAL_NET_AMOUNT/displayonly ;
+2701    L_TOTAL_DISBURSEMENTS/displayonly;
+
+Screen Exit
+        If ARSINQWRK2:COMPANY_ID <> ""
+        Then G_COMPANY_ID = ARSINQWRK2:COMPANY_ID;
+        If ARSINQWRK2:POLICY_NO > 0
+        Then G_POLICY_NO = ARSINQWRK2:POLICY_NO ;
+
+Procedure Definition
+
+Procedure GET_TOTALS
+Begin
+
+Access ARSINQWRK2_ALIAS, Set ARSINQWRK2_ALIAS:COMPANY_ID = G_COMPANY_ID,
+                             ARSINQWRK2_ALIAS:POLICY_NO  = G_POLICY_NO, Generic
+
+While ARSINQWRK2_ALIAS:COMPANY_ID = G_COMPANY_ID And
+      ARSINQWRK2_ALIAS:POLICY_NO  = G_POLICY_NO
+      Begin
+         If ARSINQWRK2_ALIAS:TRANS_EFF_YYYY = Year(G_EFF_DATE)  Then
+         Begin
+         If ARSINQWRK2_ALIAS:TRANS_CODE Not One Of 30,35,55 Then
+         Begin
+            L_TOTAL_INSTALLMENT_AMOUNT = L_TOTAL_INSTALLMENT_AMOUNT +
+                                         ARSINQWRK2_ALIAS:INSTALLMENT_AMOUNT
+            L_TOTAL_AMOUNT_PAID        = L_TOTAL_AMOUNT_PAID +
+                                         ARSINQWRK2_ALIAS:TOTAL_AMOUNT_PAID
+/*            L_TOTAL_WRITE_OFF_AMOUNT   = L_TOTAL_WRITE_OFF_AMOUNT +
+                                         arsinqwrk2_ALIAS:WRITE_OFF_AMOUNT */
+            If ARSINQWRK2_ALIAS:WRITE_OFF_AMOUNT  = 0 Then
+            Begin
+            L_TOTAL_NET_AMOUNT         = L_TOTAL_INSTALLMENT_AMOUNT -
+                                        (L_TOTAL_AMOUNT_PAID )
+            End
+            Else
+            Begin  L_TOTAL_NET_AMOUNT = 0
+            End
+         End
+         Else If ARSINQWRK2_ALIAS:TRANS_CODE One Of 30,35,55 Then
+         Begin
+              L_TOTAL_DISBURSEMENTS = L_TOTAL_DISBURSEMENTS +
+                                      (ARSINQWRK2_ALIAS:INSTALLMENT_AMOUNT -
+                                       ARSINQWRK2_ALIAS:TOTAL_AMOUNT_PAID)
+         End
+
+         End
+
+     Next ARSINQWRK2_ALIAS
+
+End
+
+End -- end of procedure
+
+End

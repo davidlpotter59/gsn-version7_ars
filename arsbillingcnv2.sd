@@ -1,0 +1,72 @@
+%%
+Program
+        Name = "arsbillingcnv2" ;
+        Type = "File" ;
+        Domain = "ARSBILLING" ;
+
+-- this conversion will
+-- 1)  change all records where the status code one of "R" and trans code = 0
+--     to trans code 65
+
+        Number COUNTER = 0;
+        Wdate L_DUE_DATE=00.00.0000;
+        String L_LOGFILE[20]="arsbillingcnv.log";
+        String L_ENTER ;
+
+        Screen Entry
+        Write ("<014>")
+        Read (23,1,"You are about to Delete ARSBILLING Transaction codes 18 for today's processing - Press Enter to Continue ",L_ENTER,1)
+
+Update
+        COUNTER = COUNTER + 1
+
+If COUNTER = 1 Then
+Begin
+    Write ("<014>")
+End
+
+If COUNTER Mod 100 = 0 Then Begin
+        Write ("%c%s%n",02001,"Counter = ",COUNTER)
+End
+
+Access ARSBILLING_ALIAS, Set ARSBILLING_ALIAS:COMPANY_ID   = ARSBILLING:COMPANY_ID,
+                             ARSBILLING_ALIAS:POLICY_NO    = ARSBILLING:POLICY_NO,
+                             ARSBILLING_ALIAS:TRANS_DATE   = ARSBILLING:TRANS_DATE,
+                             ARSBILLING_ALIAS:TRANS_EFF    = ARSBILLING:TRANS_EFF,
+                             ARSBILLING_ALIAS:TRANS_EXP    = ARSBILLING:TRANS_EXP,
+                             ARSBILLING_ALIAS:TRANS_CODE   = ARSBILLING:TRANS_CODE,
+                             ARSBILLING_ALIAS:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS,
+                             ARSBILLING_ALIAS:COMM_RATE    = ARSBILLING:COMM_RATE,
+                             ARSBILLING_ALIAS:SUB_CODE     = ARSBILLING:SUB_CODE,
+                             ARSBILLING_ALIAS:BILLING_CTR  = ARSBILLING:BILLING_CTR,
+                             ARSBILLING_ALIAS:RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR, Approximate
+
+If ARSBILLING_ALIAS:COMPANY_ID       = ARSBILLING:COMPANY_ID And
+   ARSBILLING_ALIAS:POLICY_NO        = ARSBILLING:POLICY_NO And
+   ARSBILLING_ALIAS:TRANS_DATE       = ARSBILLING:TRANS_DATE And
+   ARSBILLING_ALIAS:TRANS_EFF        = ARSBILLING:TRANS_EFF And
+   ARSBILLING_ALIAS:TRANS_EXP        = ARSBILLING:TRANS_EXP And
+   ARSBILLING_ALIAS:TRANS_CODE       = ARSBILLING:TRANS_CODE And
+   ARSBILLING_ALIAS:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS And
+   ARSBILLING_ALIAS:COMM_RATE        = ARSBILLING:COMM_RATE And
+   ARSBILLING_ALIAS:SUB_CODE         = ARSBILLING:SUB_CODE And
+   ARSBILLING_ALIAS:BILLING_CTR      = ARSBILLING:BILLING_CTR And
+   ARSBILLING_ALIAS:RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR Then
+   Begin
+   If ARSBILLING_alias:TRANS_CODE ONE OF 18 AND
+      arsbilling_alias:trans_date = 12.14.2010 and
+      arsbilling_alias:status = "O" then
+   Begin
+      DELETE ARSBILLING_ALIAS
+--      change arsbilling_alias
+  --    begin
+    --    arsbilling_alias:expansion = "*"
+      --end
+   End -- end of change
+
+   End -- end of access
+
+Screen Exit
+Write ("%c%s%n",15001,"Update is Compete......",COUNTER)
+Closefile (L_LOGFILE)
+End

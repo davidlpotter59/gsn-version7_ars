@@ -1,0 +1,163 @@
+%%
+Screen
+        Name = "Arsmt910" ;
+        Domain="ARSMENU";
+        Type = "Detail" ;
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize = "dynamic";
+        Windowtitle="%s     %a Direct Bill Reinstatement Processing (Ver 7.00)    %m";
+        iconline = 0;
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+
+        Global Wdate G_STARTING_DATE,
+                     G_ENDING_DATE;
+
+        Global String G_REPORT_DEVICE[10];
+
+        String L_OPTION[1]="";
+        String L_REINSTATEMENT_NAME[50]="arsup910.pcl";
+--        String L_ENTER[1];
+        String L_NOTICE_TYPE[3]="";
+        String L_LOGFILE[15]="arsmt910.log",
+               l_continue_1[50]="";
+
+        Access ARSMENU, Set ARSMENU:COMPANY_ID = G_COMPANY_ID
+
+        Include "STDKEYS7.INC"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        Include "STDFUNC7.INC"
+
+menu definition
+
+        Include "stdmenus7.inc"
+}
+
+toolbar definition
+
+        Include "stdtoolbar7.inc"
+}
+
+/* Initialization
+Deletefile (L_REINSTATEMENT_NAME)
+
+Access ARSCXNOTICE, Set ARSCXNOTICE:COMPANY_ID = G_COMPANY_ID,
+                        ARSCXNOTICE:NOTICE_TYPE = L_NOTICE_TYPE
+*/
+Screen Entry
+
+screen at 1,1
+Properties
+    {
+    layouttype = column
+    }
+{
+Panel tagged header_pl
+Properties
+    {
+    borderstyle = raised
+    scrollbarpolicy = never
+    }
+{
+%%
+                                                                  ____________
+*------------------------------------------------------------------------------*
+|                        Reinstatement Printing Options                        |
+*------------------------------------------------------------------------------*
+| [R                                                                           |
+|~~~ _~~Select~Reinstatements~/~New~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+|    _~~Select~Reinstatements~by~Policy~Number~/~New~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+|                                                                              |
+|    _~~Print                                                                  |
+|                                                                              |
+|                                                                          R]  |
+*------------------------------------------------------------------------------*
+%%
+
+Components
+
+Fields
+0101     FUNCTION/noecho/showasguidetext ;
+0601     L_OPTION/values="a,b,c"
+         Begin
+             If L_OPTION One Of "a" Then
+             Begin
+                Display Modal Screen "arspr950"
+                At Line 5, Column 15
+                With Initial Function "ADD|exit"
+                If G_STARTING_DATE <> 0 And
+                   G_ENDING_DATE <> 0 Then
+                Begin
+                   If ARSCXNOTICE:HEADING_WORDING <> "" Then
+                   Begin
+                        Message "Processing Rescinding Notices, Please wait ....."
+                   End
+                   Else
+                   Begin
+                       Message "Processing Reinstatement Notices, Please wait ....."
+                   End
+-- run mode 3 over rides the default dates with the dates selected here
+                     Proc ("csbatch arsup910 %s%s%s",Str(G_STARTING_DATE,"MMDDYYYY"), Str(G_ENDING_DATE,"MMDDYYYY"),"3")/noconsole
+                   Message "                                                   "
+                End
+             End
+             If L_OPTION One Of "b" Then
+             Begin
+                Display Modal Screen "arspr950"
+                At Line 5, Column 15
+                With Initial Function "ADD|exit"
+                If G_STARTING_DATE <> 0 And
+                   G_ENDING_DATE <> 0 Then
+                Begin
+                Display Modal Screen "arspr970"
+                At Line 5, Column 15
+                With Initial Function "ADD|exit"
+                If G_POLICY_NO <> 0 Then
+                Begin
+                   If ARSCXNOTICE:HEADING_WORDING <> "" Then
+                   Begin
+                        Message "Processing Rescinding Notices, Please wait ....."
+                   End
+                   Else
+                   Begin
+                       Message "Processing Reinstatement Notices, Please wait ....."
+                   End
+ Proc ("csbatch arsup910 %s%s%s%s",Str(G_STARTING_DATE,"MMDDYYYY"), Str(G_ENDING_DATE,"MMDDYYYY"),"2",Str(G_POLICY_NO))/noconsole
+                   Message "                                                   "
+                End
+                End
+             End
+             Else
+             If L_OPTION = "c" Then
+             Begin
+                Display Modal Screen "arspr965"
+                At Line 5, Column 15
+                With Initial Function "ADD|exit"
+                If G_REPORT_DEVICE <> "" Then
+                {
+                 Proc("lp -d %s -oraw %s",Trun(G_REPORT_DEVICE), L_REINSTATEMENT_NAME)/noconsole
+                 Refresh()
+
+                }
+
+             End
+
+         End;
+
+}
+}
+
+Screen Exit
+
+Closefile( L_LOGFILE )
+
+
+End -- end of program

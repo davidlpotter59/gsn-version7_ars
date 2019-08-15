@@ -1,0 +1,200 @@
+%%
+Screen
+        Name = "Arsmt04a" ;
+        Domain="ARSCREDIT";
+        Type = "Detail" ;
+        Highlite = Underscore;
+        Screensize = "dynamic";
+        Padcharacter=Space;
+        Windowtitle="%a      %s Credit Card - Payee Information - Ver. 7.00     %m";
+        resizeable = yes ;
+        iconline = 0 ;
+
+        Global Unsigned Ascii Number G_CHECK_REFERENCE[7] ;
+
+        Global String G_COMPANY_ID[10];
+
+        Signed Ascii Number L_AMOUNT[10]=0/decimals=2;
+        Signed Ascii Number L_BALANCE[10]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_CHECKS[10]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_DUE[9]=0/decimals=2;
+        Unsigned Ascii Number L_ACCOUNT_LEN[3]=0;
+        Unsigned Ascii Number L_MIN_LENGTH[3];
+
+        Access ARSCREDIT, Set ARSCREDIT:COMPANY_ID      = G_COMPANY_ID,
+                              ARSCREDIT:CHECK_REFERENCE = G_CHECK_REFERENCE ;
+
+        Include "csexec.var"
+
+        Include "stdkeys7.inc"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        Include "stdfunc7.inc"
+
+Menu Definition
+
+        Include "stdmenu7.inc"
+
+}
+
+Toolbar Definition
+
+        Include "stdtoolbar7.inc"
+}
+
+screen at 2,1 to 18,81
+{
+%%
+                                                        _______________
+*-------------------------*----------------------------------------------------*
+| Credit Card Information |                                                    |
+*-------------------------*                                                    |
+*------------------------------------------------------------------------------*
+|  Policy No                                                                   |
+|  _________ ______________________________                                    |
+*------------------------------------------------------------------------------*
+| Card Type:      _ ________________________________________                   |
+| Account Number: ____________________ Expiration Date: ____                   |
+| Trans Amount:   ______________ Trans Status: __                              |
+| Approval Code:  ______         Auth Amount:  ______________                  |
+|                                                       *----------------------*
+|                                                       | Reference: _______   |
+*-------------------------------------------------------*----------------------*
+
+
+%%
+
+components
+
+Fields
+        FUNCTION/noecho/showasguidetext ;
+701     ARSCREDIT:POLICY_NO;
+702     SFPNAME:NAME[1];
+901     ARSCREDIT:CARD_TYPE/upper
+        Error 5005 If ARSCARD:DESCRIPTION = ""
+        Activehelp ARSCARD:CARD_TYPE/returntext,
+                   ARSCARD:DESCRIPTION ;
+902     ARSCARD:DESCRIPTION;
+1001    ARSCREDIT:ACCOUNT_NUMBER
+        L_ACCOUNT_LEN = Len(Trun(ARSCREDIT:ACCOUNT_NUMBER))
+        L_MIN_LENGTH = ARSCARD:MINIMUM_ACCOUNT_LENGTH
+        Error 5006 If L_ACCOUNT_LEN < L_MIN_LENGTH;
+1002    ARSCREDIT:EXPIRATION_DATE;
+1101    Begin
+        If FUNCTION = "ADD" Or
+           FUNCTION = "APPEND" Then
+           Begin
+               Do GET_AMOUNT_DUE
+               ARSCREDIT:TRANSACTION_AMOUNT = L_TOTAL_DUE
+           End
+        End
+        ARSCREDIT:TRANSACTION_AMOUNT/default;
+1102    ARSCREDIT:TRANSACTION_STATUS;
+1201    ARSCREDIT:APPROVAL_CODE;
+1202    ARSCREDIT:AUTH_AMOUNT;
+1401    Begin
+        If FUNCTION = "ADD" Or
+           FUNCTION = "APPEND" Then
+               Do UPDATE_CSEXEC
+               ARSCREDIT:CHECK_REFERENCE = I_CSEXEC_NUMBER
+        End
+        ARSCREDIT:CHECK_REFERENCE/default/displayonly
+        If FUNCTION = "ADD" Then
+        Begin
+            Do UPDATE_ARSCHKSU
+        End ;
+
+}
+
+/* Postupdate
+
+   If Abort = "NO" And
+      UPDATEOK = "YES" Then
+         Do UPDATE_ARSCHKSU
+*/
+
+Screen Exit
+        If ARSCREDIT:CHECK_REFERENCE > 0
+        Then G_CHECK_REFERENCE = ARSCREDIT:CHECK_REFERENCE ;
+
+Procedure Definition
+
+Procedure UPDATE_CSEXEC
+Begin
+       I_CSEXEC_APPLICATION="CHECK_REFERENCE"/spacefill
+       Include "sfscsexec.pro"
+End
+
+Procedure UPDATE_ARSCHKSU
+Begin
+
+     Access ARSCHKSU, Set ARSCHKSU:COMPANY_ID      = ARSCREDIT:COMPANY_ID,
+                          ARSCHKSU:CHECK_REFERENCE = ARSCREDIT:CHECK_REFERENCE, Exact
+
+     If ARSCHKSU:COMPANY_ID      <> ARSCREDIT:COMPANY_ID And
+        ARSCHKSU:CHECK_REFERENCE <> ARSCREDIT:CHECK_REFERENCE Then
+     Begin
+     Add ARSCHKSU Begin
+         ARSCHKSU:COMPANY_ID                = ARSCREDIT:COMPANY_ID
+         ARSCHKSU:CHECK_REFERENCE           = ARSCREDIT:CHECK_REFERENCE
+         Write ("%c%s%n",10050,"Reference ",ARSCHKSU:CHECK_REFERENCE)
+         Read (10,80,"",L_TOTAL_DUE ,1)
+         ARSCHKSU:POLICY_NO                 = ARSCREDIT:POLICY_NO
+         ARSCHKSU:AGENT_NO                  = SFPNAME:AGENT_NO
+         ARSCHKSU:BANK_NO                   = "* Credit Card *"
+         ARSCHKSU:COMPANY_ID                = ARSCREDIT:COMPANY_ID
+         ARSCHKSU:TRANS_DATE                = TODAYSDATE
+         ARSCHKSU:POSTED_DATE               = 00.00.0000
+         ARSCHKSU:CHECK_NO                  = "* Credit Card *"
+         ARSCHKSU:CHECK_DATE                = 00.00.0000
+         ARSCHKSU:CHECK_AMOUNT              = ARSCREDIT:TRANSACTION_AMOUNT
+         ARSCHKSU:COMMENTS                  = "Processed via Credit Card"
+         ARSCHKSU:PAYOR_TYPE                = "C"
+         ARSCHKSU:PAYOR_NAME                = SFPNAME:NAME[1]
+         ARSCHKSU:PAYOR_CARE_OF             = SFPNAME:NAME[2]
+         ARSCHKSU:PAYOR_ADDRESS             = SFPNAME:ADDRESS[1]
+         ARSCHKSU:PAYOR_CITY                = SFPNAME:CITY
+         ARSCHKSU:PAYOR_ZIPCODE             = SFPNAME:ZIPCODE
+         ARSCHKSU:DEPOSIT_DATE              = TODAYSDATE
+         ARSCHKSU:DISPOSITION               = "OPEN"
+         ARSCHKSU:MONEY_ORDER               = "N"
+         ARSCHKSU:BALANCE                   = ARSCREDIT:TRANSACTION_AMOUNT
+         ARSCHKSU:USER                      = USERNAME
+         ARSCHKSU:USER_CONSOLE              = CONSOLE
+         ARSCHKSU:ENTER_TIME                = SYSTEMTIME
+         ARSCHKSU:ENTER_DATE                = TODAYSDATE
+         ARSCHKSU:EXPANSION                 = ""/spacefill
+     End
+
+     End
+
+End
+
+Procedure GET_AMOUNT_DUE
+Begin
+
+    L_TOTAL_DUE = 0
+
+    Access ARSBILLING, Set ARSBILLING:COMPANY_ID= ARSCREDIT:COMPANY_ID,
+                           ARSBILLING:POLICY_NO = ARSCREDIT:POLICY_NO, Generic
+
+    While ARSBILLING:POLICY_NO = ARSCREDIT:POLICY_NO
+    Begin
+    If ARSBILLING:STATUS = "B" Then
+    Begin
+--    Write ("%c%s%n", 19001,"ARSBILLING:INSTALLMENT_AMOUNT ", ARSBILLING:INSTALLMENT_AMOUNT)
+--    Read (23,1,"",L_ENTER,1)
+        L_TOTAL_DUE = L_TOTAL_DUE + ARSBILLING:INSTALLMENT_AMOUNT
+    End
+
+    Next ARSBILLING
+
+    End
+End
+
+End

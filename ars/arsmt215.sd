@@ -1,0 +1,140 @@
+%%
+Screen
+        Name = "Arsmt215" ;
+        Type = "Detail";
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize = "dynamic";
+        Windowtitle = "%a    %s  Maintain Agents Monthly Commission Balances - Version 7.00 -    %m";
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_AGENT_NO[4] ;
+        Global Unsigned Ascii Number G_PAID_YEAR[4] ;
+
+        Signed Ascii Number L_TOTAL_PREMIUM[9]=0/decimals=2,
+                            L_TOTAL_COMMISSION[9]=0/decimals=2;
+        Unsigned Ascii Number L_SUB[2]=0;
+
+        string l_continue_1[50]="";
+
+        Access ARSAGTCOM,
+           Set ARSAGTCOM:COMPANY_ID = G_COMPANY_ID ,
+               ARSAGTCOM:AGENT_NO = G_AGENT_NO ,
+               ARSAGTCOM:PAID_YEAR = G_PAID_YEAR ;
+
+        Include "STDKEYS.INC"
+
+Style Definition
+    include "styles.inc"
+
+Functions
+
+        Include "STDFUNC7.INC"
+
+Menu Definition
+    include "stdmenu7.inc"
+}
+
+ToolBar Definition
+    include "stdtoolbar7.inc"
+}
+
+Screen
+Properties
+    {
+    LayOutType      = Column
+    }
+{
+
+Panel Tagged Header_pl
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = AsNeeded
+    }
+{
+%%
+                                                                  ____________
+*------------------------------------------------------------------------------*
+| Company Id: __________ __________________________________________________    |
+| Agent No.         ____ __________________________________________________    |
+*------------------------------------------------------------------------------*
+| Paid                                                                         |
+| Year                Premium       Commission     Experience                  |
+| ____                                                                         |
+|      January     _____________    ___________    ___________                 |
+|      February    _____________    ___________    ___________                 |
+|      March       _____________    ___________    ___________                 |
+|      April       _____________    ___________    ___________                 |
+|      May         _____________    ___________    ___________                 |
+|      June        _____________    ___________    ___________                 |
+|      July        _____________    ___________    ___________                 |
+|      August      _____________    ___________    ___________                 |
+|      September   _____________    ___________    ___________                 |
+|      October     _____________    ___________    ___________                 |
+|      November    _____________    ___________    ___________                 |
+|      December    _____________    ___________    ___________                 |
+|                                                                              |
+|        TOTAL     _____________    ___________    ___________                 |
+*------------------------------------------------------------------------------*
+%%
+
+Components
+
+Fields
+0101    FUNCTION/noecho/showasguidetext ;
+0301    ARSAGTCOM:COMPANY_ID                     Mandatory
+        Include "companyhlp.inc"
+0302    SFSCOMPANY:NAME[1];
+0402    SFSAGENT:NAME[1];
+0401    ARSAGTCOM:AGENT_NO ;
+0801    ARSAGTCOM:PAID_YEAR                      Mandatory;
+0901    ARSAGTCOM:PREMIUM[1];
+0902    ARSAGTCOM:COMMISSION[1];
+0903    ARSAGTCOM:EXPERIENCE_COMMISSION[1];
+1001    ARSAGTCOM:PREMIUM[2];
+1002    ARSAGTCOM:COMMISSION[2];
+1003    ARSAGTCOM:EXPERIENCE_COMMISSION[2];
+1101    ARSAGTCOM:PREMIUM[3];
+1102    ARSAGTCOM:COMMISSION[3];
+1103    ARSAGTCOM:EXPERIENCE_COMMISSION[3];
+1201    ARSAGTCOM:PREMIUM[4];
+1202    ARSAGTCOM:COMMISSION[4];
+1203    ARSAGTCOM:EXPERIENCE_COMMISSION[4];
+1301    ARSAGTCOM:PREMIUM[5];
+1302    ARSAGTCOM:COMMISSION[5];
+1303    ARSAGTCOM:EXPERIENCE_COMMISSION[5];
+1401    ARSAGTCOM:PREMIUM[6];
+1402    ARSAGTCOM:COMMISSION[6];
+1403    ARSAGTCOM:EXPERIENCE_COMMISSION[6];
+1501    ARSAGTCOM:PREMIUM[7];
+1502    ARSAGTCOM:COMMISSION[7];
+1503    ARSAGTCOM:EXPERIENCE_COMMISSION[7];
+1601    ARSAGTCOM:PREMIUM[8];
+1602    ARSAGTCOM:COMMISSION[8];
+1603    ARSAGTCOM:EXPERIENCE_COMMISSION[8];
+1701    ARSAGTCOM:PREMIUM[9];
+1702    ARSAGTCOM:COMMISSION[9];
+1703    ARSAGTCOM:EXPERIENCE_COMMISSION[9];
+1801    ARSAGTCOM:PREMIUM[10];
+1802    ARSAGTCOM:COMMISSION[10];
+1803    ARSAGTCOM:EXPERIENCE_COMMISSION[10];
+1901    ARSAGTCOM:PREMIUM[11];
+1902    ARSAGTCOM:COMMISSION[11];
+1903    ARSAGTCOM:EXPERIENCE_COMMISSION[11];
+2001    ARSAGTCOM:PREMIUM[12];
+2002    ARSAGTCOM:COMMISSION[12];
+2003    ARSAGTCOM:EXPERIENCE_COMMISSION[12];
+2201    ARSAGTCOM:PREMIUM[13];
+2202    ARSAGTCOM:COMMISSION[13];
+2203    ARSAGTCOM:EXPERIENCE_COMMISSION[13];
+
+}
+}
+
+Screen Exit
+        If ARSAGTCOM:COMPANY_ID > "" Then G_COMPANY_ID = ARSAGTCOM:COMPANY_ID ;
+        If ARSAGTCOM:AGENT_NO > 0 Then G_AGENT_NO = ARSAGTCOM:AGENT_NO ;
+        If ARSAGTCOM:PAID_YEAR > 0 Then G_PAID_YEAR = ARSAGTCOM:PAID_YEAR ;
+
+End

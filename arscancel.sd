@@ -1,0 +1,100 @@
+Cyberscreen System                                     Function [____________]
+Screen 1. ARSCANCEL Update Screen
+ 1. Company Id:            __________
+ 2. Policy Number:           _________
+ 3. Sub Code:                     ____
+ 4. Check Reference:           _______
+ 5. Transaction Code:             ____
+ 6. Transaction Date:      __________   20. Reason Code:           ____
+ 7. Transaction Effective: __________   21. Expiration Date:      __________
+ 8. Trans Eff Mm:                   __  22. Item Number:          _____
+ 9. Trans Eff Dd:                   __  23. Billing Ctr:           ____
+10. Trans Eff Yyyy:               ____  24. Policy Year:          ____
+11. Line Of Business:             ____  25. Endorsement Sequence:  ____
+12. Payment Plan:                 ____  26. Automatic Cx Remove:      _
+13. Due Date:              __________   27. Created Time:         ________
+14. Cx Eff Date:           __________
+15. Cx Status:             _
+16. Agent Number:                 ____
+17. Cx Date:               __________
+18. Amount Past Due:       ___________
+19. Check Reference Char:  _______
+%%
+Screen
+        Name = "Arscancel" ;
+        Type = "Detail" ;
+        padcharacter = space ;
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+        Global Unsigned Ascii Number G_SUB_CODE[4] ;
+
+        Access ARSCANCEL,
+           Set ARSCANCEL:COMPANY_ID = G_COMPANY_ID ,
+               ARSCANCEL:POLICY_NO = G_POLICY_NO ,
+               ARSCANCEL:SUB_CODE = G_SUB_CODE ;
+
+
+        Include "STDKEYS.INC"
+
+Functions
+        Add;            /* Add a record */
+        Change;         /* Change an existing record */
+        Delete;         /* Delete an existing record */
+
+        Find ;          /* Select a record using an exact key */
+        Search;         /* Select a record using an approximate key */
+        Next;           /* Display the next record(s) in key sequence */
+        Previous;       /* Display the previous record(s) in key sequence */
+        View;           /* View the contents of freetext fields */
+
+        Page/noreturn;  /* Display a different page - no going back */
+
+"Back"  Return;         /* Back to previous screen */
+"Exit"  Return;
+        Return;
+
+"Bye"   Stop;           /* Terminate this session */
+        Stop;
+
+        Print;          /* Print the screen on the default printer */
+"Cq"    Proc "CQ";      /* Enter Cyberquery */
+"Cli"   Proc ":CLI";    /* Push to the CLI */
+
+Fields
+        FUNCTION ;
+301     ARSCANCEL:COMPANY_ID                    Mandatory;
+401     ARSCANCEL:POLICY_NO                     Mandatory;
+501     ARSCANCEL:SUB_CODE                      Mandatory;
+601     ARSCANCEL:CHECK_REFERENCE               Mandatory;
+701     ARSCANCEL:TRANS_CODE;
+801     ARSCANCEL:TRANS_DATE;
+901     ARSCANCEL:TRANS_EFF;
+1001    ARSCANCEL:TRANS_EFF_MM;
+1101    ARSCANCEL:TRANS_EFF_DD;
+1201    ARSCANCEL:TRANS_EFF_YYYY;
+1301    ARSCANCEL:LINE_OF_BUSINESS;
+1401    ARSCANCEL:PAYMENT_PLAN;
+1501    ARSCANCEL:DUE_DATE;
+1601    ARSCANCEL:CX_EFF_DATE;
+1701    ARSCANCEL:CX_STATUS;
+1801    ARSCANCEL:AGENT_NO;
+1901    ARSCANCEL:CX_DATE;
+2001    ARSCANCEL:AMOUNT_PAST_DUE;
+2101    ARSCANCEL:CHECK_REFERENCE_CHAR;
+802     ARSCANCEL:REASON_CODE;
+902     ARSCANCEL:EXP_DATE;
+1002    ARSCANCEL:ITEM_NUMBER;
+1102    ARSCANCEL:BILLING_CTR;
+1202    ARSCANCEL:POL_YEAR;
+1302    ARSCANCEL:END_SEQUENCE;
+1402    ARSCANCEL:AUTOMATIC_CX_REMOVE;
+1502    ARSCANCEL:CREATED_TIME;
+
+Screen Exit
+        If ARSCANCEL:COMPANY_ID > "" Then G_COMPANY_ID = ARSCANCEL:COMPANY_ID ;
+        If ARSCANCEL:POLICY_NO > 0 Then G_POLICY_NO = ARSCANCEL:POLICY_NO ;
+        If ARSCANCEL:SUB_CODE > 0 Then G_SUB_CODE = ARSCANCEL:SUB_CODE ;
+
+
+End

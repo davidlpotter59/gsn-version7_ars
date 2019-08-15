@@ -1,0 +1,106 @@
+CSCOMP                  Version  SCO5/386 7.20              14-Oct-04
+Licensed Software   - Property of Cyberscience Corporation
+Copyright 1981-2004 - All Rights Reserved
+Licensed User:SCIPS.com, Inc., 7696 Easton Road, Ottsville, PA, 18942
+
+  17:49:35 Compiling arsup010.sd - please wait
+
+ 386: Access ARSCHKWRK, Set ARSCHKWRK:COMPANY_ID       = ARSBILLING:COMPANY_ID,
+                      ^________________________________________________________
+ 387:                       ARSCHKWRK:POLICY_NO        = ARSBILLING:POLICY_NO,
+      ________________________________________________________________________
+ 388:                       ARSCHKWRK:TRANS_CODE       = L_TRANS_CODE,
+      ________________________________________________________________
+ 389:                       ARSCHKWRK:RDUE_DATE        = ARSBILLING:DUE_DATE,
+      _______________________________________________________________________
+ 390:                       ARSCHKWRK:RTRANS_DATE      = ARSBILLING:TRANS_DATE,
+      _________________________________________________________________________
+ 391:                       ARSCHKWRK:RTRANS_EFF       = ARSBILLING:TRANS_EFF,
+      ________________________________________________________________________
+ 392:                       ARSCHKWRK:RTRANS_EXP       = ARSBILLING:TRANS_EXP,
+      ________________________________________________________________________
+ 393:                       ARSCHKWRK:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS,
+      _______________________________________________________________________________
+ 394:                       ARSCHKWRK:COMM_RATE        = ARSBILLING:COMM_RATE,
+      ________________________________________________________________________
+ 395:                       ARSCHKWRK:SUB_CODE         = ARSBILLING:SUB_CODE,
+      _______________________________________________________________________
+ 396:                       ARSCHKWRK:BILLING_CTR      = ARSBILLING:BILLING_CTR,
+      __________________________________________________________________________
+ 397:                       ARSCHKWRK:RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR,
+      _______________________________________________________________________________
+ 398:                       ARSCHKWRK:CHECK_REFERENCE  = L_CHECK_REFERENCE,Approximate
+      _______________________________________________________________________________^
+*** Error: invalid SET list
+
+ 447: Access ARSCHKWRK_ALT, Set ARSCHKWRK_ALT:COMPANY_ID = ARSCHKSU:COMPANY_ID,
+                          ^____________________________________________________
+ 448:                       ARSCHKWRK_ALT:POLICY_NO  = ARSCHKSU:POLICY_NO, Approximate
+      _______________________________________________________________________________^
+*** Error: invalid SET list
+
+ 547:     ARSCHECK:PAYEE_TYPE          = "I"
+          ^_________________^
+*** Error: subscript required for array
+
+ 548:     ARSCHECK:AGENT_NO            = ARSCHKSU:AGENT_NO
+          ^_______________^
+*** Error: subscript required for array
+
+ 640: Access ARSCHKWRK, Set ARSCHKWRK:COMPANY_ID       = ARSBILLING:COMPANY_ID,
+                      ^________________________________________________________
+ 641:                       ARSCHKWRK:POLICY_NO        = ARSBILLING:POLICY_NO,
+      ________________________________________________________________________
+ 642:                       ARSCHKWRK:TRANS_CODE       = L_TRANS_CODE,
+      ________________________________________________________________
+ 643: --                      ARSCHKWRK:RDUE_DATE        = ARSBILLING:DUE_DATE,
+      _________________________________________________________________________
+ 644:                       ARSCHKWRK:RDUE_DATE        = L_DUE_DATE,
+      ______________________________________________________________
+ 645:                       ARSCHKWRK:RTRANS_DATE      = ARSBILLING:TRANS_DATE,
+      _________________________________________________________________________
+ 646:                       ARSCHKWRK:RTRANS_EFF       = ARSBILLING:TRANS_EFF,
+      ________________________________________________________________________
+ 647:                       ARSCHKWRK:RTRANS_EXP       = ARSBILLING:TRANS_EXP,
+      ________________________________________________________________________
+ 648:                       ARSCHKWRK:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS,
+      _______________________________________________________________________________
+ 649:                       ARSCHKWRK:COMM_RATE        = ARSBILLING:COMM_RATE,
+      ________________________________________________________________________
+ 650:                       ARSCHKWRK:SUB_CODE         = ARSBILLING:SUB_CODE, Approximate
+      __________________________________________________________________________________^
+*** Error: invalid SET list
+
+ 669: Access ARSCHKWRK, Set ARSCHKWRK:COMPANY_ID       = ARSBILLING:COMPANY_ID,
+                      ^________________________________________________________
+ 670:                       ARSCHKWRK:POLICY_NO        = ARSBILLING:POLICY_NO,
+      ________________________________________________________________________
+ 671:                       ARSCHKWRK:TRANS_CODE       = L_TRANS_CODE,
+      ________________________________________________________________
+ 672: --                      ARSCHKWRK:RDUE_DATE        = ARSBILLING:DUE_DATE,
+      _________________________________________________________________________
+ 673:                       ARSCHKWRK:RDUE_DATE        = L_DUE_DATE,
+      ______________________________________________________________
+ 674:                       ARSCHKWRK:RTRANS_DATE      = ARSBILLING:TRANS_DATE,
+      _________________________________________________________________________
+ 675:                       ARSCHKWRK:RTRANS_EFF       = ARSBILLING:TRANS_EFF,
+      ________________________________________________________________________
+ 676:                       ARSCHKWRK:RTRANS_EXP       = ARSBILLING:TRANS_EXP,
+      ________________________________________________________________________
+ 677:                       ARSCHKWRK:LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS,
+      _______________________________________________________________________________
+ 678:                       ARSCHKWRK:COMM_RATE        = ARSBILLING:COMM_RATE,
+      ________________________________________________________________________
+ 679:                       ARSCHKWRK:SUB_CODE         = L_SUB_CODE,
+      ______________________________________________________________
+ 680:                       ARSCHKWRK:BILLING_CTR      = ARSBILLING:BILLING_CTR,
+      __________________________________________________________________________
+ 681:                       ARSCHKWRK:RETURN_CHECK_CTR = ARSBILLING:RETURN_CHECK_CTR
+      _____________________________________________________________________________^
+*** Error: invalid SET list
+
+ 715:     Access ARSCHKWRK_ALT, Set ARSCHKWRK_ALT:COMPANY_ID = L_COMPANY_ID, Approximate
+                              ^________________________________________________________^
+*** Error: invalid SET list
+
+  17:49:35 Program ARSUP010 failed to compile - 7 errors

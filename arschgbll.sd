@@ -1,0 +1,327 @@
+                                                       ____________
+*------------------------------------------------------------------------------*
+|  Company Id: __________ __________________________________________________   |
+|  Policy No.:  _________ __________________________________________________   |
+*--------------------------------------------------------*---------------------*---------------------------*
+|    Trans    Billed       Due        Trans    Trans  B  | S   Amount      Amount      Write     Amount    |
+|    Date      Date       Date         Eff      Code  P  | T   Billed       Paid      Off Amt    Disbursed |
+| __________ __________ __________  __________  ____ __  | _ ___________ ___________ _________ ___________ |
+|                                                        |                                                 |
+|                                                        |                                                 |
+|                                                        |                                                 |
+|                                                        |                                                 |
+|                                                        |                                                 |
+|                                                        |                                                 |
+|                                                        |                                                 |
+|                                                        |                                                 |
+|                                                        |                                                 |
+|                                                        |                                                 |
+|                                                        |                                                 |
+|                                                        |                                                 |
+*--------------------------------------------------------*-------------------------------------------------*
+%%
+Screen
+        Name = "Arschgbll" ;
+        Type = "Multiline" ;
+        Repeat 0801 To 811, 13 Times Down;
+        Padcharacter = Space ;
+        Highlite = Underscore;
+        Windowtitle="%s     %a Change Billing Buckets (Management ONLY!) - Version 7.00    %m";
+        iconline=0;
+
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+        String L_ENTER[1],
+               l_prior_field_change[1]="N";
+--        String L_OUTFILE[100] ;
+        String L_STATUS[1];
+        Signed Ascii Number L_INSTALLMENT_AMOUNT[9]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_AMOUNT_PAID[9]=0/decimals=2;
+        Signed Ascii Number L_WRITE_OFF_AMOUNT[9]=0/decimals=2;
+        Signed Ascii Number L_DISBURSEMENT_AMOUNT[9]=0/decimals=2;
+        Unsigned Ascii Number L_TRANS_CODE[4]=0/decimals=0;
+        Wdate L_TRANS_DATE,
+              L_BILLED_DATE,
+              L_DUE_DATE,
+              L_TRANS_EFF;
+
+        Include "STDKEYS.INC"
+        !F9="R"/icon="WORK" ;
+        !F8="Append"/function ;
+
+Functions
+        Add/security=80;            /* Add a record */
+        Change/security=80;         /* Change an existing record */
+        Delete/security=98;         /* Delete an existing record */
+        Append/security=80 ;
+
+        Find ;          /* Select a record using an exact key */
+        Search;         /* Select a record using an approximate key */
+        Next;           /* Display the next record(s) in key sequence */
+        Previous;       /* display the previous record(s) in key sequence */
+        View;           /* View the contents of freetext fields */
+
+        Page/noreturn;  /* Display a different page - no going back */
+
+"Back"  Return;         /* Back to previous screen */
+"Exit"  Return;
+        Return;
+
+"Bye"   Return;           /* Terminate this session */
+        Stop;
+
+--        Print;          /* Print the screen on the default printer */
+--"Cq"    Proc ":CLI CQ"; /* Enter Cyberquery */
+--"Cli"   Proc ":CLI";    /* Push to the CLI */
+
+--        Enter;          /* Append a single multiline record */
+--        Append;         /* Append multiline records */
+
+"R" Continue Begin
+--          Closefile (L_OUTFILE)
+--          Proc ("rm %s ",L_OUTFILE)/noconsole
+
+          /* since the file is new scips needs to insert the header for this session */
+        End ;
+
+Screen Entry
+
+Fields
+0101    FUNCTION/noecho/showasguidetext ;
+0301    Begin
+        If FUNCTION = "CHANGE" Then
+        Begin
+            L_STATUS              = ""
+            L_INSTALLMENT_AMOUNT  = 0.00
+            L_TOTAL_AMOUNT_PAID   = 0.00
+            L_WRITE_OFF_AMOUNT    = 0.00
+            L_DISBURSEMENT_AMOUNT = 0.00
+            L_TRANS_DATE          = 00.00.0000
+            L_BILLED_DATE         = 00.00.0000
+            L_DUE_DATE            = 00.00.0000
+            L_TRANS_EFF           = 00.00.0000
+            L_TRANS_CODE          = 00
+        End
+        End
+        ARSBILLING:COMPANY_ID/displayonly/trail                    Mandatory
+        Access SFSCOMPANY, Set SFSCOMPANY:COMPANY_ID = ARSBILLING:COMPANY_ID
+        Activehelp SFSCOMPANY:COMPANY_ID,
+                   SFSCOMPANY:NAME[1];
+0302    SFSCOMPANY:NAME[1]/displayonly ;
+0401    ARSBILLING:POLICY_NO/displayonly ;
+0402    SFPNAME:NAME[1];
+0801    Begin
+            L_TRANS_DATE = ARSBILLING:TRANS_DATE
+        End
+        ARSBILLING:TRANS_DATE/trail                    Mandatory
+        If FIELDCHANGED = "YES" Then
+        {
+         l_prior_field_change = "Y"
+--  A = trans date field
+        arsbilling:user = "A"
+        arsbilling:user_console = username + "CBR"  -- correct billing records
+        };
+802     Begin
+            L_BILLED_DATE = ARSBILLING:BILLED_DATE
+        End
+        ARSBILLING:BILLED_DATE/trail
+        If FIELDCHANGED = "YES" Then
+        {
+         if l_prior_field_change = "N" then
+          {
+           arsbilling:user = "               "
+          }
+        l_prior_field_change = "Y"
+-- B = billed date field
+        arsbilling:user = trun(arsbilling:user) + "B"
+        arsbilling:user_console = username + "CBR"  -- correct billing records
+        };
+803     Begin
+             L_DUE_DATE = ARSBILLING:DUE_DATE
+        End
+        ARSBILLING:DUE_DATE/trail
+        If FIELDCHANGED = "YES" Then
+        {
+         if l_prior_field_change = "N" then
+          {
+           arsbilling:user = "               "
+          }
+        l_prior_field_change = "Y"
+-- C = due date field
+        arsbilling:user = trun(arsbilling:user) + "C"
+        arsbilling:user_console = username + "CBR"  -- correct billing records
+        };
+804     Begin
+            L_TRANS_EFF = ARSBILLING:TRANS_EFF
+        End
+        ARSBILLING:TRANS_EFF/trail                     Mandatory
+        If FIELDCHANGED = "YES" Then
+        {
+         if l_prior_field_change = "N" then
+          {
+           arsbilling:user = "               "
+          }
+        l_prior_field_change = "Y"
+-- D = trans eff field
+        arsbilling:user = trun(arsbilling:user) + "D"
+        arsbilling:user_console = username + "CBR"  -- correct billing records
+        };
+805     Begin
+            L_TRANS_CODE = ARSBILLING:TRANS_CODE
+        End
+        ARSBILLING:TRANS_CODE/trail                    Mandatory
+        If FIELDCHANGED = "YES" Then
+        {
+         if l_prior_field_change = "N" then
+          {
+           arsbilling:user = "              "
+          }
+        l_prior_field_change = "Y"
+-- E = trans code field
+        arsbilling:user = trun(arsbilling:user) + "E"
+        arsbilling:user_console = username + "CBR"  -- correct billing records
+        };
+0806    arsbilling:bill_plan/trail
+        If FIELDCHANGED = "YES" Then
+        {
+         if l_prior_field_change = "N" then
+          {
+           arsbilling:user = "               "
+          }
+        l_prior_field_change = "Y"
+-- F = status field
+        arsbilling:user = trun(arsbilling:user) + "F"
+        arsbilling:user_console = username + "CBR"  -- correct billing records
+        } ;
+807     Begin
+            L_STATUS = ARSBILLING:STATUS
+        End
+        ARSBILLING:STATUS/upper/trail
+        If FIELDCHANGED = "YES" Then
+        {
+         if l_prior_field_change = "N" then
+          {
+           arsbilling:user = "               "
+          }
+        l_prior_field_change = "Y"
+-- G = status field
+        arsbilling:user = trun(arsbilling:user) + "G"
+        arsbilling:user_console = username + "CBR"  -- correct billing records
+        } ;
+808     Begin
+             L_INSTALLMENT_AMOUNT = ARSBILLING:INSTALLMENT_AMOUNT
+        End
+        ARSBILLING:INSTALLMENT_AMOUNT/trail
+        If FIELDCHANGED = "YES" Then
+        {
+         if l_prior_field_change = "N" then
+          {
+           arsbilling:user = "               "
+          }
+        l_prior_field_change = "Y"
+-- H = installment amount field
+        arsbilling:user = trun(arsbilling:user) + "H"
+        arsbilling:user_console = username + "CBR"  -- correct billing records
+        } ;
+809     Begin
+            L_TOTAL_AMOUNT_PAID = ARSBILLING:TOTAL_AMOUNT_PAID
+        End
+        ARSBILLING:TOTAL_AMOUNT_PAID/trail
+        If FIELDCHANGED = "YES" Then
+        {
+         if l_prior_field_change = "N" then
+         {
+          arsbilling:user = "               "
+        }
+        l_prior_field_change = "Y"
+-- I = total amount paid field
+        arsbilling:user = trun(arsbilling:user) + "I"
+        arsbilling:user_console = username + "CBR"  -- correct billing records
+        } ;
+810     Begin
+            L_WRITE_OFF_AMOUNT = ARSBILLING:WRITE_OFF_AMOUNT
+        End
+        ARSBILLING:WRITE_OFF_AMOUNT/trail
+        If FIELDCHANGED = "YES" Then
+        {
+         if l_prior_field_change = "N" then
+          {
+           arsbilling:user = "               "
+          }
+
+        arsbilling:write_off_date = todaysdate
+        arsbilling:write_off = 1
+        l_prior_field_change = "Y"
+-- J = write off amount field
+        arsbilling:user = trun(arsbilling:user) + "J"
+        arsbilling:user_console = username + "CBR"  -- correct billing records
+        } ;
+811     Begin
+            L_DISBURSEMENT_AMOUNT = ARSBILLING:DISBURSEMENT_AMOUNT
+        End
+        ARSBILLING:DISBURSEMENT_AMOUNT/trail
+        If FIELDCHANGED = "YES" Then
+        {
+         if l_prior_field_change = "N" then
+          {
+           arsbilling:user = "               "
+          }
+        l_prior_field_change = "Y"
+-- K = disbursement field
+        arsbilling:user = trun(arsbilling:user) + "K"
+        arsbilling:user_console = username + "CBR"  -- correct billing records
+        };
+
+
+
+/* preupdate
+
+  add record to audit file
+if updateok = "YES" and
+abort = "NO" then
+begin
+
+add arsbillaudit
+begin
+    arsbillaudit:record              = arsbilling:record/raw
+   arsbillaudit:status              = l_status
+    arsbillaudit:installment_amount  = l_installment_amount
+    arsbillaudit:total_amount_paid   = l_total_amount_paid
+    arsbillaudit:write_off_amount    = l_write_off_amount
+    arsbillaudit:disbursement_amount = l_disbursement_amount
+--    arsbillaudit:trans_date          = l_trans_date
+--    arsbillaudit:billed_date         = l_billed_date
+--    arsbillaudit:due_date            = l_due_date
+--    arsbillaudit:trans_eff           = l_trans_eff
+--    arsbillaudit:trans_code          = l_trans_code
+    arsbillaudit:record_type = "P"
+    arsbillaudit:date_changed = todaysdate
+    arsbillaudit:time_changed = systemtime
+end
+end
+
+ postupdate
+if updateok = "YES" and
+abort ="NO" then
+begin
+
+add arsbillaudit
+begin
+   arsbillaudit:record      = arsbilling:record/raw
+   arsbillaudit:record_type = "C"
+   arsbillaudit:date_changed = todaysdate
+   arsbillaudit:user        = username
+   arsbillaudit:time_changed = systemtime
+end
+end
+*/
+
+Screen Exit
+        If ARSBILLING:COMPANY_ID > ""
+        Then G_COMPANY_ID = ARSBILLING:COMPANY_ID ;
+        If ARSBILLING:POLICY_NO > 0 Then G_POLICY_NO = ARSBILLING:POLICY_NO ;
+
+        /* only mail if on the UNIX world, windows does not work here */
+
+End

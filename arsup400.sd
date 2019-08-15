@@ -1,0 +1,404 @@
+%%        
+Program
+   Name = "arsup400" ;
+   Domain="arspayment";
+   Type = "File" ;
+   Padcharacter = Space ;
+
+/*
+
+arsup400.sd
+
+SCIPS.com, Inc.
+
+04/16/2012    CAL  created to make work file for report arspr013 for
+                   balancing CASH statements
+
+*/
+
+
+        Wdate l_STARTING_DATE,
+              l_ENDING_DATE;
+
+        String L_OPTION[1]="",
+               l_commissions_applied[1]="N";
+        String L_ENTER[1];
+        Unsigned Ascii Number L_SUB[2],
+                              l_hold_policy_no[9];
+
+        Signed Ascii Number L_COMMISSION[9]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_PREMIUM[9]=0/dec=2;
+        Signed Ascii Number L_TOTAL_COMMISSION[9]=0/decimals=2;
+        Unsigned Ascii Number L_COMM_RATE[4]=0/decimals=0;
+        String L_COMPANY[10]="";
+        Unsigned Ascii Number L_SUB_CODE[4]=0/decimals=0;
+        Signed Ascii Number L_NET_COMMISSIONS[9]=0/decimals=2,
+                            L_no_comm_amount[9]=0/decimals=2;
+
+        wdate l_date ;
+        String L_TRANSACTION[15]="";
+        String L_APPLY_COMMISSION[1]="N";
+
+        String L_MONEY_PROCESSING[1];
+        String L_SFS[3]="SFS";
+
+        String L_COMMISSIONS_ONLY_IF_MONEY[1]="";
+        Wdate L_PRIOR_STARTING_DATE=01.01.1990; -- used for processing special commissions
+        String L_SFS_CODE[3]="",
+               l_continue_1[50]="";
+        Unsigned Ascii Number L_COMMISSIONS_ON_CASH[1]=0;
+        Unsigned Ascii Number L_AGENT_COMM[4]=0/dec=2;
+        Unsigned Ascii Number L_AGENT_NO[4]=0/decimals=0;
+        Wdate L_EFF_DATE;
+        Wdate L_EXP_DATE;
+        Unsigned Ascii Number L_LINE_OF_BUSINESS[4];
+        Unsigned Ascii Number L_TRANS_CODE[4];
+
+Initialisation
+--  Write ("<014>")  --clear screen
+    Access SFSDEFAULT, Set SFSDEFAULT:SFS_CODE = L_SFS_CODE
+      l_STARTING_DATE = date(COMMANDLINE[1,8])
+      l_ENDING_DATE   = Date(COMMANDLINE[9,16])
+    do clear_work_file
+
+Update
+
+  Access SFSDEFAULT,
+     Set SFSDEFAULT:SFS_CODE = L_SFS
+  Access ARSCONTROL,
+     Set ARSCONTROL:COMPANY_ID = SFSDEFAULT:COMPANY_ID
+  If ARSCONTROL:COMMISSIONS_ONLY_IF_MONEY One Of 1 Then
+    {
+      L_COMMISSIONS_ONLY_IF_MONEY = "Y"
+    }
+  Else
+    {
+      L_COMMISSIONS_ONLY_IF_MONEY = "N"
+    }
+
+
+  L_COMMISSIONS_ON_CASH = 1
+
+--  Access ARSPAYMENT_alt,
+  --   Set ARSPAYMENT_alt:COMPANY_ID = arspayment:COMPANY_id,
+    --     arspayment_alt:policy_no  = arspayment:policy_no, generic
+
+
+  access arscontrol2,
+     set arscontrol2:company_id = arspayment:company_id, approximate
+
+   Access SFPMASTER,
+      Set SFPMASTER:POLICY_NO    = SFPCURRENT:POLICY_NO,
+          SFPMASTER:POL_YEAR     = SFPCURRENT:POL_YEAR,
+          SFPMASTER:END_SEQUENCE = SFPCURRENT:END_SEQUENCE
+
+   Access SFSLINE,
+      Set SFSLINE:COMPANY_ID       = SFPNAME:COMPANY_ID,
+          SFSLINE:LINE_OF_BUSINESS = SFPNAME:LINE_OF_BUSINESS,
+          SFSLINE:LOB_SUBLINE      = "00"
+
+
+   L_AGENT_COMM = ARSPAYMENT:COMM_RATE
+   If L_AGENT_COMM = 00 And
+      (ARSPAYMENT:TRANS_CODE < 17 or
+       arspayment:trans_code one of 25,60,62,63,64,65,66) Then
+     {
+       L_AGENT_COMM = SFSLINE:COMM_RATE[1]
+     }
+
+    If ((ARSPAYMENT:PAYMENT_TRANS_DATE => l_STARTING_DATE And
+        ARSPAYMENT:PAYMENT_TRANS_DATE <= l_ENDING_DATE) and
+        ARSPAYMENT:TRANS_CODE Not One Of 18,19,22,23,27,28,29 And -- install chrg or sur charges
+        L_AGENT_COMM <> 0.00 And
+        arspayment:comm_rate <> 0.0) then
+      {
+       access arsmaster,
+           set arsmaster:company_id = arspayment:company_id,
+               arsmaster:policy_no  = arspayment:policy_no,
+               arsmaster:trans_date = arspayment:trans_date,
+               arsmaster:trans_eff  = arspayment:trans_eff,
+               arsmaster:trans_exp  = arspayment:trans_exp,
+               arsmaster:trans_code = arspayment:trans_code,
+               arsmaster:line_of_business = arspayment:line_of_business,
+               arsmaster:comm_rate  = arspayment:comm_rate, exact
+
+       Access SFPNAME,
+           Set SFPNAME:POLICY_NO        = arsmaster:POLICY_NO,
+               SFPNAME:POL_YEAR         = arsmaster:POL_YEAR,
+               SFPNAME:END_SEQUENCE     = arsmaster:END_SEQUENCE, generic
+
+       if sfpname:eff_date => arscontrol2:cash_paid_comm_start_date and
+          sfpname:bill_plan <> "AC" then
+       {
+
+        do check_if_commission_paid
+
+        if l_commissions_applied = "N" then
+        {
+
+         Access ARSCOMCASHWRK,
+          Set ARSCOMCASHWRK:COMPANY_ID       = ARSPAYMENT:COMPANY_ID,
+              ARSCOMCASHWRK:AGENT_NO         = arspayment:AGENT_NO,
+              ARSCOMCASHWRK:POLICY_NO        = arspayment:POLICY_NO,
+              ARSCOMCASHWRK:TRANS_DATE       = arspayment:TRANS_DATE,
+              ARSCOMCASHWRK:TRANS_EFF        = arspayment:TRANS_EFF,
+              ARSCOMCASHWRK:TRANS_EXP        = arspayment:TRANS_EXP,
+              ARSCOMCASHWRK:TRANS_CODE       = arspayment:TRANS_CODE,
+              ARSCOMCASHWRK:LINE_OF_BUSINESS = arspayment:LINE_OF_BUSINESS,
+              ARSCOMCASHWRK:COMM_RATE        = L_AGENT_COMM, Exact
+
+           If ARSCOMCASHWRK:COMPANY_ID       <> arspayment:COMPANY_ID or
+              ARSCOMCASHWRK:POLICY_NO        <> arspayment:POLICY_NO or
+              ARSCOMCASHWRK:AGENT_NO         <> arspayment:AGENT_NO or
+              ARSCOMCASHWRK:POLICY_NO        <> arspayment:POLICY_NO or
+              ARSCOMCASHWRK:TRANS_DATE       <> arspayment:TRANS_DATE or
+              ARSCOMCASHWRK:TRANS_EFF        <> arspayment:TRANS_EFF or
+              ARSCOMCASHWRK:TRANS_CODE       <> arspayment:TRANS_CODE or
+              ARSCOMCASHWRK:LINE_OF_BUSINESS <> arspayment:LINE_OF_BUSINESS or
+              ARSCOMCASHWRK:COMM_RATE        <> L_AGENT_COMM Then
+             {
+               Add ARSCOMCASHWRK
+                 {
+                   ARSCOMCASHWRK:COMPANY_ID         = arspayment:COMPANY_ID
+                   ARSCOMCASHWRK:AGENT_NO           = arspayment:AGENT_NO
+                   ARSCOMCASHWRK:POLICY_NO          = arspayment:POLICY_NO
+                   ARSCOMCASHWRK:TRANS_DATE         = arspayment:TRANS_DATE
+                   ARSCOMCASHWRK:TRANS_EFF          = arspayment:TRANS_EFF
+                   ARSCOMCASHWRK:TRANS_EXP          = arspayment:TRANS_EXP
+                   ARSCOMCASHWRK:TRANS_CODE         = arspayment:TRANS_CODE
+                   ARSCOMCASHWRK:LINE_OF_BUSINESS   = arspayment:LINE_OF_BUSINESS
+                   ARSCOMCASHWRK:COMM_RATE          = arspayment:COMM_RATE
+                   arscomcashwrk:payment_trans_date = arspayment:payment_trans_date
+                   arscomcashwrk:pol_year           = arschksu:pol_year
+                   arscomcashwrk:check_reference    = arspayment:check_reference
+                   ARSCOMCASHWRK:PREMIUM            = arspayment:AMOUNT
+                   ARSCOMCASHWRK:COMMISSION         = arspayment:AMOUNT * (L_AGENT_COMM * 0.01)
+                 }  -- end of add
+             }
+           Else
+             Change ARSCOMCASHWRK
+               {
+                 ARSCOMCASHWRK:PREMIUM      = ARSCOMCASHWRK:PREMIUM + arspayment:AMOUNT
+                 ARSCOMCASHWRK:COMMISSION   = ARSCOMCASHWRK:COMMISSION +
+                     (arspayment:AMOUNT * (L_AGENT_COMM * 0.01))
+                 if arscomCASHwrk:commission < 0.99 then
+                   arscomCASHwrk:commission = 0.00
+               } -- end of change
+        }  -- if l commissions applied
+       } -- if sfpname eff_date
+      }
+
+Screen Exit
+--   If L_COMMISSIONS_ON_CASH One Of 1 Then
+  --  {
+     Do PROCESS_CASH_CANCELLATIONS
+   -- }
+
+
+Errors
+
+Procedure Definition
+
+procedure check_if_commission_paid
+begin
+l_commissions_applied = "N"
+Access ARSMASTER,Set arsmaster:COMPANY_ID = arspayment:COMPANY_ID,
+                     arsmaster:POLICY_NO  = arspayment:POLICY_NO,
+                     arsmaster:TRANS_DATE = arspayment:TRANS_DATE,
+                     arsmaster:TRANS_EFF  = arspayment:TRANS_EFF,
+                     arsmaster:TRANS_EXP  = arspayment:TRANS_EXP,
+                     arsmaster:TRANS_CODE = arspayment:TRANS_CODE,
+                     arsmaster:LINE_OF_BUSINESS = arspayment:LINE_OF_BUSINESS,
+                     arsmaster:COMM_RATE  = arspayment:COMM_RATE, generic
+
+If arsmaster:COMPANY_ID = arspayment:COMPANY_ID And
+   arsmaster:POLICY_NO  = arspayment:POLICY_NO And
+   arsmaster:TRANS_DATE = arspayment:TRANS_DATE And
+   arsmaster:TRANS_EFF  = arspayment:TRANS_EFF And
+   arsmaster:TRANS_EXP  = arspayment:TRANS_EXP And
+   arsmaster:TRANS_CODE = arspayment:TRANS_CODE And
+   arsmaster:LINE_OF_BUSINESS = arspayment:LINE_OF_BUSINESS And
+   arsmaster:COMM_RATE  = arspayment:COMM_RATE Then
+   {
+     if arsmaster:commissions_applied <> 00.00.0000 and
+             arsmaster:commission_run_date <> 00.00.0000 then
+                         l_commissions_applied = "Y"
+   }
+end
+
+Procedure CLEAR_WORK_FILE
+
+Begin
+  Access ARSCOMCASHWRK,
+     Set ARSCOMCASHWRK:COMPANY_ID = arspayment:COMPANY_ID, Approximate
+
+  If ARSCOMCASHWRK:COMPANY_ID = arspayment:COMPANY_ID Then
+    {
+      While ARSCOMCASHWRK:ERRORNUMBER = 0 -- until EOF
+        {
+          Delete ARSCOMCASHWRK
+
+        Next ARSCOMCASHWRK
+        }
+    }
+End
+
+
+Procedure PROCESS_CASH_CANCELLATIONS
+Begin
+  L_COMPANY = ""
+  -- this procedure will zero out the agents commission balance for current month
+
+  Access ARSCHECK,
+     Set ARSCHECK:COMPANY_ID = L_COMPANY, Approximate
+
+  While ARSCHECK:ERRORNUMBER = 0 -- read until eof
+    Begin
+       -- allow this disbursements to be an as of process
+       -- this way all missed disbursements will be picked up
+
+
+-- QUESTION I dont think this should be done for an OVERPAYMENT becuase the overpayment
+-- is not in arspayment
+    if arscheck:eff_date => arscontrol2:cash_paid_comm_start_date then
+     {
+      If (arscheck:check_date => l_starting_date and
+         ARSCHECK:CHECK_DATE <= l_ending_date) and
+         ARSCHECK:CHECK_DATE <> 00.00.0000 And
+--         ARSCHECK:COMMISSIONS_RUN_DATE  = 00.00.0000 And
+         ARSCHECK:RELEASE Not One Of  "V","S" And
+         ARSCHECK:APS_TRANS_CODE Not One Of  "OVER", "VOIDRP" Then
+        Begin
+
+
+          Access SFPCURRENT,
+             Set SFPCURRENT:POLICY_NO  = ARSCHECK:POLICY_NO
+
+          Access SFPNAME,
+             Set SFPNAME:POLICY_NO        = sfpcurrent:POLICY_NO,
+                 SFPNAME:POL_YEAR         = sfpcurrent:POL_YEAR,
+                 SFPNAME:END_SEQUENCE     = sfpcurrent:END_SEQUENCE
+
+--          Access SFPMASTER,
+  --           Set SFPMASTER:POLICY_NO    = SFPCURRENT:POLICY_NO,
+    --             SFPMASTER:POL_YEAR     = SFPCURRENT:POL_YEAR,
+      --           SFPMASTER:END_SEQUENCE = SFPCURRENT:END_SEQUENCE
+
+          access arspayment_alias1, set arspayment_alias1:company_id = arscheck:company_id,
+                                        arspayment_alias1:policy_no  = arscheck:policy_no, approximate
+
+          l_no_comm_amount = 0
+          while arspayment_alias1:company_id = arscheck:company_id and
+                arspayment_alias1:policy_no  = arscheck:policy_no
+              {
+              l_date = dateadd(arscheck:eff_date,0,1)
+              if arspayment_alias1:line_of_business one of 9 and
+                 arspayment_alias1:trans_exp   = l_date and
+                 arspayment_alias1:lob_subline = "10" then
+                 {
+                  L_no_comm_amount   = l_no_comm_amount + arspayment_alias1:amount
+                 }
+              next arspayment_alias1
+              }
+
+            access prsmaster_alt, set prsmaster_alt:company_id = arscheck:company_id,
+                                      prsmaster_alt:policy_no  = arscheck:policy_no, generic
+
+            while prsmaster_alt:company_id = arscheck:company_id and
+                  prsmaster_alt:policy_no  = arscheck:policy_no
+              {
+               if prsmaster_alt:pol_year     = sfpcurrent:pol_year and
+                  prsmaster_alt:end_sequence = sfpcurrent:end_sequence then
+                 {
+                  if prsmaster_alt:trans_code one of 11 then
+                   {
+                    L_AGENT_COMM       = prsMASTER_alt:comm_rate
+                   }
+                 }
+              next prsmaster_alt
+              }
+
+          L_AGENT_NO         = SFPNAME:AGENT_NO
+          L_EFF_DATE         = SFPNAME:EFF_DATE
+          L_EXP_DATE         = SFPNAME:EXP_DATE
+          L_TRANS_CODE       = 30   --- SFPNAME:TRANS_CODE
+          L_LINE_OF_BUSINESS = SFPNAME:LINE_OF_BUSINESS
+--          L_AGENT_COMM       = SFPMASTER:AGENT_COMM
+
+          Access ARSCOMCASHWRK,
+             Set ARSCOMCASHWRK:COMPANY_ID       = ARSCHECK:COMPANY_ID,
+                 ARSCOMCASHWRK:AGENT_NO         = L_AGENT_NO,
+                 ARSCOMCASHWRK:POLICY_NO        = ARSCHECK:POLICY_NO,
+                 ARSCOMCASHWRK:TRANS_DATE       = ARSCHECK:CHECK_DATE,
+                 ARSCOMCASHWRK:TRANS_EFF        = L_EFF_DATE,
+                 ARSCOMCASHWRK:TRANS_EXP        = L_EXP_DATE,
+                 ARSCOMCASHWRK:TRANS_CODE       = L_TRANS_CODE,
+                 ARSCOMCASHWRK:LINE_OF_BUSINESS = L_LINE_OF_BUSINESS,
+                 ARSCOMCASHWRK:COMM_RATE        = L_AGENT_COMM,Exact
+
+          If ARSCOMCASHWRK:COMPANY_ID       <> ARSCHECK:COMPANY_ID Or
+             ARSCOMCASHWRK:AGENT_NO         <> L_AGENT_NO Or
+             ARSCOMCASHWRK:POLICY_NO        <> arscheck:POLICY_NO Or
+             ARSCOMCASHWRK:TRANS_DATE       <> ARSCHECK:CHECK_DATE Or
+             ARSCOMCASHWRK:TRANS_EFF        <> L_EFF_DATE Or
+             ARSCOMCASHWRK:TRANS_EXP        <> L_EXP_DATE Or
+             ARSCOMCASHWRK:TRANS_CODE       <> L_TRANS_CODE Or
+             ARSCOMCASHWRK:LINE_OF_BUSINESS <> L_LINE_OF_BUSINESS Or
+             ARSCOMCASHWRK:COMM_RATE        <> L_AGENT_COMM And
+             L_AGENT_COMM                   <> 00.00 And
+             ARSCHECK:APS_TRANS_CODE Not One Of "OVER", "VOIDRP" Then
+             {
+              Add ARSCOMCASHWRK
+                {
+                  ARSCOMCASHWRK:COMPANY_ID         = ARSCHECK:COMPANY_ID
+                  ARSCOMCASHWRK:AGENT_NO           = L_AGENT_NO
+                  ARSCOMCASHWRK:POLICY_NO          = ARSCHECK:POLICY_NO
+                  ARSCOMCASHWRK:TRANS_DATE         = ARSCHECK:CHECK_DATE
+                  ARSCOMCASHWRK:TRANS_EFF          = L_EFF_DATE
+                  ARSCOMCASHWRK:TRANS_EXP          = L_EXP_DATE
+                  ARSCOMCASHWRK:TRANS_CODE         = L_TRANS_CODE
+                  ARSCOMCASHWRK:LINE_OF_BUSINESS   = L_LINE_OF_BUSINESS
+                  ARSCOMCASHWRK:COMM_RATE          = L_AGENT_COMM
+                  arscomcashwrk:payment_trans_date = arspayment:payment_trans_date
+                  arscomcashwrk:pol_year           = arschksu:pol_year
+                  arscomcashwrk:check_reference    = arspayment:check_reference
+
+                  if L_no_comm_amount = 0 then
+                   {
+                    ARSCOMCASHWRK:PREMIUM            = ARSCHECK:CHECK_AMOUNT * -1
+                    ARSCOMCASHWRK:COMMISSION         = (ARSCHECK:CHECK_AMOUNT * (l_AGENT_COMM * 0.01)) * -1
+                   }
+                  else
+                  if L_no_comm_amount <> 0 then
+                   {
+                    ARSCOMCASHWRK:PREMIUM            = ARSCHECK:CHECK_AMOUNT * -1
+                    ARSCOMCASHWRK:COMMISSION         = ((ARSCHECK:CHECK_AMOUNT - l_no_comm_amount) * (l_AGENT_COMM * 0.01)) * -1
+                   }
+                }-- end of add
+             }  -- end of checking for "" company_id
+             else -- change
+              change arscomCASHwrk
+               {
+
+                if L_no_comm_amount = 0 then
+                 {
+                  ARSCOMCASHWRK:PREMIUM          = arscomCASHwrk:premium + (ARSCHECK:CHECK_AMOUNT * -1)
+                  ARSCOMCASHWRK:COMMISSION       = arscomCASHwrk:commission + ((ARSCHECK:CHECK_AMOUNT * (l_AGENT_COMM * 0.01)) * -1)
+                 }
+                if L_no_comm_amount <> 0 then
+                 {
+                  ARSCOMCASHWRK:PREMIUM          = arscomCASHwrk:premium + ((ARSCHECK:CHECK_AMOUNT - l_no_comm_amount) * -1)
+                  ARSCOMCASHWRK:COMMISSION       = arscomCASHwrk:commission + (((ARSCHECK:CHECK_AMOUNT - l_no_comm_amount) * (l_AGENT_COMM * 0.01)) * -1)
+                 }
+               }
+        End      -- end of date, "DB" and trans code checking
+
+     }
+    Next ARSCHECK
+    End  -- end of while stmt
+End  -- end of procedure
+
+
+
+
+End  -- end of program

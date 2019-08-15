@@ -1,0 +1,528 @@
+%%
+Program
+        Name = "arsup610x"
+        Type = "file" ;
+        Padcharacter = space ;
+        Domain = "sfpcurrent" ;
+/*
+        FOR Salem MOB customer outfile Custacct going file in XML format.
+*/
+
+        local string l_policy_no[12]="",
+                     l_record_creation_date[19],
+                     l_record_creation_date1[19],
+                     l_group_no[5],
+                     l_record_type[2]="",
+                     l_filename[24],
+                     l_filename1[24],
+                     l_filename_script[30],
+                     l_company_id[10] = "FARMERS",
+                     l_first_name[20],
+                     l_last_name[30],
+                     l_enter[1],
+                     l_status[1],
+                     l_address1[25],
+                     l_city[15],
+                     l_state[15],
+                     l_zipcode[9],
+                     l_mortgage[1] = "N",
+                     l_time[8],
+                     l_day1[2],
+                     l_month1[2] ;
+
+        local wdate l_starting_date ;
+
+        local unsigned ascii number l_policy_no_1[9],
+                                    l_pol_length[2]=0,
+                                    l_pol_year[4],
+                                    l_end_sequence[4],
+                                    l_pol_count[2]=0,
+                                    l_rec_date[14],
+                                    l_prem_no[4]=0,
+                                    l_build_no[4] = 0,
+                                    l_sub_code[4]=0,
+                                    l_pos[2],
+                                    l_pos1[2],
+                                    l_pos2[2],
+                                    l_pos3[2],
+                                    i_length_1[2],
+                                    i_length_2[2],
+                                    i_length_3[2],
+                                    i_total_length[3],
+                                    i_total_length_150[3],
+                                    i_found_deliminator,
+                                    l_total_days[3] ,
+                                    l_sub[3],
+                                    l_year[4],
+                                    l_month[2],
+                                    l_day[2]=00,
+                                    l_second[2]=00,
+                                    l_old_id_number[6] ;
+
+        String I_NAME[90]="",
+               I_FIRST_NAME[90]="",
+               I_LAST_NAME[90]="",
+               I_REV_NAME[90]="",
+               i_rev_name_1[90]="",
+               i_rev_name_2[90]="",
+               i_rev_name_3[90]="",
+               i_rev_name_first_90[90]="",
+               i_rev_name_second_90[90]="" ,
+               i_rev_name_third_90[90]="",
+               i_rev_name_150[150]="",
+               l_new_id[1]="N" ;
+
+
+initialisation
+l_filename_script = "cust_conversion.sh"     --this will move the lowercase filename to the mixed case that is needed in the filename.
+l_filename = "CUSTAcctData" + str(todaysdate,"YYYYMMDD") + ".xml"
+--l_filename = "custacctdata" + str(todaysdate,"YYYYMMDD") + ".xml"
+-- for debugging
+--l_filename = "custacctdata20120618" + ".xml"
+deletefile(l_filename)
+writefile(l_filename,"%s%s",'<?xml version="1.0" encoding="utf-8"?>',"<NL>")
+-- mob id = 10868
+writefile(l_filename,"%s%s",'<Accounts mobId="10868" xmlns="http://myonlinebill.com/core/xml/account">',"<NL>")
+
+update
+
+access sfpname, set sfpname:policy_no    = sfpcurrent:policy_no,
+                    sfpname:pol_year     = sfpcurrent:pol_year,
+                    sfpname:end_sequence = sfpcurrent:end_sequence, exact
+
+
+if sfpname:status = "CURRENT" then
+{
+  l_old_id_number = 0
+  l_new_id        = "N"
+
+  if sfpname:trans_code = 14 and
+     sfpname:end_sequence = 0 then
+    {
+      if sfpname:previous_policy_no = sfpname:policy_no then
+       {
+        l_pol_year     = sfpname:pol_year - 1
+        l_end_sequence = 0
+
+        access sfpname_alt, set sfpname_alt:policy_no    = sfpname:policy_no,
+                                sfpname_alt:pol_year     = l_pol_year,
+                                sfpname_alt:end_sequence = l_end_sequence, exact
+
+        access sfsagent, set sfsagent:Company_id = sfpname:company_id,
+                             sfsagent:agent_no   = sfpname:agent_no, exact
+
+
+        access sfsagent_alt, set sfsagent_alt:Company_id = sfpname_alt:company_id,
+                                 sfsagent_alt:agent_no   = sfpname_alt:agent_no, exact
+
+
+        if sfsagent:mob_agent_no <> sfsagent_alt:mob_agent_no then
+         {
+          l_new_id        = "Y"
+          l_old_id_number = sfsagent_alt:mob_agent_no
+         }
+       }
+      else
+       {
+        l_new_id = "N"
+       }
+    }
+  else
+    {
+     l_new_id = "N"
+    }
+
+
+
+ access sfscompany, set sfscompany:company_id = sfpname:company_id, generic
+
+ access custacctdata, set custacctdata:policy_no    = sfpname:policy_no,
+                          custacctdata:pol_year     = sfpname:pol_year,
+                          custacctdata:end_sequence = sfpname:end_sequence, generic
+
+ if custacctdata:policy_no    <> sfpname:policy_no or
+    custacctdata:pol_year     <> sfpname:pol_year or
+    custacctdata:end_sequence <> sfpname:end_sequence then
+    begin
+    add custacctdata
+      begin
+          writefile(l_filename,"%s%s","<Account>","<NL>")
+          custacctdata:policy_no    = sfpname:policy_no
+          custacctdata:pol_year     = sfpname:pol_year
+          custacctdata:end_sequence = sfpname:end_sequence
+
+          l_status = "A"
+
+          -- cust status
+          custacctdata:mob_status = l_status
+          writefile(l_filename,"%s%s%s%s","<Status>",l_status,"</Status>","<NL>")
+
+
+          -- creation date
+          l_year = year(todaysdate)
+          l_month = month(todaysdate)
+          l_day = day(todaysdate)
+          l_time =  trun(str(systemtime,"HH:MM:SS"))
+             if l_month < 10 then
+             {
+             l_month1 = "0" + str(l_month)
+             }
+             else
+              l_month1 = str(l_month)
+             if l_day < 10 then
+             {
+             l_day1 = "0" + str(l_day)
+             }
+             else
+               l_day1 = str(l_day)
+
+          l_record_creation_date = " "
+          l_record_creation_date = str(l_year) + "-" + l_month1 + "-" + l_day1
+          l_record_creation_date1 = trun(l_record_creation_date) + "T" + trun(l_time)
+          writefile(l_filename,"%s%s%s%s","<CreateUpdateDate>",l_record_creation_date1,"</CreateUpdateDate>","<NL>")
+          custacctdata:creation_date = l_rec_date
+
+          -- cust acct number
+          l_policy_no = str(sfpcurrent:policy_no)
+          writefile(l_filename,"%s%s%s%s","<AccountNo>",trun(l_policy_no),"</AccountNo>","<NL>")
+          custacctdata:cust_acct = l_policy_no
+
+          -- cust div/group number - installation id
+
+          access sfsagent, set sfsagent:Company_id = sfpname:company_id,
+                               sfsagent:agent_no   = sfpname:agent_no, exact
+
+          if l_new_id = "N" then
+           {
+            custacctdata:cust_division_group = str(sfsagent:mob_agent_no)
+            writefile(l_filename,"%s%s%s%s","<InstallationId>",str(sfsagent:mob_agent_no),"</InstallationId>","<NL>")
+           }
+          else
+           {
+            custacctdata:cust_division_group = str(sfsagent:mob_agent_no)
+            writefile(l_filename,"%s%s%s%s","<InstallationId>",str(l_old_id_number),"</InstallationId>","<NL>")
+            writefile(l_filename,"%s%s%s%s","<NewInstallationId>",str(sfsagent:mob_agent_no),"</NewInstallationId>","<NL>")
+           }
+
+          i_last_name = ""
+          i_first_name = ""
+          i_rev_name = ""
+          i_name = trun(sfpname:name[1])
+          include "sfsrevname7.pro"
+          IF (pos("=",i_name)) <> 0 then
+            {
+              -- billing last name
+              writefile(l_filename,"%s%s%s%s%s%s","<AccountName>",trun(i_first_name)," ",trun(i_last_name),"</AccountName>","<NL>")
+              -- billing first name
+              custacctdata:billing_last_name = i_last_name
+              custacctdata:billing_first_name = i_first_name
+
+            }
+         else
+            {
+              -- billing last name
+              -- billing first name
+              writefile(l_filename,"%s%s%s%s","<AccountName>",trun(i_rev_name),"</AccountName>","<NL>")
+              custacctdata:billing_last_name = ""
+              custacctdata:billing_first_name = i_rev_name
+
+            }
+
+          writefile(l_filename,"%s%s","<BillTo>","<NL>")
+
+          i_last_name = ""
+          i_first_name = ""
+          i_rev_name = ""
+          i_name = trun(sfpname:name[1])
+          include "sfsrevname7.pro"
+          IF (pos("=",i_name)) <> 0 then
+            {
+              -- billing last name
+              -- billing first name
+--              writefile(l_filename,"%s%s%s%s","<FirstName>",trun(i_first_name),"</FirstName>","<NL>")
+--              writefile(l_filename,"%s%s%s%s","<LastName>",trun(i_last_name),"</LastName>","<NL>")
+              writefile(l_filename,"%s%s%s%s%s%s","<BillingName>",trun(i_first_name)," ",trun(i_last_name),"</BillingName>","<NL>")
+              custacctdata:billing_last_name = i_last_name
+              custacctdata:billing_first_name = i_first_name
+
+            }
+         else
+            {
+              -- billing last name
+              -- billing first name
+--              writefile(l_filename,"%s%s%s%s","<FirstName>",trun(i_rev_name),"</FirstName>","<NL>")
+  --            writefile(l_filename,"%s%s%s","<LastName>","</LastName>","<NL>")
+              writefile(l_filename,"%s%s%s%s","<BillingName>",trun(i_rev_name),"</BillingName>","<NL>")
+              custacctdata:billing_last_name = ""
+              custacctdata:billing_first_name = i_rev_name
+
+            }
+
+
+          -- billing address1
+          writefile(l_filename,"%s%s%s%s","<AddressLine1>",trun(sfpname:address[1]),"</AddressLine1>","<NL>")
+          custacctdata:billing_address1 = sfpname:address[1]
+
+          -- billing address2
+          writefile(l_filename,"%s%s%s%s","<AddressLine2>",trun(sfpname:address[2]),"</AddressLine2>","<NL>")
+          custacctdata:billing_address2 = sfpname:address[2]
+
+          -- billing city
+          writefile(l_filename,"%s%s%s%s","<City>",trun(sfpname:city),"</City>","<NL>")
+          custacctdata:billing_city = sfpname:city
+
+          -- billing state
+          writefile(l_filename,"%s%s%s%s","<State>",trun(sfpname:str_state),"</State>","<NL>")
+          custacctdata:billing_state = sfpname:str_state
+
+          -- billing zipcode
+--          writefile(l_filename,"%s%s%s%s","<ZipCode>",trun(sfpname:str_zipcode),"</ZipCode>","<NL>")
+          writefile(l_filename,"%s%s%s%s","<ZipCode>",sfpname:zipcode_5_9,"</ZipCode>","<NL>")
+          custacctdata:billing_zipcode = sfpname:zipcode_5_9
+
+          -- billing country
+          writefile(l_filename,"%s%s%s%s","<Country>","USA","</Country>","<NL>")
+          custacctdata:billing_country = "USA"
+
+          writefile(l_filename,"%s%s","</BillTo>","<NL>")
+          writefile(l_filename,"%s%s","</Account>","<NL>")
+
+
+      end   -- end of add
+    end
+ else
+   {
+
+    if custacctdata:policy_no    = sfpname:policy_no and
+       custacctdata:pol_year     = sfpname:pol_year and
+       custacctdata:end_sequence = sfpname:end_sequence then
+        begin
+        change custacctdata
+          begin
+             writefile(l_filename,"%s%s","<Account>","<NL>")
+
+             l_status = "U"
+             -- cust status
+             custacctdata:mob_status = l_status
+             writefile(l_filename,"%s%s%s%s","<Status>",l_status,"</Status>","<NL>")
+
+             -- creation date
+             l_year = year(todaysdate)
+             l_month = month(todaysdate)
+             l_day = day(todaysdate)
+             l_record_creation_date = " "
+             if l_month < 10 then
+             {
+             l_month1 = "0" + str(l_month)
+             }
+             else
+              l_month1 = str(l_month)
+             if l_day < 10 then
+             {
+             l_day1 = "0" + str(l_day)
+             }
+             else
+               l_day1 = str(l_day)
+
+             l_record_creation_date = str(l_year) + "-" + l_month1 + "-" + l_day1
+
+
+             l_time =  str(systemtime,"HH:MM:SS")
+
+             l_record_creation_date1 = trun(l_record_creation_date) + "T" + trun(l_time)
+
+             l_rec_date = 0
+             l_rec_date = val(l_record_creation_date1)
+             writefile(l_filename,"%s%s%s%s","<CreateUpdateDate>",l_record_creation_date1,"</CreateUpdateDate>","<NL>")
+             custacctdata:creation_date = l_rec_date
+
+             -- cust acct number
+             l_policy_no = str(sfpcurrent:policy_no)
+             writefile(l_filename,"%s%s%s%s","<AccountNo>",trun(l_policy_no),"</AccountNo>","<NL>")
+             custacctdata:cust_acct = l_policy_no
+
+             -- cust div/group number
+
+             access sfsagent, set sfsagent:Company_id = sfpname:company_id,
+                                  sfsagent:agent_no   = sfpname:agent_no, exact
+
+             custacctdata:cust_division_group = str(sfsagent:mob_agent_no)
+
+             if l_new_id = "N" then
+             {
+              custacctdata:cust_division_group = str(sfsagent:mob_agent_no)
+              writefile(l_filename,"%s%s%s%s","<InstallationId>",str(sfsagent:mob_agent_no),"</InstallationId>","<NL>")
+             }
+            else
+             {
+              custacctdata:cust_division_group = str(sfsagent:mob_agent_no)
+              writefile(l_filename,"%s%s%s%s","<InstallationId>",str(l_old_id_number),"</InstallationId>","<NL>")
+              writefile(l_filename,"%s%s%s%s","<NewInstallationId>",str(sfsagent:mob_agent_no),"</NewInstallationId>","<NL>")
+             }
+
+             i_last_name = ""
+             i_first_name = ""
+             i_rev_name = ""
+             i_name = trun(sfpname:name[1])
+             include "sfsrevname7.pro"
+             IF (pos("=",i_name)) <> 0 then
+               {
+                 -- billing last name
+                 -- billing first name
+                 writefile(l_filename,"%s%s%s%s%s%s","<AccountName>",trun(i_first_name)," ",trun(i_last_name),"</AccountName>","<NL>")
+                 custacctdata:billing_last_name = i_last_name
+                 custacctdata:billing_first_name = i_first_name
+
+               }
+             else
+               {
+                 -- billing last name
+                 -- billing first name
+                 writefile(l_filename,"%s%s%s%s","<AccountName>",trun(i_rev_name),"</AccountName>","<NL>")
+                 custacctdata:billing_last_name = ""
+                 custacctdata:billing_first_name = i_rev_name
+
+               }
+
+            writefile(l_filename,"%s%s","<BillTo>","<NL>")
+
+            i_last_name = ""
+            i_first_name = ""
+            i_rev_name = ""
+            i_name = trun(sfpname:name[1])
+            include "sfsrevname7.pro"
+            IF (pos("=",i_name)) <> 0 then
+             {
+              -- billing last name
+              -- billing first name
+--              writefile(l_filename,"%s%s%s%s","<FirstName>",trun(i_first_name),"</FirstName>","<NL>")
+--              writefile(l_filename,"%s%s%s%s","<LastName>",trun(i_last_name),"</LastName>","<NL>")
+              writefile(l_filename,"%s%s%s%s%s%s","<BillingName>",trun(i_first_name)," ",trun(i_last_name),"</BillingName>","<NL>")
+              custacctdata:billing_last_name = i_last_name
+              custacctdata:billing_first_name = i_first_name
+
+             }
+            else
+             {
+              -- billing last name
+              -- billing first name
+--              writefile(l_filename,"%s%s%s%s","<FirstName>",trun(i_rev_name),"</FirstName>","<NL>")
+  --            writefile(l_filename,"%s%s%s","<LastName>","</LastName>","<NL>")
+              writefile(l_filename,"%s%s%s%s","<BillingName>",trun(i_rev_name),"</BillingName>","<NL>")
+              custacctdata:billing_last_name = ""
+              custacctdata:billing_first_name = i_rev_name
+
+             }
+
+             -- billing address1
+             writefile(l_filename,"%s%s%s%s","<AddressLine1>",trun(sfpname:address[1]),"</AddressLine1>","<NL>")
+             custacctdata:billing_address1 = sfpname:address[1]
+
+             -- billing address2
+             writefile(l_filename,"%s%s%s%s","<AddressLine2>",trun(sfpname:address[2]),"</AddressLine2>","<NL>")
+             custacctdata:billing_address2 = sfpname:address[2]
+
+             -- billing city
+             writefile(l_filename,"%s%s%s%s","<City>",trun(sfpname:city),"</City>","<NL>")
+             custacctdata:billing_city = sfpname:city
+
+             -- billing state
+             writefile(l_filename,"%s%s%s%s","<State>",trun(sfpname:str_state),"</State>","<NL>")
+             custacctdata:billing_state = sfpname:str_state
+
+             -- billing zipcode
+--             writefile(l_filename,"%s%s%s%s","<ZipCode>",trun(sfpname:str_zipcode),"</ZipCode>","<NL>")
+             writefile(l_filename,"%s%s%s%s","<ZipCode>",sfpname:zipcode_5_9,"</ZipCode>","<NL>")
+             custacctdata:billing_zipcode = sfpname:zipcode_5_9
+
+             -- billing country
+             writefile(l_filename,"%s%s%s%s","<Country>","USA","</Country>","<NL>")
+             custacctdata:billing_country = "USA"
+
+             writefile(l_filename,"%s%s","</BillTo>","<NL>")
+             writefile(l_filename,"%s%s","</Account>","<NL>")
+         end
+
+
+        end
+
+   }
+}
+
+screen exit
+writefile(l_filename,"%s%s","</Accounts>","<NL>")
+closefile(l_filename)
+--write ("%c%s%s",2001,"l filename = ",l_filename)
+--Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+
+proc("cli /usr/bin/perl -pi -e 's/\n/\r\n/;' %s",l_filename)/casesensitive
+proc("cli /usr/bin/perl -pi -e 's/&/&amp;/g;' %s",l_filename)/casesensitive
+
+--writefile(l_filename_script,"mv %s %s",l_filename,l_filename1)
+--closefile(l_filename_script)
+
+--proc ("cli chmod 777 %s",l_filename_script)
+
+--proc ("cli %s",l_filename_script)
+
+-- BILLING INFORMATION  saving this in case we need it
+/*
+       access sfpsupp, set sfpsupp:policy_no    = sfpname:policy_no,
+                           sfpsupp:pol_year     = sfpname:pol_year,
+                           sfpsupp:end_sequence = sfpname:end_sequence, generic
+
+       while sfpsupp:policy_no    = sfpname:policy_no and
+             sfpsupp:pol_year     = sfpname:pol_year and
+             sfpsupp:end_sequence = sfpname:end_sequence
+             {
+
+          if sfpsupp:mort_type_2 = "P", "F" then
+           {
+           if sfpsupp:mort_type_1 one of "C","B", "F" then
+             {
+               l_mortgagee = "Y"
+               if sfpsupp:mortgage_id <> 0 then
+                   {
+                     access sfsmort, set sfsmort:company_id = sfpname:company_id,
+                                         sfsmort:mortgage_id = sfpsupp:mortgage_id, exact
+                     i_name    = sfsmort:name
+                     l_address = sfsmort:address
+                     l_city    = sfsmort:city
+                     l_state   = sfsmort:str_state
+                     l_zipcode = sfsmort:str_zipcode
+
+                   }
+                else
+                   {
+                     i_name    = sfpsupp:name
+                     l_address = sfssupp:address
+                     l_city    = sfssupp:city
+                     l_state   = sfssupp:str_state
+                     l_zipcode = sfssupp:str_zipcode
+                   }
+             }
+            }
+          else
+            l_mortgagee = "N"
+
+        next sfpsupp
+        }
+       -- sfpname
+        if l_mortgagee = "N" then
+         {
+          i_name = trun(sfpname:name_key_1[1])
+          include "sfsrevname7.pro"
+          IF (pos("=",i_name)) <> 0 then
+            {
+              i_rev_name_1 = trun(i_rev_name)
+              l_pos = pos("=",i_name)
+              l_first_name = trun(i_name,(1,l_pos1))
+              l_last_name = trun(i_name,l_pos2,30)
+            }
+          else
+              i_rev_name_1 = i_name
+              l_first_name = i_name
+          }
+*/
+
+end

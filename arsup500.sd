@@ -1,0 +1,283 @@
+%%
+Program
+        Name = "arsup500" ;
+        Type = "File" ;
+        Domain = "qcsupdate" ;
+        Padcharacter = Space ;
+
+/*      this program will take an input file from another vendor and create
+        from the data on that input file the arschksu records required.
+        Because all data that is required on the arschksu file is not there
+        assumptions had to be made.  These are:
+        1.      Payor is the payor on file
+        2.      Transaction date is the date that this program is run
+        3.      Username will be "scan"
+        4.      Terminal will be 999
+        5.      Check date will be scan date
+        6.      if check pays total then credit installment charge
+                this is for the first installment only
+*/
+        Number COUNTER       = 0 ,
+               L_ERRORS      = 0;
+
+        Unsigned Ascii Number L_CHECK_REFERENCE[7]=0/decimals=0;
+
+        String L_LOGFILE[40]    = "",
+               l_outfile[40]    = "",
+               l_sfs[3]         = "",
+               l_company_id[10] = "",
+               L_ENTER[1]       ="" ;
+
+-- payor hold values
+        String l_payor_name[50]        = "",
+               l_payor_care_of[50]     = "",
+               l_payor_address[50]     = "",
+               l_payor_city[30]        = "",
+               l_payor_str_state[2]    = "",
+               l_payor_zip_code_str[9] = "";
+
+        include "sfscsexec.var"
+
+Initialisation
+
+L_LOGFILE = "arsup500.log"
+l_outfile = "arsup500.out"
+
+/* create a new finder file */
+
+Writefile (L_LOGFILE,"%s","======================================<nl>")
+Writefile (L_LOGFILE,"%s%d%s","Log file created on ",TODAYSDATE,"<NL>")
+
+Update
+COUNTER = COUNTER + 1
+
+If COUNTER = 1 Then
+Begin
+    Write ("<014>")
+End
+
+if counter mod 100 = 0 then
+begin
+    Write ("%c%n",09060,COUNTER)
+end
+
+--Do Get_file
+Do UPDATE_ARSCHKSU
+
+Screen Exit
+
+Deletefile (L_OUTFILE)
+Writefile (L_OUTFILE,"%s%s","==========| Check Scanning Input Processing |=========","<NL><NL>")
+Writefile (L_OUTFILE,"%s%s%s","Username      =====| ",USERNAME,                    "<NL>")
+Writefile (L_OUTFILE,"%s%d%s","Rundate       =====| ",TODAYSDATE,                  "<NL>")
+Writefile (L_OUTFILE,"%s%t%s","System Time   =====| ",SYSTEMTIME,                  "<NL>")
+Writefile (L_OUTFILE,"%s%n%s","Completed with ====| ",L_ERRORS," number of errors   <NL>")
+Writefile (L_OUTFILE,"%s","<NL>NOTE: if the number of errors reported on the line above <NL>")
+Writefile (L_OUTFILE,"%s","is greater than 0 (ZERO) then there was a problem with the <NL>")
+Writefile (L_OUTFILE,"%s","automatic invoicing procedure.  Please contact SCIPS at support@scips.com<NL>")
+Writefile (L_OUTFILE,"%s%s","==========| Check Scanning Input Processing Completed |=========","<NL><NL>")
+Closefile (L_OUTFILE)
+
+If L_ERRORS <> 0 Then
+Begin
+    Writefile (L_LOGFILE,"%s","Check Scanning Input did not complete Successfully<NL>")
+    Writefile (L_LOGFILE,"%s","See arsup500.log for details")
+End
+
+Errors
+L_ERRORS = L_ERRORS + 1
+Writefile (L_LOGFILE,"%s%s%s","Error in arsup500 ",ERRORTEXT ,"<NL>")
+
+Procedure Definition
+
+Procedure GET_FILE
+Begin
+
+-- this procedure locates the file according to arscontrol2
+-- copies the file to the correct location
+-- renames the file to qcsupdate
+
+l_sfs = "SFS"
+access sfsdefault, set sfsdefault:sfs_code = l_sfs
+
+access arscontrol2, set arscontrol2:company_id = sfsdefault:company_id
+
+-- delete old file - CYA
+write ("%c%s%s",01001,"location = ",arscontrol2:checks_input_location)
+proc (":cli rm %s",trun(arscontrol2:checks_input_location)+"qcsupdate")/noconsole
+
+--mv filename to correct name
+write ("%c%s%s",01001,"location = ",arscontrol2:checks_input_name)
+proc (":cli mv %s %s",trun(arscontrol2:checks_input_location)+trun(arscontrol2:checks_input_name), "qcsupdate")/noconsole
+Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+
+end -- end of procedure
+
+Procedure UPDATE_ARSCHKSU
+Begin
+
+l_sfs = "SFS"
+access sfsdefault, set sfsdefault:sfs_code = l_sfs
+
+l_company_id = sfsdefault:company_id
+
+-- get next check reference #
+
+I_CSEXEC_APPLICATION = "CHECK_REFERENCE"
+
+Include "sfscsexec.pro"
+
+L_CHECK_REFERENCE = I_CSEXEC_NUMBER
+
+access arschksu, set arschksu:company_id      = l_company_id,
+                     arschksu:check_reference = l_check_reference
+
+if arschksu:company_id      <> l_company_id or
+   arschksu:check_reference <> l_check_reference then
+   begin
+   add arschksu
+   begin
+       arschksu:company_id                     = l_company_id/raw
+       arschksu:check_reference                = l_check_reference
+       arschksu:policy_no                      = qcsupdate:policy_no
+       arschksu:check_no                       = qcsupdate:check_no
+       arschksu:check_amount                   = qcsupdate:check_amount
+       arschksu:balance                        = arschksu:check_amount
+       arschksu:disposition                    = "OPEN"
+       arschksu:trans_date                     = qcsupdate:trans_date
+       arschksu:check_date                     = qcsupdate:trans_date
+       arschksu:posted_date                    = 00.00.0000
+       arschksu:deposit_date                   = 00.00.0000
+       arschksu:money_order                    = "N"
+
+       -- access external files
+       access sfpcurrent, set sfpcurrent:policy_no = arschksu:policy_no
+
+       access sfpname, set sfpname:policy_no    = sfpcurrent:policy_no,
+                           sfpname:pol_year     = sfpcurrent:pol_year,
+                           sfpname:end_sequence = sfpcurrent:end_sequence
+
+       arschksu:agent_no                       = sfpname:agent_no
+       arschksu:post_dated                     = "N"
+       arschksu:comments                       = "Check input from Scanning"
+       arschksu:payor_type                     = "I" -- scan input
+       arschksu:bank_no                        = qcsupdate:bank_no
+       arschksu:check_hold                     = "N"
+       arschksu:user                           = "scan"
+       arschksu:user_console                   = "scan"
+       arschksu:enter_date                     = todaysdate
+       arschksu:enter_time                     = systemtime
+       arschksu:quote_no                       = 0
+       arschksu:deposit_premium                = 0.00
+       arschksu:mortgage_ID                    = ""
+       arschksu:credit_installment_chage       = 0
+       arschksu:check_pays_total               = 0
+       arschksu:internal_check                 = 0
+       arschksu:application                    = 0
+       arschksu:trans_eff                      = sfpname:eff_date
+       arschksu:credit_card                    = 0
+       arschksu:reapplied_from_policy_no       = 0
+       arschksu:reapllied_to_policy_no         = 0
+       arschksu:return_reason                  = ""
+       arschksu:return_date                    = 00.00.0000
+       arschksu:pol_year                       = sfpcurrent:pol_year
+       arschksu:master_reference               = 0
+       arschksu:ac_payment                     = 0
+       arschksu:check_image                    = qcsupdate:image_name
+
+       -- get payor information, if other than insured
+       arschksu:payor_name                     = ""
+       arschksu:payor_care_of                  = ""
+       arschksu:payor_address                  = ""
+       arschksu:payor_city                     = ""
+       arschksu:payor_str_state                = ""
+       arschksu:payor_zip_code_str             = ""
+
+       do get_payor_information
+       if l_payor_name = "" then
+       begin
+          arschksu:payor_name                  = sfpname:name[1]
+          arschksu:payor_care_of               = sfpname:name[2]
+          arschksu:payor_address               = sfpname:address[1]
+          arschksu:payor_city                  = sfpname:city
+          arschksu:payor_str_state             = sfpname:str_state
+          arschksu:payor_zip_code_str          = sfpname:str_zipcode
+       end
+       else
+       begin
+          arschksu:payor_name                  = l_payor_name
+          arschksu:payor_care_of               = l_payor_care_of
+          arschksu:payor_address               = l_payor_address
+          arschksu:payor_city                  = l_payor_city
+          arschksu:payor_str_state             = l_payor_str_state
+          arschksu:payor_zip_code_str          = l_payor_zip_code_str
+       end -- end of payor setup
+
+   do add_to_image_file
+
+   end -- end of add
+
+   end -- end of record exists checking
+
+End -- end of update_arschksu
+
+Procedure get_payor_information
+begin
+
+l_payor_name            = ""
+l_payor_care_of         = ""
+l_payor_address         = ""
+l_payor_city            = ""
+l_payor_str_state       = ""
+l_payor_zip_code_str    = ""
+
+access sfpsupp, set sfpsupp:policy_no    = sfpcurrent:policy_no,
+                    sfpsupp:pol_year     = sfpcurrent:pol_year,
+                    sfpsupp:end_sequence = sfpcurrent:end_sequence, approximate
+
+while sfpsupp:policy_no    = sfpcurrent:policy_no and
+      sfpsupp:pol_year     = sfpcurrent:pol_year and
+      sfpsupp:end_sequence = sfpcurrent:end_sequence
+      begin
+      if sfpsupp:mortgage_type_1 one of "B","C","F" and
+         l_payor_name = "" then
+         begin
+         l_payor_name    = sfpsupp:name[1]
+         if sfpsupp:name[2] <> "" then
+         begin
+             l_payor_care_of  = sfpsupp:name[2]
+         end
+         else
+         begin
+             l_payor_care_of  = sfpsupp:name[3]
+         end
+         l_payor_address      = sfpsupp:address[1]
+         l_payor_city         = sfpsupp:city
+         l_payor_str_state    = sfpsupp:str_state
+         l_payor_zip_code_str = sfpsupp:str_zipcode
+      end -- end of payor type
+
+      next sfpsupp
+
+end -- end of while loop
+
+end -- end of procedure
+
+procedure add_to_image_file
+begin
+
+access arschksu_image, set arschksu_image:check_reference = arschksu:check_reference, exact
+
+if arschksu_image:check_reference = 0 then -- records exists
+begin
+   add arschksu_image
+   begin
+       arschksu_image:company_id            = arschksu:company_id
+       arschksu_Image:check_reference       = arschksu:check_reference
+       arschksu_image:image_name            = qcsupdate:image_name[1,30]
+   end
+end
+
+end -- end of procedure
+
+End

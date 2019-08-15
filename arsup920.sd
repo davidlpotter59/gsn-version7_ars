@@ -1,0 +1,1480 @@
+%%
+Program
+        Name = "arsup920" ;
+        Domain="FLAT";
+        Type = "File"  ;
+        Padcharacter = Space ;
+/*  scips.com
+
+    december 6, 2001
+
+    select and print cancellation balance due notice by policy
+    this program will be used by the rating system to print the
+    notice at the same time the cancellation is processed
+
+    must compile for 730_3a
+*/
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+        Global Wdate G_TRANS_DATE ;
+        Global Wdate G_TRANS_EFF ;
+        Global Wdate G_TRANS_EXP ;
+
+        Global Wdate G_STARTING_DATE,
+                     G_ENDING_DATE;
+
+        Global Unsigned Ascii Number G_TRANS_CODE[4] ;
+        Global Unsigned Ascii Number G_LINE_OF_BUSINESS[4] ;
+        Global Unsigned Ascii Number G_COMM_RATE[4]/decimals=2 ;
+        Global Unsigned Ascii Number G_SUB_CODE[4] ;
+        Global Unsigned Ascii Number G_BILLING_CTR[4] ;
+        Global Unsigned Ascii Number G_RETURN_CHECK_CTR[4] ,
+                                     g_scan[1],
+                                     g_image_array_position[1] ;
+        Global String G_REPORT_DEVICE[10];
+
+        String L_OPTION[1]="";
+--        String L_BALANCE_DUE_NAME[50]="arsup920.pcl";
+        array [2] of string l_balance_due_name[50] ;
+        Unsigned Ascii Number L_LINE_CTR[3]=0;
+        String L_ENTER[1];
+        String L_FIRST_TIME[1]="Y";
+        Unsigned Ascii Number L_SUB[2];
+        Unsigned Ascii Number L_V_POSITION[5]=0/decimals=0;
+        String L_ZIPCODE[10]="";
+        Unsigned Ascii Number L_LOOP_CTR[2]=0;
+        Unsigned Ascii Number L_LINES_PRINTED[2]=0;
+        Unsigned Ascii Number L_COPY_CTR[2]=0;
+
+        Unsigned Ascii Number L_PAGES_CTR[4]=0;
+        Unsigned Ascii Number L_HOLD_AGENT_NO[4]=0;
+        Signed Ascii Number L_COMMISSION[9]=0/decimals=2;
+        Signed Ascii Number L_TOTAL_PREMIUM[9]=0/dec=2;
+        Signed Ascii Number L_TOTAL_COMMISSION[9]=0/decimals=2;
+        Unsigned Ascii Number L_COMM_RATE[4]=0/decimals=0;
+        String L_COMPANY[10]="";
+        Unsigned Ascii Number L_PAID_YEAR[4]=0/decimals=0;
+        Unsigned Ascii Number L_PAID_MONTH[2]=0/decimals=0;
+        Signed Ascii Number L_YTD_PREMIUM[9]=0/decimals=2;
+        Signed Ascii Number L_YTD_COMMISSION[9]=0/decimals=2;
+        Unsigned Ascii Number L_SUB_CODE[4]=0/decimals=0;
+
+
+        local wdate l_eff_date ;
+
+        String L_TRANSACTION[30]="";
+        String L_LOGFILE[15]="arsup920.log";
+        String L_TOTALS_PAGE[1]="N";
+        Unsigned Ascii Number L_HOLD_POLICY_NO[9]=0/decimals=0;
+        Unsigned Ascii Number L_COPIES_REQUIRED[2]=0;
+        Unsigned Ascii Number L_POL_YEAR[4]=0;
+        Unsigned Ascii Number L_END_SEQUENCE[4]=0;
+        Unsigned Ascii Number L_POLICY_NO[9]=0,
+                              l_mm[2]=0,
+                              l_dd[2]=0,
+                              l_yy[4]=0 ;
+
+        String L_COPY_LIT[20]="",
+               l_invoice_PDF_1[20]="", -- used for image copy - is put in image directory
+               l_header_name[50],
+               l_policy_str[11],
+               l_file_number[80]="",
+               l_file_name[70]="",
+               l_drawer[45]="",
+               l_folder_type[80]="",
+               l_doc_type[45]="",
+               l_doc_date[70]="",
+               l_unix_path[100],
+               l_policy[9] ;
+
+        Unsigned Ascii Number L_HOLD_COPY_CTR[4]=0;
+        Unsigned Ascii Number L_H_POSITION[4]=0;
+        Unsigned Ascii Number L_AGENT_PRODUCER_POSITION[4]=0;
+
+/* buidling the array to hold sfpname keys */
+Array [200] Of Unsigned Ascii Number L_SFPNAME_POLICY_NO[9],
+                                     L_SFPNAME_POL_YEAR[4],
+                                     L_SFPNAME_END_SEQUENCE[4],
+                                     L_SFPNAME_PREM_NO[4],
+                                     L_SFPNAME_BUILD_NO[4],
+                                     L_SFPNAME_SUB_CODE[4];
+
+Unsigned Ascii Number L_SFPNAME_LOOP_CTR[4]=0;
+Unsigned Ascii Number L_TEMP_POLICY_NO[9]=0;
+Unsigned Ascii Number L_TEMP_POL_YEAR[4]=0;
+Unsigned Ascii Number L_TEMP_END_SEQUENCE[4]=0;
+Unsigned Ascii Number L_TEMP_PREM_NO[4]=0;
+Unsigned Ascii Number L_TEMP_BUILD_NO[4]=0;
+Unsigned Ascii Number L_TEMP_SUB_CODE[4]=0;
+Signed Ascii Number L_TOTAL_AMOUNT_DUE[9]=0/decimals=2;
+String L_HOLD_COMPANY_ID[10]="";
+string l_lob_subline[2]="00" ;
+String L_LINE_PRINTED[1]="N";
+Unsigned Ascii Number L_HOLD_LINE_OF_BUSINESS[4]=0;
+Unsigned Ascii Number L_HOLD_PAYMENT_PLAN[2]=0;
+Unsigned Ascii Number L_HOLD_CHECK_REFERENCE[7]=0;
+Global Unsigned Ascii Number G_RUN_OPTION[1];
+
+/* *****  new check scanning line variables */
+string l_check_scan_policy_no[9],
+       l_check_scan_due_date[8],
+       l_check_scan_current_due[8],
+       l_check_scan_total_due[8],
+       l_check_scan_check_digit[2],
+       l_check_scan_line[50],
+       l_check_digit_final_str[3];
+
+-- use this to force amount due to whole numbers without decimals
+unsigned ascii number l_check_scan_amount[8]=0/decimals=0;
+
+-- for check digit calculations
+array [100] of unsigned ascii number l_check_digit_amount[3];
+unsigned ascii number l_check_digit_weight[1],
+                      l_check_digit_sub[3]=0/decimals=0,
+                      l_check_digit_total[4]=0/decimals=0,
+                      l_check_digit_number[4]=0/decimals=0,
+                      l_check_digit_raw[4]=0/decimals=0,
+                      l_check_digit_final[3]=0/decimals=0;
+
+        Include "scipserr.var"
+
+        Include "sfsrevname7.var"
+
+        Include "csfonts.inc"
+
+        Include "sfscsexec.var"
+
+Initialization
+
+--Deletefile (L_BALANCE_DUE_NAME)
+--add 03/14/2007 for imaging purposes REL
+l_balance_due_name[1] = programid + ".pcl" -- gets arsup920 from the name of the program and cats .pcl to it
+l_balance_due_name[2] = programid + "i.pcl"
+l_header_name = programid + "_header"
+deletefile(l_header_name)
+deletefile(l_balance_due_name[1])
+deletefile(l_balance_due_name[2])
+g_scan = 1
+
+L_COMPANY = "XXXXXXXXXX"
+Access ARSCONTROL, Set ARSCONTROL:COMPANY_ID = L_COMPANY
+L_COMPANY = ARSCONTROL:DEFAULT_COMPANY
+Access ARSCONTROL, Set ARSCONTROL:COMPANY_ID = L_COMPANY
+G_COMPANY_ID = L_COMPANY
+G_RUN_OPTION    = Val(COMMANDLINE[1,1])
+G_POLICY_NO     = Val(COMMANDLINE[2,10])
+G_STARTING_DATE = Date(COMMANDLINE[11,18])
+G_ENDING_DATE   = G_STARTING_DATE
+G_REPORT_DEVICE = COMMANDLINE[19,28]/raw
+
+write ("<014>")
+write ("%c%s%s",2001,"commandline = ",commandline)
+Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+
+Do NEW_NOTICES
+For L_SUB = 1 To L_COPY_CTR
+Begin
+     L_HOLD_COPY_CTR = L_SUB
+     Do EJECT_PAGE
+     if scipsimage:items_as_image[8] one of "1" then
+      {
+       if g_scan one of 1 then
+        {
+         if l_hold_copy_ctr = 3 then -- home office copy
+          {
+           l_balance_due_name[1] = programid + "i.pcl"
+           l_balance_due_name[2] = programid + ".pcl"
+          }
+        }
+      }
+
+     Do PRINT_FORM
+     L_LINES_PRINTED = 0
+     L_V_POSITION    = 1800
+     Do PRINT_DETAIL_LINE
+     if scipsimage:items_as_image[8] one of "1"  then
+      {
+       if g_scan one of 1 then
+        {
+         if l_hold_copy_ctr = 3 then -- home office copy
+          {
+           closefile(l_balance_due_name[1])
+--          proc("cli joinit %s%s",l_balance_due_name[1],l_balance_due_name[2])/noconsole
+           do add_image_header
+           l_balance_due_name[1] = programid + ".pcl"
+           l_balance_due_name[2] = programid + "i.pcl"
+          }
+         }
+      }
+
+End -- end of loop
+
+
+Update
+
+Screen Exit
+Closefile( L_LOGFILE )
+
+Proc ("lp -d%s -oraw %s",Trun(G_REPORT_DEVICE),L_BALANCE_DUE_NAME[1])/noconsole
+
+Errors
+If ERRORNUMBER <> ERR_EOF Then
+Begin
+    Writefile (L_LOGFILE,"arsup920 had errors<NL>")
+    Writefile (L_LOGFILE,"Date of run: %d<NL> ",TODAYSDATE )
+    Writefile (L_LOGFILE,"Policy No  : %n<NL> ",ARSBILLING:POLICY_NO )
+    Writefile (L_LOGFILE,"Error        %s<NL><NL> ",ERRORTEXT)
+    Writefile (L_LOGFILE,"========================================<NL><NL>")
+End
+
+Procedure Definition
+
+Procedure NEW_NOTICES
+Begin
+
+L_HOLD_AGENT_NO = 0
+L_FIRST_TIME = "Y"
+L_COMPANY = ""
+L_TOTALS_PAGE = "N"
+L_COPIES_REQUIRED = 0
+
+Deletefile(l_balance_due_name[1])
+Writefile(l_balance_due_name[1],"%s<NL>",L_RESET)  -- reset the printer
+Writefile(l_balance_due_name[1],"%s<NL>","<033>&l2A")  -- set to letter size
+
+L_HOLD_AGENT_NO = 0
+L_LINES_PRINTED = 0 -- to track the lines being printed
+L_PAGES_CTR     = 0
+--L_COPY_CTR      = 0 -- this is only to control the # of stmts for testing, remove for live
+
+Access ARSBILLING, Set ARSBILLING:COMPANY_ID = G_COMPANY_ID,
+                       ARSBILLING:POLICY_NO  = G_POLICY_NO, Approximate
+
+While ARSBILLING:COMPANY_ID = G_COMPANY_ID And
+      ARSBILLING:POLICY_NO  = G_POLICY_NO
+Begin
+
+If ARSBILLING:STATUS = "B" And
+  ( ARSBILLING:BILLED_DATE >= G_STARTING_DATE And
+   ARSBILLING:BILLED_DATE <= G_ENDING_DATE ) And
+   ARSBILLING:TRANS_CODE = 25 Then -- trans code 25 is cx balance due t/c
+   Begin
+
+   If L_FIRST_TIME = "Y" Then
+   Begin
+       L_FIRST_TIME = "N"
+       L_HOLD_COMPANY_ID       = ARSBILLING:COMPANY_ID/raw
+       L_HOLD_POLICY_NO        = ARSBILLING:POLICY_NO
+       L_HOLD_AGENT_NO         = ARSBILLING:AGENT_NO
+       L_HOLD_LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS
+       L_HOLD_PAYMENT_PLAN     = ARSBILLING:PAYMENT_PLAN
+       L_PAGES_CTR = 1
+       L_TOTAL_AMOUNT_DUE = 0.00
+       Do GET_CURRENT_SFPNAME
+       Access SFPNAME, Set SFPNAME:POLICY_NO    = l_policy_no,
+                           SFPNAME:POL_YEAR     = L_POL_YEAR,
+                           SFPNAME:END_SEQUENCE = L_END_SEQUENCE
+
+       access scipsimage, set scipsimage:company_id = sfpname:company_id, generic
+
+       L_COPY_CTR = 3 -- start at 3 since this is a fixed number
+       Do GET_NUMBER_OF_COPIES
+   End
+   If L_HOLD_POLICY_NO <> ARSBILLING:POLICY_NO Then
+   Begin
+    /* loop here for the number of copies needed */
+       For L_SUB = 1 To L_COPY_CTR
+       Begin
+           L_HOLD_COPY_CTR = L_SUB
+           Do EJECT_PAGE
+
+           if scipsimage:items_as_image[8] one of "1" then
+             {
+             if g_scan one of 1 then
+               {
+               if l_hold_copy_ctr = 3 then -- home office copy
+                 {
+                  l_balance_due_name[1] = programid + "i.pcl"
+                  l_balance_due_name[2] = programid + ".pcl"
+                 }
+               }
+             }
+--           Do GET_CURRENT_SFPNAME
+           access sfpcurrent, set sfpcurrent:policy_no = l_hold_policy_no, generic
+
+
+           L_POL_YEAR     = sfpcurrent:pol_year     -- Year(ARSBILLING:TRANS_EXP) - 1
+           L_END_SEQUENCE = sfpcurrent:end_sequence -- 0
+           Access SFPNAME, Set SFPNAME:POLICY_NO    = L_POLICY_NO,
+                           SFPNAME:POL_YEAR     = L_POL_YEAR,
+                           SFPNAME:END_SEQUENCE = L_END_SEQUENCE
+
+           Do PRINT_FORM
+           L_LINES_PRINTED = 0
+           L_V_POSITION    = 1800
+           Do PRINT_DETAIL_LINE
+
+           if scipsimage:items_as_image[8] one of "1"  then
+             {
+             if g_scan one of 1 then
+               {
+               if l_hold_copy_ctr = 3 then -- home office copy
+                  {
+                   closefile(l_balance_due_name[1])
+--                 proc("cli joinit %s%s",l_balance_due_name[1],l_balance_due_name[2])/noconsole
+                   do add_image_header
+                   l_balance_due_name[1] = programid + ".pcl"
+                   l_balance_due_name[2] = programid + "i.pcl"
+                  }
+               }
+             }
+       End -- end of loop
+
+       Do GET_CURRENT_SFPNAME
+       Access SFPNAME, Set SFPNAME:POLICY_NO    = L_POLICY_NO,
+                           SFPNAME:POL_YEAR     = L_POL_YEAR,
+                           SFPNAME:END_SEQUENCE = L_END_SEQUENCE
+       L_COPY_CTR = 3 -- start at 3 since this is a fixed number
+       Do GET_NUMBER_OF_COPIES
+       L_HOLD_COPY_CTR = 1
+       L_HOLD_COMPANY_ID       = ARSBILLING:COMPANY_ID/raw
+       L_HOLD_POLICY_NO        = ARSBILLING:POLICY_NO
+       L_HOLD_AGENT_NO         = ARSBILLING:AGENT_NO
+       L_HOLD_LINE_OF_BUSINESS = ARSBILLING:LINE_OF_BUSINESS
+       L_HOLD_PAYMENT_PLAN     = ARSBILLING:PAYMENT_PLAN
+       L_TOTAL_AMOUNT_DUE = 0.00
+   End -- end of policy number control break
+
+L_TOTAL_AMOUNT_DUE = L_TOTAL_AMOUNT_DUE + ((ARSBILLING:INSTALLMENT_AMOUNT - arsbilling:total_amount_paid)
+                     - arsbilling:write_off_amount)
+
+End -- end of status = "R" and date checking
+
+Next ARSBILLING
+
+End -- while stmt end
+
+Closefile(l_balance_due_name[2])
+
+End -- end of new_invoices
+
+/* *****************  Printing Invoice Form ************************** */
+Procedure PRINT_FORM
+Begin
+L_TOTALS_PAGE = "N"
+
+/*  setup access to all external files here */
+
+Access SFSCOMPANY, Set SFSCOMPANY:company_id = L_HOLD_COMPANY_ID, generic
+
+Access ARSCONTROL, Set ARSCONTROL:COMPANY_ID = L_HOLD_COMPANY_ID, generic
+
+Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = L_HOLD_COMPANY_ID, generic
+
+Access SFSAGENT, Set SFSAGENT:COMPANY_ID = L_HOLD_COMPANY_ID,
+                     SFSAGENT:AGENT_NO   = L_HOLD_AGENT_NO, Generic
+
+Access SFSLINE, Set SFSLINE:COMPANY_ID = L_HOLD_COMPANY_ID,
+                    SFSLINE:LINE_OF_BUSINESS = L_HOLD_LINE_OF_BUSINESS, generic
+
+Access ARSPAYPLAN, Set ARSPAYPLAN:COMPANY_ID       = L_HOLD_COMPANY_ID,
+                       ARSPAYPLAN:LINE_OF_BUSINESS = L_HOLD_LINE_OF_BUSINESS,
+                       ARSPAYPLAN:PAYMENT_PLAN     = L_HOLD_PAYMENT_PLAN, Approximate
+
+/* end of access setup */
+
+Writefile(l_balance_due_name[1],"<033>&a90h0V") -- CAP to top
+Writefile(l_balance_due_name[1],"%s<NL>",L_ARIAL)
+
+/* draw the box around the form */
+
+     -- left and right verticle lines --          2900 replaced by 3050
+     -- was 2900
+Writefile(l_balance_due_name[1],"<033>&a90h0V<033>*c5a3000b0P<NL>")
+Writefile(l_balance_due_name[1],"<033>&a5670h0V<033>*c5a3000b0P")
+Writefile(l_balance_due_name[1],"<033>&a0h0V<NL>") -- CAP
+
+     -- top and bottom horizontal lines --
+Writefile(l_balance_due_name[1],"<033>&a90h0V<033>*c5580h5v0P<NL>")
+-- was 6960
+Writefile(l_balance_due_name[1],"<033>&a90h7200V<033>*c5580h5v0P")
+Writefile(l_balance_due_name[1],"<033>&a0h0V<NL>") -- CAP
+
+/* draw lines within the form */
+Writefile(l_balance_due_name[1],"<033>&a90h1440V<033>*c5580h5v0P<NL>") -- 1st line
+Writefile(l_balance_due_name[1],"<033>&a90h1620V<033>*c5580h5v0P<NL>") -- 2nd line
+Writefile(l_balance_due_name[1],"<033>&a90h1800V<033>*c5580h5v0P<NL>") -- 3rd line
+-- was 5390
+Writefile(l_balance_due_name[1],"<033>&a90h5040V<033>*c5580h5v0P<NL>") -- 4th line
+Writefile(l_balance_due_name[1],"<033>&a90h1620V<033>*c2325a75b5g2P<NL>") -- shading
+
+/* draw small verticle lines in headings */
+Writefile(l_balance_due_name[1],"<033>&a810h1620V<033>*c5a80b0P<NL>")  -- 1st line
+Writefile(l_balance_due_name[1],"<033>&a1530h1620V<033>*c5a80b0P<NL>") -- 2nd line
+Writefile(l_balance_due_name[1],"<033>&a3780h1620V<033>*c5a80b0P<NL>") -- 3rd line
+Writefile(l_balance_due_name[1],"<033>&a4680h1620V<033>*c5a80b0P<NL>") -- 4th line
+
+/* draw pay this amount box */
+-- was 5390
+Writefile(l_balance_due_name[1],"<033>&a2800h5040V<033>*c5a150b0P<NL>") -- left side verticle line
+-- was 5750
+Writefile(l_balance_due_name[1],"<033>&a2800h5400V<033>*c2880h5v0P<NL>") -- bottom of box
+
+/* draw fold tick mark */
+Writefile(l_balance_due_name[1],"<033>&a90h4635V<033>*c150h5v0P<NL>")
+
+/* print arscontrol items */
+Writefile(l_balance_due_name[1],"%s<NL>",L_ARIAL)
+-- was 5040
+Writefile(l_balance_due_name[1],"<033>&a180h4770V<NL>")
+Writefile(l_balance_due_name[1],"%s<NL>",ARSCONTROL:INVOICE_PAYTO)
+-- was 5040
+Writefile(l_balance_due_name[1],"<033>&a3240h4770V<NL>")
+Writefile(l_balance_due_name[1],"%s<NL>",ARSCONTROL:INVOICE_COMPANY)
+Writefile(l_balance_due_name[1],"<033>&a3040h5130V")
+Writefile(l_balance_due_name[1],"%s<NL>",ARSCONTROL:INVOICE_SLOGAN)
+-- was 5390
+Writefile(l_balance_due_name[1],"<033>&a180h5040V<NL>")
+Writefile(l_balance_due_name[1],"%s<NL>",ARSCONTROL:INVOICE_SEPERATOR)
+Writefile(l_balance_due_name[1],"<033>&a2800h5940V<NL>")
+Writefile(l_balance_due_name[1],"%s<NL>",ARSCONTROL:INVOICE_PAYMENT_OPTIONS)
+Writefile(l_balance_due_name[1],"%s<NL>",L_ARIAL_ITALIC_12)
+Writefile(l_balance_due_name[1],"<033>&a2800h6060V<NL>")
+Writefile(l_balance_due_name[1],"%s<NL>",ARSCONTROL:INVOICE_CLOSING)
+Writefile(l_balance_due_name[1],"%s<NL>",L_ARIAL)
+
+/* print cancellation acknowledgement information */
+L_V_POSITION = 3720
+L_H_POSITION =  450
+L_AGENT_PRODUCER_POSITION = 1170  -- prints the variable or word "Agent:" in the correct
+                                   -- position in the paragraph below
+
+
+Writefile(l_balance_due_name[1],"%s<NL>",L_ARIAL_ITALIC_12)
+Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) +"h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"%s<NL>","Cancellation Balance Due Notice.  Your Policy has been cancelled, however")
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) +"h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"%s<NL>","there is a balance due.  Please remit payment by the above due date.")
+/* L_V_POSITION = L_V_POSITION + 120
+Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) +"h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"%s<NL>","bank.  Then our cancellation notice already mailed to you continues to apply and")
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) +"h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"%s<NL>","Coverage terminates according to that notice.")
+*/
+L_V_POSITION = L_V_POSITION + 240
+Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) +"h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"%s<NL>","Contact your ")
+access arscontrol2,
+   set arscontrol2:company_id = sfsdefault:company_id, approximate
+
+if ARScontrol2:AGENT_PRODUCER <> "" then
+  {
+    Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_AGENT_PRODUCER_POSITION)) +"h" + Trun(Str(L_V_POSITION)+"V"))
+    Writefile(l_balance_due_name[1],"%s",trun(arscontrol2:AGENT_PRODUCER))
+  }
+else
+  {
+    Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_AGENT_PRODUCER_POSITION)) +"h" + Trun(Str(L_V_POSITION)+"V"))
+    Writefile(l_balance_due_name[1],"%s","agent")
+  }
+
+Writefile(l_balance_due_name[1],"%s<NL>"," at the address and phone number above for assistance.")
+
+/* print the fixed literals */
+Writefile(l_balance_due_name[1],"%s",L_ARIAL)
+
+Writefile(l_balance_due_name[1],"<033>&a3420h1155V<NL>")
+Writefile(l_balance_due_name[1],"Policy Type:<NL>")
+Writefile(l_balance_due_name[1],"<033>&a3420h1290V<NL>")
+Writefile(l_balance_due_name[1],"%s<NL>",SFSLINE:DESCRIPTION)
+Writefile(l_balance_due_name[1],"<033>&a180h1455V<NL>")
+Writefile(l_balance_due_name[1],"Run Date: %d<NL>",TODAYSDATE)
+Writefile(l_balance_due_name[1],"<033>&a2620h1455V<NL>")
+Writefile(l_balance_due_name[1],"Payment Plan: %s<NL>",ARSPAYPLAN:DESCRIPTION)
+
+Writefile(l_balance_due_name[1],"%s",L_ARIAL_BOLD)
+L_V_POSITION = 1755
+
+Writefile(l_balance_due_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"Eff Date<NL>")
+
+Writefile(l_balance_due_name[1],"%s","<033>&a910h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"Exp Date<NL>")
+
+Writefile(l_balance_due_name[1],"%s","<033>&a2100h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"Description")
+
+Writefile(l_balance_due_name[1],"%s","<033>&a3990h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"Due Date<NL>")
+
+Writefile(l_balance_due_name[1],"%s","<033>&a4920h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"Amount<NL>")
+
+-- print the company name and address here
+
+Writefile(l_balance_due_name[1],"%s",L_ARIAL)
+L_V_POSITION = 5330
+
+If SFSCOMPANY:USE_OTHER_MAILING = 0 Then -- use primary mailing address
+Begin
+Writefile(l_balance_due_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"%s",Trun(SFSCOMPANY:NAME[1])+"<NL>"+"<CR>")
+if sfpname:name[2] <> "" then
+    begin
+    L_V_POSITION = L_V_POSITION + 120
+    Writefile(l_balance_due_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+    Writefile(l_balance_due_name[1],"%s",Trun(SFSCOMPANY:NAME[2])+"<NL>"+"<CR>")
+    end
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_balance_due_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"%s",Trun(SFSCOMPANY:ADDRESS[1])+"<NL>"+"<CR>")
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_balance_due_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"%s",Trun(SFSCOMPANY:CITY)+", "+
+                              Trun(SFSCOMPANY:STR_STATE) +
+                              "  " + Str(Val(SFSCOMPANY:STR_ZIPCODE),"99999-9999") + "<NL>")
+End
+Else If SFSCOMPANY:USE_OTHER_MAILING = 1 Then -- user optional mailing
+Begin
+Access SFSCOMPMAIL, Set SFSCOMPMAIL:COMPANY_ID = SFSCOMPANY:COMPANY_ID
+Writefile(l_balance_due_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"%s",Trun(SFSCOMPMAIL:NAME[1])+"<NL>"+"<CR>")
+if sfscompmail:name[2] <> "" then
+    begin
+    L_V_POSITION = L_V_POSITION + 120
+    Writefile(l_balance_due_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+    Writefile(l_balance_due_name[1],"%s",Trun(SFSCOMPMAIL:NAME[2])+"<NL>"+"<CR>")
+    end
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_balance_due_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"%s",Trun(SFSCOMPMAIL:ADDRESS[1])+"<NL>"+"<CR>")
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_balance_due_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"%s",Trun(SFSCOMPMAIL:CITY)+", "+
+                              Trun(SFSCOMPMAIL:STR_STATE) +
+                              "  " + Str(Val(SFSCOMPMAIL:STR_ZIPCODE),"99999-9999") + "<NL>")
+End
+
+Writefile (l_balance_due_name[1],"%s<NL>",L_ARIAL_ITALIC_BOLD_16)
+Writefile (l_balance_due_name[1],"<033>&a1600h0V")
+Writefile (l_balance_due_name[1],"Cancellation Balance Due Invoice<nl>")
+
+/* =====================  Insured =========================   */
+Writefile (l_balance_due_name[1],"%s<NL>",L_ARIAL_BOLD)
+
+Writefile(l_balance_due_name[1],"<033>&a180h90V")
+Writefile(l_balance_due_name[1],"   Insured<NL>")
+Writefile(l_balance_due_name[1],"%s<NL>",L_ARIAL)
+Writefile (l_balance_due_name[1],"<033>&a180h210V")
+
+if arscontrol2:no_alpha_reinstatements = 1 then
+ {
+  Writefile(l_balance_due_name[1],"%s", Str(Val( Str(L_HOLD_POLICY_NO,"ZZZZZZZZZ")))+"<NL>")
+ }
+else
+ {
+  Writefile(l_balance_due_name[1],"%s", Trun(SFSLINE:ALPHA) +Str(Val( Str(L_HOLD_POLICY_NO,"ZZZZZZZZZ")))+"<NL>")
+ }
+
+L_LOOP_CTR = 0
+L_V_POSITION = 210
+For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the name
+Begin
+    If SFPNAME:NAME[L_LOOP_CTR] <> "" Then
+    {
+        L_V_POSITION = L_V_POSITION + 120
+        Writefile(l_balance_due_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+        I_NAME=SFPNAME:NAME[L_LOOP_CTR]
+        Do REVERSE_NAME
+        Writefile(l_balance_due_name[1],"%s",I_REV_NAME + "<NL>")
+    }
+End
+
+For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the address
+Begin
+    If SFPNAME:ADDRESS[L_LOOP_CTR] <> "" Then
+    {
+        L_V_POSITION = L_V_POSITION + 120
+        Writefile(l_balance_due_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+        Writefile(l_balance_due_name[1],"%s",SFPNAME:ADDRESS[L_LOOP_CTR] + "<NL>")
+    }
+End
+
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_balance_due_name[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"%s",Trun(SFPNAME:CITY) + ", " +
+                              Trun(SFPNAME:STR_STATE) + "  " +
+                              Str(Val(SFPNAME:STR_ZIPCODE),"99999-9999") + "<NL>")
+
+/* =====================   AGENT  =========================   */
+
+Writefile(l_balance_due_name[1],"%s<NL>",L_ARIAL_BOLD)
+Writefile(l_balance_due_name[1],"<033>&a3130h90V")
+if ARScontrol2:AGENT_PRODUCER <> "" then
+  {
+    Writefile(l_balance_due_name[1],"%s",trun(arscontrol2:AGENT_PRODUCER))
+  }
+else
+  {
+    Writefile(l_balance_due_name[1],"%s","Agent: ")
+  }
+
+Writefile(l_balance_due_name[1],"%s",Str(SFSAGENT:AGENT_NO,"ZZZZ")+"<NL>")
+Writefile(l_balance_due_name[1],"%s<NL>",L_ARIAL)
+
+L_LOOP_CTR = 0
+L_V_POSITION = 90
+For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the name
+Begin
+    If SFSAGENT:NAME[L_LOOP_CTR] <> "" Then
+    {
+        L_V_POSITION = L_V_POSITION + 120
+        Writefile(l_balance_due_name[1],"%s","<033>&a3130h" + Trun(Str(L_V_POSITION)+"V"))
+        Writefile(l_balance_due_name[1],"%s",SFSAGENT:NAME[L_LOOP_CTR] + "<NL>")
+    }
+End
+
+For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the address
+Begin
+    If SFSAGENT:ADDRESS[L_LOOP_CTR] <> "" Then
+    {
+        L_V_POSITION = L_V_POSITION + 120
+        Writefile(l_balance_due_name[1],"%s","<033>&a3130h" + Trun(Str(L_V_POSITION)+"V"))
+        Writefile(l_balance_due_name[1],"%s",SFSAGENT:ADDRESS[L_LOOP_CTR] + "<NL>")
+    }
+End
+
+L_V_POSITION = L_V_POSITION + 120
+Writefile(l_balance_due_name[1],"%s","<033>&a3130h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"%s",Trun(SFSAGENT:CITY) + ", " +
+                              Trun(SFSAGENT:STR_STATE) + "  " +
+                              Str(Val(SFSAGENT:STR_ZIPCODE),"99999-9999") + "<NL>")
+L_V_POSITION = L_V_POSITION + 120
+Writefile (l_balance_due_name[1],"%s","<033>&a3130h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile (l_balance_due_name[1],"%s",Str(Val(SFSAGENT:TELEPHONE[1]),"(999) 999-9999") + "<NL>")
+
+/* copy literal */
+
+Switch(L_HOLD_COPY_CTR)
+    Case 1  : L_COPY_LIT = "Insured Copy       "
+    Case 2  : if ARScontrol2:AGENT_PRODUCER <> "" then
+                {
+                  L_COPY_LIT = trun((arscontrol2:AGENT_PRODUCER)+ "Copy")
+                }
+              Else
+                {
+                  L_COPY_LIT = "Agent Copy         "
+                }
+    Case 3  : L_COPY_LIT = "Home Office Copy   "
+    Default : L_COPY_LIT = "Payor Copy         "
+End
+
+L_V_POSITION = 0
+Writefile (l_balance_due_name[1],"%s","<033>&a4860h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile (l_balance_due_name[1],"%s<NL>",Trun(L_COPY_LIT))
+
+/* bottom of invoce name and address */
+
+If L_HOLD_COPY_CTR <= 3 Then
+Begin
+
+L_LOOP_CTR = 0
+L_V_POSITION = 6390
+L_H_POSITION = 540
+
+For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the name
+Begin
+    If SFPNAME:NAME[L_LOOP_CTR] <> "" Then
+    {
+        L_V_POSITION = L_V_POSITION + 120
+        Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+        I_NAME=SFPNAME:NAME[L_LOOP_CTR]
+        Do REVERSE_NAME
+        Writefile(l_balance_due_name[1],"%s",I_REV_NAME + "<NL>")
+    }
+End
+
+For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the address
+Begin
+    If SFPNAME:ADDRESS[L_LOOP_CTR] <> "" Then
+    {
+        L_V_POSITION = L_V_POSITION + 120
+--        Writefile(l_balance_due_name[1],"%s","<033>&a540h" + Trun(Str(L_V_POSITION)+"V"))
+        Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+        Writefile(l_balance_due_name[1],"%s",SFPNAME:ADDRESS[L_LOOP_CTR] + "<NL>")
+    }
+End
+
+L_V_POSITION = L_V_POSITION + 120
+-- Writefile(l_balance_due_name[1],"%s","<033>&a540h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"%s",Trun(SFPNAME:CITY) + ", " +
+                              Trun(SFPNAME:STR_STATE) + "  " +
+                              Str(Val(SFPNAME:STR_ZIPCODE),"99999-9999") + "<NL>")
+
+End -- end of if l_hold_copy_ctr <= 3
+
+If L_HOLD_COPY_CTR >= 4 Then
+    Begin
+    L_TEMP_POLICY_NO   = L_SFPNAME_POLICY_NO[L_HOLD_COPY_CTR]
+    L_TEMP_POL_YEAR    = L_SFPNAME_POL_YEAR[L_HOLD_COPY_CTR]
+    L_TEMP_END_SEQUENCE = L_SFPNAME_END_SEQUENCE[L_HOLD_COPY_CTR]
+    L_TEMP_PREM_NO      = L_SFPNAME_PREM_NO[L_HOLD_COPY_CTR]
+    L_TEMP_BUILD_NO     = L_SFPNAME_BUILD_NO[L_HOLD_COPY_CTR]
+    L_TEMP_SUB_CODE     = L_SFPNAME_SUB_CODE[L_HOLD_COPY_CTR]
+
+    Access SFPSUPP, Set SFPSUPP:POLICY_NO    = L_TEMP_POLICY_NO,
+                        SFPSUPP:POL_YEAR     = L_TEMP_POL_YEAR,
+                        SFPSUPP:END_SEQUENCE = L_TEMP_END_SEQUENCE, generic
+
+    If SFPSUPP:POLICY_NO    = L_TEMP_POLICY_NO And
+       SFPSUPP:POL_YEAR     = L_TEMP_POL_YEAR And
+       SFPSUPP:END_SEQUENCE = L_TEMP_END_SEQUENCE Then
+        Begin
+        L_COMPANY = SFPNAME:COMPANY_ID
+        Access SFSMORT, Set SFSMORT:COMPANY_ID  = L_COMPANY,
+                            SFSMORT:MORTGAGE_ID = SFPSUPP:MORTGAGE_ID,Generic
+
+        L_LOOP_CTR = 0
+        L_V_POSITION = 6120
+        L_H_POSITION = 180
+
+        if sfpsupp:mortgage_id <> "" then
+            begin
+            For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the name
+                Begin
+                If SFSMORT:NAME[L_LOOP_CTR] <> "" Then
+                    {
+                    L_V_POSITION = L_V_POSITION + 120
+                    Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+                    I_NAME=SFSMORT:NAME[L_LOOP_CTR]
+                    Do REVERSE_NAME
+                    Writefile(l_balance_due_name[1],"%s",I_REV_NAME + "<NL>")
+                    }
+                End
+
+            For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the address
+                Begin
+                If SFSMORT:ADDRESS[L_LOOP_CTR] <> "" Then
+                    {
+                    L_V_POSITION = L_V_POSITION + 120
+                    Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+                    Writefile(l_balance_due_name[1],"%s",SFSMORT:ADDRESS[L_LOOP_CTR] + "<NL>")
+                    }
+                End
+
+            L_V_POSITION = L_V_POSITION + 120
+            Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+            Writefile(l_balance_due_name[1],"%s",Trun(SFSMORT:CITY) + ", " +
+                              Trun(SFSMORT:STR_STATE) + "  " +
+                              Str(Val(SFSMORT:STR_ZIPCODE),"99999-9999") + "<NL>")
+
+            Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = ARSCONTROL:COMPANY_ID, Approximate
+
+
+            If SFPSUPP:ACCOUNT_NO <> "" And ARSCONTROL2:PRINT_LOAN_NO_BOTTOM One Of 1  Then
+                {
+                /**** Account number information here ****/
+                L_V_POSITION = L_V_POSITION + 120
+                Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+                Writefile(l_balance_due_name[1],"%s","LOAN NO.: " + SFPSUPP:ACCOUNT_NO + "<nl>")
+                }
+
+            End -- checking for mortgage id
+        else
+            begin
+            For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the name
+                Begin
+                If SFPSUPP:NAME[L_LOOP_CTR] <> "" Then
+                    {
+                    L_V_POSITION = L_V_POSITION + 120
+                    Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+                    I_NAME=sfpsupp:NAME[L_LOOP_CTR]
+                    Do REVERSE_NAME
+                    Writefile(l_balance_due_name[1],"%s",I_REV_NAME + "<NL>")
+                    }
+                End
+
+            For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the address
+                Begin
+                If sfpsupp:ADDRESS[L_LOOP_CTR] <> "" Then
+                    {
+                    L_V_POSITION = L_V_POSITION + 120
+                    Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+                    Writefile(l_balance_due_name[1],"%s",sfpsupp:ADDRESS[L_LOOP_CTR] + "<NL>")
+                    }
+                End
+
+            L_V_POSITION = L_V_POSITION + 120
+            Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+            Writefile(l_balance_due_name[1],"%s",Trun(sfpsupp:CITY) + ", " +
+                              Trun(sfpsupp:STR_STATE) + "  " +
+                              Str(Val(sfpsupp:STR_ZIPCODE),"99999-9999") + "<NL>")
+
+            Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = ARSCONTROL:COMPANY_ID, Approximate
+
+
+            If SFPSUPP:ACCOUNT_NO <> "" And ARSCONTROL2:PRINT_LOAN_NO_BOTTOM One Of 1  Then
+                {
+                /**** Account number information here ****/
+                L_V_POSITION = L_V_POSITION + 120
+                Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+                Writefile(l_balance_due_name[1],"%s","LOAN NO.: " + SFPSUPP:ACCOUNT_NO + "<nl>")
+                }
+
+            End -- checking for mortgage id
+
+        end -- checking for policy no
+
+    Access SFPSUPP1, Set SFPSUPP1:POLICY_NO    = L_TEMP_POLICY_NO,
+                         SFPSUPP1:POL_YEAR     = L_TEMP_POL_YEAR,
+                         SFPSUPP1:END_SEQUENCE = L_TEMP_END_SEQUENCE, generic
+
+    If SFPSUPP1:POLICY_NO    = L_TEMP_POLICY_NO And
+       SFPSUPP1:POL_YEAR     = L_TEMP_POL_YEAR And
+       SFPSUPP1:END_SEQUENCE = L_TEMP_END_SEQUENCE Then
+        Begin
+        L_COMPANY = SFPNAME:COMPANY_ID
+        Access SFSMORT, Set SFSMORT:COMPANY_ID  = L_COMPANY,
+                            SFSMORT:MORTGAGE_ID = SFPSUPP1:MORTGAGE_ID,Generic
+
+        L_LOOP_CTR = 0
+        L_V_POSITION = 6120
+        L_H_POSITION = 180
+
+        if sfpsupp1:mortgage_id <> "" then
+            begin
+            For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the name
+                Begin
+                If SFSMORT:NAME[L_LOOP_CTR] <> "" Then
+                    {
+                    L_V_POSITION = L_V_POSITION + 120
+                    Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+                    I_NAME=SFSMORT:NAME[L_LOOP_CTR]
+                    Do REVERSE_NAME
+                    Writefile(l_balance_due_name[1],"%s",I_REV_NAME + "<NL>")
+                    }
+                End
+
+            For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the address
+                Begin
+                If SFSMORT:ADDRESS[L_LOOP_CTR] <> "" Then
+                    {
+                    L_V_POSITION = L_V_POSITION + 120
+                    Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+                    Writefile(l_balance_due_name[1],"%s",SFSMORT:ADDRESS[L_LOOP_CTR] + "<NL>")
+                    }
+                End
+
+            L_V_POSITION = L_V_POSITION + 120
+            Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+            Writefile(l_balance_due_name[1],"%s",Trun(SFSMORT:CITY) + ", " +
+                              Trun(SFSMORT:STR_STATE) + "  " +
+                              Str(Val(SFSMORT:STR_ZIPCODE),"99999-9999") + "<NL>")
+
+            Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = ARSCONTROL:COMPANY_ID, Approximate
+
+
+            If SFPSUPP1:ACCOUNT_NO <> "" And ARSCONTROL2:PRINT_LOAN_NO_BOTTOM One Of 1  Then
+                {
+                /**** Account number information here ****/
+                L_V_POSITION = L_V_POSITION + 120
+                Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+                Writefile(l_balance_due_name[1],"%s","LOAN NO.: " + SFPSUPP1:ACCOUNT_NO + "<nl>")
+                }
+
+            End -- checking for mortgage id
+        else
+            begin
+            For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the name
+                Begin
+                If SFPSUPP1:NAME[L_LOOP_CTR] <> "" Then
+                    {
+                    L_V_POSITION = L_V_POSITION + 120
+                    Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+                    I_NAME=sfpsupp1:NAME[L_LOOP_CTR]
+                    Do REVERSE_NAME
+                    Writefile(l_balance_due_name[1],"%s",I_REV_NAME + "<NL>")
+                    }
+                End
+
+            For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the address
+                Begin
+                If sfpsupp1:ADDRESS[L_LOOP_CTR] <> "" Then
+                    {
+                    L_V_POSITION = L_V_POSITION + 120
+                    Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+                    Writefile(l_balance_due_name[1],"%s",sfpsupp1:ADDRESS[L_LOOP_CTR] + "<NL>")
+                    }
+                End
+
+            L_V_POSITION = L_V_POSITION + 120
+            Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+            Writefile(l_balance_due_name[1],"%s",Trun(sfpsupp1:CITY) + ", " +
+                              Trun(sfpsupp1:STR_STATE) + "  " +
+                              Str(Val(sfpsupp1:STR_ZIPCODE),"99999-9999") + "<NL>")
+
+            Access ARSCONTROL2, Set ARSCONTROL2:COMPANY_ID = ARSCONTROL:COMPANY_ID, Approximate
+
+
+            If SFPSUPP1:ACCOUNT_NO <> "" And ARSCONTROL2:PRINT_LOAN_NO_BOTTOM One Of 1  Then
+                {
+                /**** Account number information here ****/
+                L_V_POSITION = L_V_POSITION + 120
+                Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)) + "V")
+                Writefile(l_balance_due_name[1],"%s","LOAN NO.: " + SFPSUPP1:ACCOUNT_NO + "<nl>")
+                }
+
+            End -- checking for mortgage id
+
+        end -- checking for policy no
+
+    End -- end of l_hold_copy_ctr >= 4
+
+/* Print policy Number on return Invoice */
+
+L_V_POSITION = 5940
+L_H_POSITION = 180
+
+Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+--Writefile(l_balance_due_name[1],"%s","<033>&a2880h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"Policy Number: <NL>")
+
+L_H_POSITION = L_H_POSITION + 720
+Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+--Writefile(l_balance_due_name[1],"%s","<033>&a3600h" + Trun(Str(L_V_POSITION)+"V"))
+
+if arscontrol2:no_alpha_reinstatements = 1 then
+ {
+  Writefile(l_balance_due_name[1],"%s", Str(Val(Str(L_HOLD_POLICY_NO,"ZZZZZZZZZ")))+"<NL>")
+ }
+else
+ {
+  Writefile(l_balance_due_name[1],"%s", Trun(SFSLINE:ALPHA) + Str(Val(Str(L_HOLD_POLICY_NO,"ZZZZZZZZZ")))+"<NL>")
+ }
+
+Writefile(l_balance_due_name[1],"%s<NL>",L_ARIAL_BOLD_14)
+
+L_V_POSITION = 5310
+L_H_POSITION = 3060
+Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+
+--Writefile(l_balance_due_name[1],"%s<NL>","<033>&a2880h5100V<NL>")
+Writefile(l_balance_due_name[1],"%s<NL>",ARSCONTROL:INVOICE_PAY_AMOUNT)
+
+L_H_POSITION = L_H_POSITION + 1440 -- 2.0" to the right
+Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+--Writefile(l_balance_due_name[1],"%s<NL>","<033>&a4680h5100V<NL>")
+Writefile(l_balance_due_name[1],"%s<NL>",Str(L_TOTAL_AMOUNT_DUE,"($ZZ,ZZZ,ZZZ.99)"))
+
+If ARSCONTROL2:PRINT_RUN_DATE_ON_cx_bal_due One Of 1 Then
+Begin
+    Writefile (l_balance_due_name[1],"%s<NL>",L_ARIAL_8)
+    L_V_POSITION = ARSCONTROL2:DATE_ON_INVOICE_V_POSITION
+    L_H_POSITION = ARSCONTROL2:DATE_ON_INVOICE_H_POSITION
+    Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+    Writefile(l_balance_due_name[1],"%s",Str(TODAYSDATE,"MM/DD/YYYY"))
+End
+
+-- new OCR printing on the bottom of the invoice
+
+-- house cleaning
+l_check_scan_policy_no          = ""
+l_check_scan_due_date           = ""
+l_check_scan_due_date           = ""
+l_check_scan_total_due          = ""
+l_check_scan_check_digit        = ""
+l_check_scan_line               = ""
+l_check_scan_amount             = 0
+l_check_digit_weight            = 0
+l_check_digit_total             = 0
+
+for l_check_digit_sub = 1 to 100
+begin
+   l_check_digit_amount[l_check_digit_sub] = 0
+end
+
+/*  end of house cleaning */
+
+
+if arscontrol2:check_scan one of 1 then
+begin
+   l_v_position = arscontrol2:check_scan_v_position
+   l_h_position = arscontrol2:check_scan_h_position
+
+access arsbilling_alt2, set arsbilling_alt2:company_id = l_hold_company_id,
+                            arsbilling_alt2:policy_no  = l_hold_policy_no, approximate
+
+while arsbilling_alt2:company_id = l_hold_company_id and
+      arsbilling_alt2:policy_no  = l_hold_policy_no
+      begin
+
+   if arsbilling_alt2:trans_code one of 25 then
+   begin
+
+   if arscontrol2:check_scan_policy_no one of 1 then
+   begin
+       l_check_scan_policy_no = str(l_hold_policy_no,"999999999")
+   end
+   else
+   begin
+       l_check_scan_policy_no = ""
+   end
+
+
+   if arscontrol2:check_scan_due_date one of 1 then
+   begin
+       l_check_scan_due_date = str(arsbilling_alt2:due_date,"MMDDYYYY")
+   end
+   else
+   begin
+       l_check_scan_due_date = ""
+   end
+
+   if arscontrol2:check_scan_current_due one of 1 then
+   begin
+       l_check_scan_amount      = l_total_amount_due * 100
+       l_check_scan_current_due = str(l_check_scan_amount,"99999999")
+       l_check_scan_amount      = 0
+   end
+   else
+   begin
+       l_check_scan_due_date = ""
+   end
+
+   if arscontrol2:check_scan_total_due one of 1 then
+   begin
+       l_check_scan_amount    = l_total_amount_due * 100
+       l_check_scan_total_due = str(l_check_scan_amount,"99999999")
+       l_check_scan_amount    = 0
+   end
+   else
+   begin
+       l_check_scan_total_due = ""
+   end
+
+l_check_scan_line = l_check_scan_policy_no   +
+                    l_check_scan_due_date    +
+                    l_check_scan_current_due +
+                    l_check_scan_total_due
+
+/* calculate the check digit here */
+for l_check_digit_sub = 1 to len(l_check_scan_line)
+begin
+   l_check_digit_weight = (l_check_digit_sub mod arscontrol2:check_digit_weight) + 1
+   l_check_digit_amount[l_check_digit_sub] =
+   val(l_check_scan_line[l_check_digit_sub]) * l_check_digit_weight
+end
+
+for l_check_digit_sub = 1 to len(l_check_scan_line)
+begin
+   l_check_digit_total = l_check_digit_total +
+                         l_check_digit_amount[l_check_digit_sub]
+end
+
+l_check_digit_number = (l_check_digit_total div arscontrol2:check_digit_divisor)
+l_check_digit_raw  = l_check_digit_number * arscontrol2:check_digit_divisor
+l_check_digit_final = l_check_digit_total - l_check_digit_raw
+
+l_check_digit_final_str = str(l_check_digit_final,"999")
+l_check_scan_line = trun(l_check_scan_line) + l_check_digit_final_str
+
+
+-- removed <NL> after the %s - testing this
+
+Writefile(l_balance_due_name[1],"%s",L_pop)
+Writefile(l_balance_due_name[1],"%s",L_ocr_a)
+Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"%s",trun(l_check_scan_line))
+Writefile(l_balance_due_name[1],"%s",L_push)
+--Writefile(l_balance_due[1],"%s<NL>",L_arial_12)
+
+end
+
+next arsbilling_alt2
+
+end -- end of loop
+
+end -- end of check_scan switch
+
+/* if arscontrol2:check_scan one of 1 then
+begin
+   l_v_position = arscontrol2:check_scan_v_position
+   l_h_position = arscontrol2:check_scan_h_position
+
+   if arscontrol2:check_scan_policy_no one of 1 then
+   begin
+       l_check_scan_policy_no = str(arsbilling_alias:policy_no,"999999999")
+   end
+   else
+   begin
+       l_check_scan_policy_no = ""
+   end
+
+   if arscontrol2:check_scan_due_date one of 1 then
+   begin
+       l_check_scan_due_date = str(arsbilling_alias:due_date,"MMDDYYYY")
+   end
+   else
+   begin
+       l_check_scan_due_date = ""
+   end
+
+   if arscontrol2:check_scan_current_due one of 1 then
+   begin
+       l_check_scan_amount      = l_total_amount_due * 100
+       l_check_scan_current_due = str(l_check_scan_amount,"99999999")
+       l_check_scan_amount      = 0
+   end
+   else
+   begin
+       l_check_scan_due_date = ""
+   end
+
+   if arscontrol2:check_scan_total_due one of 1 then
+   begin
+       l_check_scan_amount    = l_total_amount_due * 100
+       l_check_scan_total_due = str(l_check_scan_amount,"99999999")
+       l_check_scan_amount    = 0
+   end
+   else
+   begin
+       l_check_scan_total_due = ""
+   end
+
+l_check_scan_line = l_check_scan_policy_no   +
+                    l_check_scan_due_date    +
+                    l_check_scan_current_due +
+                    l_check_scan_total_due
+*/
+/* calculate the check digit here */
+/*
+for l_check_digit_sub = 1 to len(l_check_scan_line)
+begin
+   l_check_digit_weight = (l_check_digit_sub mod arscontrol2:check_digit_weight) + 1
+   l_check_digit_amount[l_check_digit_sub] =
+   val(l_check_scan_line[l_check_digit_sub]) * l_check_digit_weight
+end
+
+for l_check_digit_sub = 1 to len(l_check_scan_line)
+begin
+   l_check_digit_total = l_check_digit_total +
+                         l_check_digit_amount[l_check_digit_sub]
+end
+
+l_check_digit_number = (l_check_digit_total div arscontrol2:check_digit_divisor)
+l_check_digit_raw  = l_check_digit_number * arscontrol2:check_digit_divisor
+l_check_digit_final = l_check_digit_total - l_check_digit_raw
+
+l_check_digit_final_str = str(l_check_digit_final,"999")
+l_check_scan_line = trun(l_check_scan_line) + l_check_digit_final_str
+
+
+-- removed <NL> after the %s - testing this
+
+Writefile(l_balance_due_name[1],"%s",L_pop)
+Writefile(l_balance_due_name[1],"%s",L_ocr_a)
+Writefile(l_balance_due_name[1],"%s","<033>&a" + Trun(Str(L_H_POSITION)) + "h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(l_balance_due_name[1],"%s",trun(l_check_scan_line))
+Writefile(l_balance_due_name[1],"%s",L_push)
+--Writefile(l_balance_due_name[1],"%s<NL>",L_arial_12)
+
+end -- end of check_scan switch
+*/
+
+End
+
+Procedure PRINT_DETAIL_LINE
+Begin
+
+L_LINE_PRINTED = "N"
+I_NAME = SFPNAME:NAME[1]
+
+Include "sfsrevname7.pro"
+
+Access ARSBILLING_ALIAS, Set ARSBILLING_ALIAS:COMPANY_ID = L_HOLD_COMPANY_ID,
+                             ARSBILLING_ALIAS:POLICY_NO  = L_HOLD_POLICY_NO, Approximate
+
+While ARSBILLING_ALIAS:COMPANY_ID = L_HOLD_COMPANY_ID And
+      ARSBILLING_ALIAS:POLICY_NO  = L_HOLD_POLICY_NO And
+      L_LINE_PRINTED             = "N"
+      Begin
+
+If ARSBILLING_ALIAS:BILLED_DATE >= G_STARTING_DATE And
+   ARSBILLING_ALIAS:BILLED_DATE <= G_ENDING_DATE And
+   ARSBILLING_ALIAS:STATUS = "B" And
+   ARSBILLING_ALIAS:TRANS_CODE = 25 Then
+   Begin
+      L_LINE_PRINTED = "Y"
+
+   access sfpname_alt, set sfpname_alt:policy_no    = arsbilling_alias:policy_no,
+                           sfpname_alt:pol_year     = arsbilling_alias:pol_year,
+                           sfpname_alt:end_sequence = arsbilling_alias:end_sequence, exact
+
+
+L_TRANSACTION = "Cancellation Balance Due"
+
+Writefile(l_balance_due_name[1],"%s<NL>",L_LETTER_GOTHIC_12)
+
+L_V_POSITION = L_V_POSITION + 120
+
+Writefile(l_balance_due_name[1],"%s","<033>&a210h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(l_balance_due_name[1],"%s<NL>",Trun(Str(sfpname_alt:eff_DATE,"MM/DD/YYYY"))) --not always current term.
+Writefile(l_balance_due_name[1],"%s","<033>&a930h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(l_balance_due_name[1],"%s<NL>",Trun(Str(ARSBILLING_ALIAS:TRANS_EFF,"MM/DD/YYYY")))
+Writefile(l_balance_due_name[1],"%s","<033>&a1620h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(l_balance_due_name[1],"%s<NL>",Trun(L_TRANSACTION))
+Writefile(l_balance_due_name[1],"%s","<033>&a4000h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(l_balance_due_name[1],"%s<NL>",Trun(Str(ARSBILLING_ALIAS:DUE_DATE,"MM/DD/YYYY")))
+Writefile(l_balance_due_name[1],"%s","<033>&a4590h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(l_balance_due_name[1],"%s<NL>",Trun(Str(L_TOTAL_AMOUNT_DUE,"($$,$$$,$$$.99)")))
+
+L_LINES_PRINTED = L_LINES_PRINTED + 1
+If L_LINES_PRINTED >= 29 Then
+Begin
+   Do EJECT_PAGE
+   Do PRINT_FORM
+   L_LINES_PRINTED = 0
+   L_PAGES_CTR = L_PAGES_CTR + 1
+   L_V_POSITION = 1800
+End
+
+End
+
+Next ARSBILLING_ALIAS
+
+End -- while
+
+End
+
+Procedure EJECT_PAGE
+Begin
+
+    Writefile(l_balance_due_name[1],"%s",L_FORMFEED+"<NL>")
+    Writefile(l_balance_due_name[1],"%s",L_RESET + "<NL>")
+-- options are:
+--     1 = Executive
+--     2 = Letter
+--     3 = Legal
+--     4 = A4
+--     5 = Monarch
+--     6 = Commercial 10
+--     7 = International DL
+--     8 = International C5
+
+Writefile(l_balance_due_name[1],"<033>&l2A")   -- set the printer to Letter, see above
+--Writefile(l_balance_due_name[1],"<033>&k2G") -- set to cr=cr+lf, lf=lf, ff=ff
+--Writefile(l_balance_due_name[1],"<033>&s0C") -- enable end of line wrap
+
+    L_PAGES_CTR = L_PAGES_CTR + 1
+
+End
+
+Procedure REVERSE_NAME
+Begin
+
+Include "sfsrevname7.pro"
+
+End
+
+Procedure GET_CURRENT_SFPNAME
+Begin
+
+access sfpcurrent, set sfpcurrent:policy_no = arsbilling:policy_no, generic
+
+l_policy_no    = sfpcurrent:policy_no
+L_POL_YEAR     = sfpcurrent:pol_year
+L_END_SEQUENCE = sfpcurrent:end_sequence
+
+--Access SFPNAME, Set SFPNAME:POLICY_NO = ARSBILLING:POLICY_NO,
+--                    SFPNAME:POL_YEAR  = L_POL_YEAR,
+ --                   sfpname:end_seqence = l_end_sequence, Approximate
+
+--While SFPNAME:POLICY_NO = ARSBILLING:POLICY_NO And
+--      SFPNAME:POL_YEAR  = L_POL_YEAR
+--      Begin
+--          L_POLICY_NO    = SFPNAME:POLICY_NO
+--          L_END_SEQUENCE = SFPNAME:END_SEQUENCE
+--          Next SFPNAME
+--      End
+
+End  -- end of get_current_sfpname procedure
+
+Procedure GET_NUMBER_OF_COPIES
+Begin
+For L_SFPNAME_LOOP_CTR = 1 To 200
+    Begin
+    L_SFPNAME_POLICY_NO[L_SFPNAME_LOOP_CTR]    = 0
+    L_SFPNAME_POL_YEAR[L_SFPNAME_LOOP_CTR]     = 0
+    L_SFPNAME_END_SEQUENCE[L_SFPNAME_LOOP_CTR] = 0
+    L_SFPNAME_PREM_NO[L_SFPNAME_LOOP_CTR]      = 0
+    L_SFPNAME_BUILD_NO[L_SFPNAME_LOOP_CTR]     = 0
+    L_SFPNAME_SUB_CODE[L_SFPNAME_LOOP_CTR]     = 0
+    End
+
+L_SFPNAME_LOOP_CTR = 0
+Access SFPSUPP, Set SFPSUPP:POLICY_NO    = L_POLICY_NO,
+                    SFPSUPP:POL_YEAR     = L_POL_YEAR,
+                    SFPSUPP:END_SEQUENCE = L_END_SEQUENCE, generic
+
+While SFPSUPP:POLICY_NO    = L_POLICY_NO And
+      SFPSUPP:POL_YEAR     = L_POL_YEAR and
+      sfpsupp:end_sequence = l_end_sequence
+    Begin
+    If SFPSUPP:MORTGAGE_TYPE_1 One Of "B","C","M" Then
+        {
+        L_COPY_CTR                                 = L_COPY_CTR + 1
+        L_SFPNAME_LOOP_CTR                         = L_COPY_CTR  -- the first 3 positions are blank
+        L_SFPNAME_POLICY_NO[L_SFPNAME_LOOP_CTR]    = SFPSUPP:POLICY_NO
+        L_SFPNAME_POL_YEAR[L_SFPNAME_LOOP_CTR]     = SFPSUPP:POL_YEAR
+        L_SFPNAME_END_SEQUENCE[L_SFPNAME_LOOP_CTR] = SFPSUPP:END_SEQUENCE
+        L_SFPNAME_PREM_NO[L_SFPNAME_LOOP_CTR]      = SFPSUPP:PREM_NO
+        L_SFPNAME_BUILD_NO[L_SFPNAME_LOOP_CTR]     = SFPSUPP:BUILD_NO
+        L_SFPNAME_SUB_CODE[L_SFPNAME_LOOP_CTR]     = SFPSUPP:SUB_CODE
+        }
+
+    Next SFPSUPP
+    End
+
+Access SFPSUPP1, Set SFPSUPP1:POLICY_NO   = L_POLICY_NO,
+                     SFPSUPP1:POL_YEAR    = L_POL_YEAR,
+                     SFPSUPP:END_SEQUENCE = L_END_SEQUENCE, generic
+
+While SFPSUPP1:POLICY_NO    = L_POLICY_NO And
+      SFPSUPP1:POL_YEAR     = L_POL_YEAR and
+      sfpsupp1:end_sequence = l_end_sequence
+    Begin
+    If SFPSUPP1:MORTGAGE_TYPE_1 One Of "B","C","M", "L", "A" Then
+        {
+        L_COPY_CTR                                 = L_COPY_CTR + 1
+        L_SFPNAME_LOOP_CTR                         = L_COPY_CTR  -- the first 3 positions are blank
+        L_SFPNAME_POLICY_NO[L_SFPNAME_LOOP_CTR]    = SFPSUPP1:POLICY_NO
+        L_SFPNAME_POL_YEAR[L_SFPNAME_LOOP_CTR]     = SFPSUPP1:POL_YEAR
+        L_SFPNAME_END_SEQUENCE[L_SFPNAME_LOOP_CTR] = SFPSUPP1:END_SEQUENCE
+        L_SFPNAME_PREM_NO[L_SFPNAME_LOOP_CTR]      = SFPSUPP1:vehicle_no
+        L_SFPNAME_BUILD_NO[L_SFPNAME_LOOP_CTR]     = 0
+        L_SFPNAME_SUB_CODE[L_SFPNAME_LOOP_CTR]     = SFPSUPP1:SUB_CODE
+        }
+
+    Next SFPSUPP1
+    End
+
+End  -- end of get_number_of_copies
+
+procedure add_image_header
+
+begin
+  Access scipsimage,
+     Set scipsimage:COMPANY_ID = sfpname:company_id, Generic
+
+  L_DD = Day(TODAYSDATE)
+  L_MM = Month(TODAYSDATE)
+  L_YY = Year(TODAYSDATE)
+
+  If scipsimage:ZEROSUPPRESS_NUMBER = 1 Then
+    {
+      L_policy = Str(L_policy_NO,"ZZZZZZZZZ")
+    }
+  Else
+    {
+      L_policy = Str(L_policy_NO,"999999999")
+    }
+  If scipsimage:ALPHA_CHARACTER = 1 Then
+    Begin
+      If scipsimage:SPACE_BETWEEN_ALPHA_NUMBER = 0 Then
+        {
+          L_policy_str = Trun(SFSLINE:ALPHA + L_policy)
+        }
+      Else
+        {
+          L_policy_str = Trun(SFSLINE:ALPHA + " " + L_policy)
+        }
+    End
+  Else
+    {
+      L_policy_STR = Trun(L_policy)
+    }
+
+  L_FILE_NUMBER = Trun(scipsimage:FILE_NUMBER[1]) + Trun(L_policy_STR) +
+                  Trun(scipsimage:FILE_NUMBER[2])
+
+  I_NAME = sfpname:name[1]
+  Include "sfsrevname7.pro"
+  If scipsimage:REVERSE_NAME = 1 Then
+    {
+      L_FILE_NAME = Trun(scipsimage:FILE_NAME[1]) + Trun(I_REV_NAME) +
+                    Trun(scipsimage:FILE_NAME[2])
+    }
+
+  Access SFSLINE,
+     Set SFSLINE:COMPANY_ID       = SFPNAME:COMPANY_ID,
+         SFSLINE:LINE_OF_BUSINESS = SFPNAME:LINE_OF_BUSINESS,
+         SFSLINE:LOB_SUBLINE      = L_LOB_SUBLINE
+
+  if (sfsline:personal_commercial = "P") then  --if the line is Personal Lines then I need a different Drawer
+    {
+      L_DRAWER  = Trun(scipsimage:DRAWER[1]) +
+                  Trun(scipsimage:DRAWER_NAME_2[1]) +
+                  Trun(scipsimage:DRAWER[2])
+    }
+  else  --COMMERCIAL LINES HERE
+    {
+      L_DRAWER  = Trun(scipsimage:DRAWER[1]) +
+                  Trun(scipsimage:DRAWER_NAME) +
+                  Trun(scipsimage:DRAWER[2])
+    }
+
+  L_FOLDER_TYPE = Trun(scipsimage:FOLDER_TYPE[1]) +
+                  Trun(scipsimage:FOLDER_TYPE2[3]) +
+                  Trun(scipsimage:FOLDER_TYPE[2])
+  L_DOC_TYPE    = Trun(scipsimage:DOC_TYPE[1]) +
+                  Trun(scipsimage:DOC_TYPE2[3]) +
+                  Trun(scipsimage:DOC_TYPE[2])
+  L_DOC_DATE    = Trun(scipsimage:DOC_DATE[1]) +
+                  Str(L_YY,4) + Str(L_MM,2) + Str(L_DD,2) +
+                  Trun(scipsimage:DOC_DATE[2])
+
+  Deletefile(l_header_name)   --name for the header information to be added for imaging
+
+  If scipsimage:ZEROSUPPRESS_NUMBER = 1 Then
+    {
+      Writefile (l_header_name,"%s%n%s<nl>",Trun(scipsimage:FILE_NUMBER[1]),
+                               L_policy_no,Trun(scipsimage:FILE_NUMBER[2]))
+    }
+
+  Writefile (l_header_name,"%s<nl>",L_FILE_NAME)
+  Writefile (l_header_name,"%s<nl>",L_DRAWER)
+  Writefile (l_header_name,"%s<nl>",L_FOLDER_TYPE)
+  Writefile (l_header_name,"%s<nl>",L_DOC_TYPE)
+  Writefile (l_header_name,"%s<nl>",L_DOC_DATE)
+  Writefile (l_header_name,"%s<nl>",scipsimage:START_CAPTURE)
+  Writefile (l_header_name,"%s<ff>",scipsimage:END_CAPTURE)
+  Closefile (l_header_name)
+
+  Proc("cli joinit %s %s",l_balance_due_name[1],l_header_name)  --this is because the sfpindex will need to go at the beginning
+
+  do get_unique_pcl_file
+  Proc("cli mv %s %s",l_header_name,L_invoice_PDF_1)/noconsole  --moving it to a unique file
+--  read("%c%s",10001,"I have a unique key",l_enter,1)
+  --make sure we have a unique file name.
+
+  L_UNIX_PATH   = scipsimage:DIRECTORY_PATH/raw
+  Proc("cli mv %s %s",L_invoice_PDF_1,L_UNIX_PATH)/noconsole
+  Deletefile (L_header_name)
+  Deletefile (L_balance_due_name[1])
+end
+
+Procedure get_unique_pcl_file
+
+BEGIN
+  I_CSEXEC_APPLICATION = "PRINT                    "/raw
+  Include "sfscsexec.pro"
+  L_invoice_PDF_1 = programid+"_"+Str(I_CSEXEC_NUMBER)+".pcl"
+END
+
+
+End  -- end of program
+
+/* end of file */

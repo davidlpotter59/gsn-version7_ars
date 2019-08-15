@@ -1,0 +1,71 @@
+%%
+Screen
+        Name = "arsmn001" ;
+        Type = "Menu" ;
+        Include "MENUKEYS.INC"
+        iconline = 0;
+
+        global string g_company_id[10],
+                      g_lib[10];
+
+        string l_continue_1[100];
+
+Functions
+1       Display "arsmn010" ;
+2       Display "arsmn020" ;
+3       Display "arsmn030" ;
+
+97  stop ;
+
+99 continue begin
+           l_continue_1 = dialog("Exiting SCIPS","warning.bmp","You are about to Exit SCIPS.<NL>  <NL>Click YES to Confirm<NL>","YES","NO")
+           switch (l_continue_1)
+           case "YES" : function = "97"
+           end
+           end ;
+
+
+--menu definition
+
+--     include "stdmenu7m.inc"
+--}
+
+screen entry
+g_lib = "arslib"
+
+screen at 1,1 to 10,80
+Properties
+     {
+     LayOutType = Column
+     }
+{
+Panel Tagged header_pl
+Properties
+    {
+    BorderStyle = Raised
+    ScrollBarPolicy = Never
+    }
+{
+%%
+*-----------------------------------------------------------------------------*
+|                          Accounts Receivable                                |
+|                                                                             |
+|                        1. Process Payments                                  |
+|                        2. SFPMASTER Update Screen                           |
+|                        3. APSACCOUNT Update Screen                          |
+|                                                                             |
+*-----------------------------------------------------------------------------*
+                                                       _______________
+
+%%
+
+Components
+
+Fields
+        FUNCTION/noecho/showasguidetext ;
+}
+}
+screen exit
+g_lib = "arslib"
+
+End

@@ -1,0 +1,154 @@
+%%
+Screen
+        Name = "Arsin210" ;
+        Type = "Detail";
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize = "dynamic";
+        Windowtitle = "%a     %s   Account Current Inquiry by Agent Version 7.00    %m";
+        iconline = 0;
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_AGENT_NO[4] ;
+        Global Unsigned Ascii Number G_PAID_YEAR[4] ;
+
+        Signed Ascii Number L_TOTAL_PREMIUM[9]=0/decimals=2,
+                            L_TOTAL_COMMISSION[9]=0/decimals=2;
+
+        Unsigned Ascii Number L_SUB[2]=0;
+
+        string l_continue_1[50]="";
+
+        Access ARSAGTACCOM,
+           Set ARSAGTACCOM:COMPANY_ID = G_COMPANY_ID ,
+               ARSAGTACCOM:AGENT_NO = G_AGENT_NO ,
+               ARSAGTACCOM:PAID_YEAR = G_PAID_YEAR ;
+
+        Include "STDKEYS7.INC"
+
+Style Definition
+    include "styles.inc"
+
+Functions
+
+        Include "STDFUNC7.INC"
+Menu Definition
+    include "stdmenu7.inc"
+}
+
+ToolBar Definition
+    include "stdtoolbar7.inc"
+}
+
+Screen
+Properties
+    {
+    LayOutType      = Column
+    }
+{
+
+Panel Tagged Header_pl
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = AsNeeded
+    }
+{
+%%
+                                                                  ____________
+*------------------------------------------------------------------------------*
+| Company Id: __________ __________________________________________________    |
+| Agent No.         ____ __________________________________________________    |
+*------------------------------------------------------------------------------*
+| Paid                                                                         |
+| Year                Premium       Commission         NET         Received    |
+| ____                                                                         |
+|      January     _____________    ___________    ___________   ___________   |
+|      February    _____________    ___________    ___________   ___________   |
+|      March       _____________    ___________    ___________   ___________   |
+|      April       _____________    ___________    ___________   ___________   |
+|      May         _____________    ___________    ___________   ___________   |
+|      June        _____________    ___________    ___________   ___________   |
+|      July        _____________    ___________    ___________   ___________   |
+|      August      _____________    ___________    ___________   ___________   |
+|      September   _____________    ___________    ___________   ___________   |
+|      October     _____________    ___________    ___________   ___________   |
+|      November    _____________    ___________    ___________   ___________   |
+|      December    _____________    ___________    ___________   ___________   |
+|                                                                              |
+|        TOTAL     _____________    ___________    ___________   ___________   |
+*------------------------------------------------------------------------------*
+%%
+
+Components
+
+Fields
+101     FUNCTION/noecho/showasguidetext ;
+        ARSAGTACCOM:COMPANY_ID/displayonly                     Mandatory
+        Activehelp SFSCOMPANY:COMPANY_ID,
+                   SFSCOMPANY:NAME[1];
+302     SFSCOMPANY:NAME[1];
+401     ARSAGTACCOM:AGENT_NO/displayonly ;
+402     SFSAGENT:NAME[1];
+801     ARSAGTACCOM:PAID_YEAR/displayonly                      Mandatory;
+0901    ARSAGTACCOM:PREMIUM[1]/displayonly;
+902     ARSAGTACCOM:COMMISSION[1]/displayonly;
+1001    ARSAGTACCOM:PREMIUM[2]/displayonly;
+1002    ARSAGTACCOM:COMMISSION[2]/displayonly;
+1003    ARSAGTACCOM:NET[2]/displayonly;
+1101    ARSAGTACCOM:PREMIUM[3]/displayonly;
+1102    ARSAGTACCOM:COMMISSION[3]/displayonly;
+1103    ARSAGTACCOM:NET[3]/displayonly;
+1201    ARSAGTACCOM:PREMIUM[4]/displayonly;
+1202    ARSAGTACCOM:COMMISSION[4]/displayonly;
+1203    ARSAGTACCOM:NET[4]/displayonly;
+1301    ARSAGTACCOM:PREMIUM[5]/displayonly;
+1302    ARSAGTACCOM:COMMISSION[5]/displayonly;
+1303    ARSAGTACCOM:NET[5]/displayonly;
+1401    ARSAGTACCOM:PREMIUM[6]/displayonly;
+1402    ARSAGTACCOM:COMMISSION[6]/displayonly;
+1403    ARSAGTACCOM:NET[6]/displayonly;
+1501    ARSAGTACCOM:PREMIUM[7]/displayonly;
+1502    ARSAGTACCOM:COMMISSION[7]/displayonly;
+1503    ARSAGTACCOM:NET[7]/displayonly;
+1601    ARSAGTACCOM:PREMIUM[8]/displayonly;
+1602    ARSAGTACCOM:COMMISSION[8]/displayonly;
+1603    ARSAGTACCOM:NET[8]/displayonly;
+1701    ARSAGTACCOM:PREMIUM[9]/displayonly;
+1702    ARSAGTACCOM:COMMISSION[9]/displayonly;
+1703    ARSAGTACCOM:NET[9]/displayonly;
+1801    ARSAGTACCOM:PREMIUM[10]/displayonly;
+1802    ARSAGTACCOM:COMMISSION[10]/displayonly;
+1803    ARSAGTACCOM:NET[10]/displayonly;
+1901    ARSAGTACCOM:PREMIUM[11]/displayonly;
+1902    ARSAGTACCOM:COMMISSION[11]/displayonly;
+1903    ARSAGTACCOM:NET[11]/displayonly;
+2001    ARSAGTACCOM:PREMIUM[12]/displayonly;
+2002    ARSAGTACCOM:COMMISSION[12]/displayonly;
+2003    ARSAGTACCOM:NET[12]/displayonly;
+2201    ARSAGTACCOM:PREMIUM[13]/displayonly;
+2202    ARSAGTACCOM:COMMISSION[13]/displayonly;
+2203    ARSAGTACCOM:NET[13]/displayonly;
+903     ARSAGTACCOM:EXPERIENCE_COMMISSION[1]/displayonly;
+904     ARSAGTACCOM:EXPERIENCE_COMMISSION[1]/displayonly;
+1004    ARSAGTACCOM:EXPERIENCE_COMMISSION[2]/displayonly;
+1104    ARSAGTACCOM:EXPERIENCE_COMMISSION[3]/displayonly;
+1204    ARSAGTACCOM:EXPERIENCE_COMMISSION[4]/displayonly;
+1304    ARSAGTACCOM:EXPERIENCE_COMMISSION[5]/displayonly;
+1404    ARSAGTACCOM:EXPERIENCE_COMMISSION[6]/displayonly;
+1504    ARSAGTACCOM:EXPERIENCE_COMMISSION[7]/displayonly;
+1604    ARSAGTACCOM:EXPERIENCE_COMMISSION[8]/displayonly;
+1704    ARSAGTACCOM:EXPERIENCE_COMMISSION[9]/displayonly;
+1804    ARSAGTACCOM:EXPERIENCE_COMMISSION[10]/displayonly;
+1904    ARSAGTACCOM:EXPERIENCE_COMMISSION[11]/displayonly;
+2004    ARSAGTACCOM:EXPERIENCE_COMMISSION[12]/displayonly;
+2204    ARSAGTACCOM:EXPERIENCE_COMMISSION[13]/displayonly;
+}
+}
+
+Screen Exit
+        If ARSAGTACCOM:COMPANY_ID > "" Then G_COMPANY_ID = ARSAGTACCOM:COMPANY_ID ;
+        If ARSAGTACCOM:AGENT_NO > 0 Then G_AGENT_NO = ARSAGTACCOM:AGENT_NO ;
+        If ARSAGTACCOM:PAID_YEAR > 0 Then G_PAID_YEAR = ARSAGTACCOM:PAID_YEAR ;
+
+End

@@ -1,0 +1,212 @@
+%%
+Screen
+     Name = "arsin056sc" ;
+     Type = "Detail" ;
+     Padcharacter = Space ;
+     Highlight = Underscore ;
+     Screensize="dynamic";
+     Domain="arscheck";
+     resizeable = yes ;
+     iconline = 0 ;
+
+     global string g_lib[10] ;
+
+     Global Unsigned Ascii Number G_CHECK_REFERENCE[7];
+     Global Unsigned ascii number g_year[4];
+     global Unsigned ascii number g_policy_no[9];
+     global unsigned ascii number g_policy_no2[9];
+     Global Unsigned Ascii Number g_sub_code[4];
+
+     Global String G_COMPANY_ID[10];
+
+     Local String l_payor_type[50],
+                  l_enter[1];
+
+     signed ascii number l_check_amount[9]=0/decimals=2;
+
+     Include "arsmenu.var"
+
+     Access arscheck,
+            Set arscheck:COMPANY_ID      = G_COMPANY_ID,
+                arscheck:POLICY_NO       = G_POLICY_NO2,
+                arscheck:sub_code        = g_sub_code, exact
+
+     Include "csexec.var"
+
+     Include "scipsprint.var"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        Include "stdfunc7.inc"
+        reaccess ;
+
+EVENT DEFINITION
+    default eventhandler {
+            "reload" { function ="reaccess" abort() }
+                         }
+
+Toolbar Definition
+
+Screen Entry
+
+access validation
+
+--write ("%c%s%n",11001,"G Policy No2    = ",g_policy_no2)
+--write ("%c%s%n",13001,"arscheck:policy_no = ",arscheck:policy_no)
+--Read (23,1,"Press Enter to Continue ",L_ENTER,1)
+
+if g_policy_no2 <> arscheck:policy_no or
+   g_year <> year(arscheck:eff_date) then
+{
+   abort ()
+}
+
+Screen -- at 1,1 to 50, 150
+{
+
+CardDialog
+Properties
+    {
+    LayOutConstraints = stretch
+    }
+{
+
+Panel
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = asneeded
+    Text            = "Detail"
+    }
+{
+%%
+
+ [R __ Check __ DraftR]
+                            Check No:  ____________________
+ Check Cleared: __          Check Date:          __________
+                            Check Amount:     _____________
+ 1099:          __          TIN:               ____________
+
+
+
+
+
+
+
+%%
+
+Components
+
+fields
+    arscheck:CHECK_DRAFT/button/values="C,D"/default tagged check_draft_tg;
+    val(arscheck:CHECK_NO)/displayonly/mask="Z(15)" ;
+    arscheck:CHECK_CLEARED tagged check_cleared_tg;
+    arscheck:CHECK_DATE/displayonly ;
+    begin
+    if function = "CHANGE" then
+    begin
+        l_check_amount = arscheck:check_amount
+    end
+    end
+    arscheck:CHECK_AMOUNT tagged check_amount_tg;
+    arscheck:TEN99 tagged ten99_tg;
+    arscheck:TIN tagged tin_tg;
+
+}  -- end of Detail
+
+Panel
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = asneeded
+    Text            = "Pay To"
+    }
+{
+%%
+ Payee         __________________________________________________
+               __________________________________________________
+               __________________________________________________
+               __________________________________________________
+               __________________________________________________
+               __________________________________________________
+%%
+
+Components
+
+Fields
+     arscheck:PAYEE_NAME[1];
+     arscheck:PAYEE_NAME[2];
+     arscheck:PAYEE_NAME[3];
+     arscheck:PAYEE_NAME[4];
+     arscheck:PAYEE_NAME[5];
+     arscheck:PAYEE_NAME[6];
+
+} -- end of Pay To
+
+Panel
+Properties
+    {
+    BorderStyle     = Raised
+--    ScrollBarPolicy = asneeded
+    Text            = "Mail To"
+    }
+{
+%%
+
+ Mail to Name: __________________________________________________
+               __________________________________________________
+               __________________________________________________
+ Address:      __________________________________________________
+               __________________________________________________
+               __________________________________________________
+ City:         ______________________________  ___  _________
+
+%%
+
+Components
+
+Fields
+
+    arscheck:MAILTO_NAME[1];
+    arscheck:MAILTO_NAME [2];
+    arscheck:MAILTO_NAME[3];
+    arscheck:ADDRESS[1];
+    arscheck:ADDRESS[2];
+    arscheck:ADDRESS[3];
+    arscheck:CITY;
+    arscheck:STR_STATE;
+    arscheck:STR_ZIPCODE;
+
+} -- end of Mail To
+
+Panel
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = asneeded
+    Text            = "Message"
+    }
+{
+%%
+ Payment Message: __________________________________________________
+
+
+
+%%
+
+Components
+
+Fields
+    arscheck:PAYMENT_MESSAGE/freetextlines = 4;
+
+} -- end of Message
+
+}
+
+}
+
+End

@@ -1,0 +1,201 @@
+%%
+Screen
+        Name = "Arsin041" ;
+        Type = "Multiline" ;
+        Padcharacter = Space ;
+        Highlite = Underscore ;
+        Screensize="Dynamic";
+        Repeat line_items_tg, 15 Times ;
+        Windowtitle="%s    %a  NonPay Cancellation Inquiry - Version 7.23    %m";
+        iconline = 0;
+        Resizeable = yes ;
+        domain="arscancel";
+
+        Global String G_COMPANY_ID[10],
+                      G_lib_2[10];
+
+        Global Unsigned Ascii Number G_POLICY_NO[9],
+                                     G_year[4],
+                                     g_mort_exists[1];
+
+        Global Unsigned Ascii Number G_SUB_CODE[4] ;
+        Global Wdate G_EFF_DATE ;
+        Global Wdate G_EXP_DATE;
+
+        string l_continue_1[50]="",
+               l_sfs[3]="SFS",
+               l_username[15]="",
+               l_system_id[15];
+
+        string l_programid[20]="";
+        include "csfunctions.var"
+
+        Access ARSCANCEL,
+           Set ARSCANCEL:COMPANY_ID = G_COMPANY_ID ,
+               ARSCANCEL:POLICY_NO  = G_POLICY_NO, approximate
+
+Style Definition
+    include "styles.inc"
+
+Functions
+
+"Exit"  Return  tagged exit_tg ;
+        Return ;
+
+        Previous ;
+        Next ;
+
+Next ;
+
+Previous ;
+
+        "display_Next" sequence "next_seq" tagged display_next_tg;
+        "next_seq" continue
+        begin
+            function = "Next"
+        end ;
+
+        "Display_Previous" sequence "Previous_seq" tagged display_Previous_tg;
+        "Previous_seq" continue
+        begin
+            function = "Previous"
+        end ;
+
+include "csfunctions2.inc"
+
+include "csfunctions.inc"
+
+Menu Definition
+
+ToolBar Definition
+
+Initialisation
+  L_USER_ID = USERNAME
+
+include "pssmort.inc"
+
+include "csentry.inc"
+include "csentry2.inc"
+
+Access Validation
+
+
+/*
+If arscancel:POLICY_NO <> G_POLICY_NO Then
+   {
+       function="abort"
+       Error
+      "No More Records for This Policy"
+    } ;
+
+*/
+
+If G_POLICY_NO <> ARSCANCEL:POLICY_NO Then
+Begin
+     abort ()
+End
+
+--skip if g_policy_no <> arscancel:policy_no
+
+Screen
+
+include "csbuttons.inc"
+
+include "cspolicyheading.inc"
+
+Listbox
+{ Heading
+  Properties {
+      LayoutType        = Row
+      LayoutConstraints = "North"
+      ScrollBarPolicy   = asNeeded
+      }
+      {Components
+      Button to 1,20.0
+             Properties {
+             Text = "Status Date"
+             }
+      Button to 1,20.0
+             Properties {
+             Text = "Due Date"
+             }
+      Button to 1,20.0
+             Properties {
+             Text = "CX Eff"
+             }
+      Button to 1,10.0
+             Properties {
+             Text = "Status"
+             }
+      Button to 1,20.0
+             Properties {
+             Text = "Run Date"
+             }
+      Button to 1,15.0
+             Properties {
+             Text = "Past Due"
+             }
+}
+
+Panel
+    Properties {
+        LayoutType        = Row
+        LayoutConstraints = Stretch
+        ScrollbarPolicy   = asNeeded
+        }
+
+{Fields
+
+{
+   setproperty(line_items_tg,foregroundcolor,"black")
+   setproperty(line_items_tg,backgroundcolor,"white")
+}
+ARSCANCEL:TRANS_DATE to 1.0, 20.0 Tagged line_items_tg
+Properties {
+             ForeGroundColor = if arscancel:cx_date < todaysdate
+             and arscancel:cx_status not one of "R" then "red" else "black"
+           } ;
+ARSCANCEL:DUE_DATE to 1.0, 20.0  tagged line_items_tg
+Properties {
+             ForeGroundColor = if arscancel:cx_date < todaysdate
+             and arscancel:cx_status not one of "R" then "red" else "black"
+           } ;
+ARSCANCEL:CX_EFF_DATE to 1.0, 20.0 tagged line_items_tg
+Properties {
+             ForeGroundColor = if arscancel:cx_date < todaysdate
+             and arscancel:cx_status not one of "R" then "red" else "black"
+           } ;
+ARSCANCEL:CX_STATUS to 1.0, 10.0 tagged line_items_tg
+Properties {
+             ForeGroundColor = if arscancel:cx_date < todaysdate
+             and arscancel:cx_status not one of "R" then "red" else "black"
+           } ;
+ARSCANCEL:CX_DATE to 1.0, 20.0 tagged line_items_tg
+Properties {
+             ForeGroundColor = if arscancel:cx_date < todaysdate
+             and arscancel:cx_status not one of "R" then "red" else "black"
+           } ;
+ARSCANCEL:AMOUNT_PAST_DUE to 1.0, 15.0 tagged line_items_tg
+Properties {
+             ForeGroundColor = if arscancel:cx_date < todaysdate
+             and arscancel:cx_status not one of "R" then "red" else "black"
+           } ;
+
+}
+}
+}
+
+
+
+Screen Exit
+        If ARSCANCEL:COMPANY_ID > "" Then G_COMPANY_ID = ARSCANCEL:COMPANY_ID ;
+        If ARSCANCEL:POLICY_NO > 0 Then G_POLICY_NO = ARSCANCEL:POLICY_NO ;
+        If ARSCANCEL:SUB_CODE > 0 Then G_SUB_CODE = ARSCANCEL:SUB_CODE ;
+
+procedure definition
+
+include "csfunctions.pro"
+
+
+
+end

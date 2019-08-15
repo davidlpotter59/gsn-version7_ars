@@ -1,0 +1,2090 @@
+%%        
+screen
+   Name = "arsmt400" ;
+   Domain="ARSMENU";
+   Type = "Detail" ;
+   Padcharacter = Space ;
+   Highlight = Underscore ;
+   Screensize = "dynamic";
+   Windowtitle="%s     %a CASH - Direct Bill Commission Statements Processing    %m";
+   iconline = 0;
+
+/* date     initials  comments
+
+SCIPS.com, Inc.
+
+03/08/2012    CAL     created direct bill commissions statement based on cash paid
+
+*/
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+        Global Unsigned Ascii Number G_AGENT_NO[4];
+        Global Wdate G_TRANS_DATE ;
+        Global Wdate G_TRANS_EFF ;
+        Global Wdate G_TRANS_EXP ;
+
+        Global Wdate G_STARTING_DATE,
+                     G_ENDING_DATE;
+
+        Global Unsigned Ascii Number G_NO_COPIES[2];
+        Global Unsigned Ascii Number G_TRANS_CODE[4] ;
+        Global Unsigned Ascii Number G_LINE_OF_BUSINESS[4] ;
+        Global Unsigned Ascii Number G_COMM_RATE[4]/decimals=2 ;
+        Global Unsigned Ascii Number G_SUB_CODE[4] ;
+        Global Unsigned Ascii Number G_BILLING_CTR[4] ;
+        Global Unsigned Ascii Number G_RETURN_CHECK_CTR[4] ;
+        Global Unsigned Ascii Number G_scan[1] ;
+        Global String G_REPORT_DEVICE[10];
+
+        String L_OPTION[1]="",
+               l_commissions_applied[1]="N";
+        Array [2] Of String L_INVOICE_NAME1[50];
+        String L_UNIX_PATH[100]="";
+        Unsigned Ascii Number L_LINE_CTR[3]=0;
+        String L_ENTER[1];
+        String L_FIRST_TIME[1]="Y";
+        Unsigned Ascii Number L_SUB[2];
+        Unsigned Ascii Number L_V_POSITION[5]=0/decimals=0;
+        String L_ZIPCODE[10]="";
+        Unsigned Ascii Number L_LOOP_CTR[2]=0;
+        Unsigned Ascii Number L_LINES_PRINTED[2]=0;
+        Unsigned Ascii Number L_COPY_CTR[2]=0;
+        unsigned ascii number I_FOUND_DELIMINATOR;
+
+        Unsigned Ascii Number L_PAGES_CTR[4]=0;
+        Unsigned Ascii Number L_HOLD_AGENT_NO[4]=0;
+        Signed Ascii Number L_COMMISSION[9]=0/decimals=2,
+                            L_no_comm_amount[9]=0/decimals=2;
+
+        Signed Ascii Number L_TOTAL_PREMIUM[9]=0/dec=2;
+        Signed Ascii Number L_TOTAL_COMMISSION[9]=0/decimals=2;
+        Unsigned Ascii Number L_COMM_RATE[4]=0/decimals=0;
+        String L_COMPANY[10]="";
+        Unsigned Ascii Number L_PAID_YEAR[4]=0/decimals=0;
+        Unsigned Ascii Number L_PAID_MONTH[2]=0/decimals=0;
+        Signed Ascii Number L_YTD_PREMIUM[9]=0/decimals=2;
+        Signed Ascii Number L_YTD_COMMISSION[9]=0/decimals=2;
+        Unsigned Ascii Number L_SUB_CODE[4]=0/decimals=0;
+        Signed Ascii Number L_NET_COMMISSIONS[9]=0/decimals=2;
+
+        String I_NAME[50]="",
+               I_FIRST_NAME[50]="",
+               I_LAST_NAME[50]="",
+               I_REV_NAME[50]="",
+               L_DRAWER_NAME_TO_USE[4],
+               L_FOLDER_TYPE_TO_USE[8],
+               L_LOB_SUBLINE[2]= "00",
+               L_DOC_TYPES_TO_USE[4];
+
+        String L_TRANSACTION[15]="";
+        String L_LOGFILE[15]="arsmt200.log";
+        String L_TOTALS_PAGE[1]="N";
+        String L_ARSDATES[13]="arsdates.par";
+        Signed Ascii Number L_TOTAL_EXP_COMM[9]=0/decimals=2;
+        Signed Ascii Number L_EXPERIENCE_MODIFIER[5]=0/decimals=4;
+        Unsigned Ascii Number L_LINES_PER_PAGE[2]=0;
+        Signed Ascii Number L_YTD_EXPERIENCE_COMM[9]=0/decimals=2;
+        String L_APPLY_COMMISSION[1]="N";
+
+        Wdate L_STARTING_DATE = 00.00.0000,
+              L_ENDING_DATE   = 00.00.0000;
+        String L_MONEY_PROCESSING[1];
+        String L_SFSAGENT_NAME[50]="";
+        String L_CURRENT_SFSAGENT_NAME[50]="";
+        Unsigned Ascii Number L_CURRENT_SFSAGENT_NO[4]=0;
+        String L_SFS[3]="SFS";
+        String L_COMPANY_ID[10];
+        String L_COMMISSIONS_ONLY_IF_MONEY[1]="";
+        Wdate L_PRIOR_STARTING_DATE=01.01.1990; -- used for processing special commissions
+        Wdate L_PRIOR_ENDING_DATE=00.00.0000; -- set later in the code
+        wdate l_date ;
+        Unsigned Ascii Number L_PRINT_COPY_CTR[3]=0/dec=0;
+        String L_SFS_CODE[3]="",
+               l_continue_1[50]="";
+        Unsigned Ascii Number L_COMMISSIONS_ON_CASH[1]=0;
+        Unsigned Ascii Number L_AGENT_COMM[4]=0/dec=2;
+        Unsigned Ascii Number L_AGENT_NO[4]=0/decimals=0;
+        Wdate L_EFF_DATE;
+        Wdate L_EXP_DATE;
+        Unsigned Ascii Number L_LINE_OF_BUSINESS[4];
+        Unsigned Ascii Number L_TRANS_CODE[4];
+--        String L_COMM_OLD[1]="N";
+
+        Include "scipserr.var"
+
+        Access ARSMENU, Set ARSMENU:COMPANY_ID = G_COMPANY_ID
+
+        Include "csfonts.inc"
+
+        Include "image.var"
+
+        Include "sfscsexec.var"
+
+        Include "sdpqueue.var"
+
+        Include "STDKEYS7.INC"
+
+Style Definition
+    include "styles.inc"
+
+Functions
+
+        Include "STDFUNC7.INC"
+
+Menu Definition
+    include "stdmenus7.inc"
+}
+
+ToolBar Definition
+    include "stdtoolbar7.inc"
+}
+
+ Initialization
+        L_INVOICE_NAME1[1] = PROGRAMID + ".pcl"  --gets the name of the file arsmt200 from name of the program above and cat .pcl to it
+        L_INVOICE_NAME1[2] = PROGRAMID + "i.pcl" --arsmt200.pcl and arsmt200.pcl
+        L_HEADER_NAME = PROGRAMID + "_header"
+        Deletefile(L_INVOICE_NAME1[1])
+        Deletefile(L_INVOICE_NAME1[2])
+        Deletefile(L_HEADER_NAME)
+--        Do CLEAR_WORK_FILE -- clear out all old data
+        Proc ("arscomwrk.mk")/noconsole
+-- FOR LEBINS
+--        IF G_COMPANY_ID = "LEBINS" THEN
+  --       {
+    --      G_STARTING_DATE = 06.01.2012
+      --   }
+
+
+Screen
+Properties
+    {
+    LayOutType      = Column
+    }
+{
+
+Panel Tagged Header_pl
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = AsNeeded
+    }
+{
+%%
+                                                                  ____________
+*------------------------------------------------------------------------------*
+|          CASH Direct Bill Commission Statements Printing Options             |
+*------------------------------------------------------------------------------*
+| [R                                                                           |
+| _~CASH Direct Bill Commission Statements by Premium Processing Date          |
+| _~CASH Direct Bill Commission Statements by Premium Processing Date/Reprint  |
+|                                                                              |
+| _~CASH Update Agents YTD Commission Data Base                                |
+| _~CASH Commission Inquiry By Agent and Processing Year                       |
+| _~CASH Maintain Commissions Processed By Agent and Processing Period         |
+| _~Cash Requirements Report                                                   |
+| _~CASH Commission Inquiry By Policy Number                                   |
+| _~CASH Clear Previous Run Update                                             |
+| _~Print   R]                                                                 |
+*------------------------------------------------------------------------------*
+%%
+
+Components
+
+Fields
+0101     FUNCTION/noecho/showasguidetext ;
+0601     L_OPTION/values="a,b,d,e,f,g,h,i,j"
+          Begin
+             If L_OPTION One Of "a","b" Then
+             Begin
+                Deletefile (L_INVOICE_NAME1[1]) -- cleanup the stmts file after printing
+                Deletefile (L_INVOICE_NAME1[2]) -- cleanup the stmts file after printing
+                G_STARTING_DATE = Dateadd(01.01.2000,Month(TODAYSDATE) -2,
+                                  Year(TODAYSDATE) Mod 100)
+
+
+--                IF G_COMPANY_ID = "LEBINS" THEN
+  --              {
+    --             G_STARTING DATE = 06.01.2012
+      --          }
+
+                G_ENDING_DATE   = Dateadd(01.01.2000,Month(G_STARTING_DATE),
+                                  Year(G_STARTING_DATE) Mod 100 ) -1
+                Display Modal Screen "arspr951"
+                At Line 5, Column 15
+                With Initial Function "ADD|exit"
+                Error "Can Not Run Statements for Current Month" If
+                Month(G_STARTING_DATE) = Month(TODAYSDATE) And
+                Year(G_STARTING_DATE)  = Year(TODAYSDATE) And
+-- username = davep is here so that these can be tested in the current month
+                USERNAME Not One Of "davep", "richl", "jamieb"
+                Access SCIPSIMAGE,
+                   Set SCIPSIMAGE:COMPANY_ID = g_COMPANY_ID, Generic
+                if scipsimage:items_as_image[4] one of "1" then
+                  {
+                    Display Modal Screen "arspr967"  --prompt for scanning if scipsimage it checked.
+                    At Line 5, Column 15
+                    With Initial Function "ADD|exit"
+                  }
+
+                If G_STARTING_DATE <> 0 And
+                   G_ENDING_DATE <> 0 Then
+                   Begin
+                   If G_NO_COPIES = 0 Then
+                   Begin
+                       G_NO_COPIES = 1
+                   End
+                   Do CLEAR_WORK_FILE
+                   Message "Processing Commission Statements, Please wait ....."
+
+    /* need to access the sfsdefault to get a good company id.  once you have the
+       company id hen access arscontrol where the flag is set for the special
+       commission statement processing options */
+
+                       Access SFSDEFAULT,
+                          Set SFSDEFAULT:SFS_CODE = L_SFS
+                       Access ARSCONTROL,
+                          Set ARSCONTROL:COMPANY_ID = SFSDEFAULT:COMPANY_ID
+                       If ARSCONTROL:COMMISSIONS_ONLY_IF_MONEY One Of 1 Then
+                         Begin
+                           L_COMMISSIONS_ONLY_IF_MONEY = "Y"
+                         End
+                       Else
+                         Begin
+                           L_COMMISSIONS_ONLY_IF_MONEY = "N"
+                         End
+
+                       -- this will allow a company to process on cash received
+                       -- rather than on premiums written
+
+                       L_COMMISSIONS_ON_CASH = 1
+
+                           Do BUILD_WORK_FILE_CASH
+                           If L_COMMISSIONS_ON_CASH One Of 1 Then
+                             Begin
+                               Do PROCESS_CASH_CANCELLATIONS
+                             End
+
+                       If L_COMMISSIONS_ONLY_IF_MONEY = "Y" And
+                          L_COMMISSIONS_ON_CASH Not One Of 1 Then
+                       Begin
+                           Do BUILD_WORK_FILE_PRIOR
+                       End
+                       Do NEW_STATEMENTS
+                       Do CREATE_TOTALS_PAGE
+                       Do PRINT_TOTALS_LINE
+                       Do DELETE_NEGATIVE_CHECKS
+                       Closefile(L_INVOICE_NAME1[1])
+                       Closefile(L_INVOICE_NAME1[2])
+                       If L_OPTION One Of "a","b" Then
+                         {
+                           If SCIPSIMAGE:ITEMS_AS_IMAGE[4] One Of "1" and
+                              g_scan one of 1  Then   --this is the checkbox that was set with date run
+                             {
+                               L_INVOICE_NAME1[1] = L_INVOICE_NAME1[2]/raw
+                             }
+                         }
+                   Message "                                                   "
+                   End
+             End
+             Else
+             If L_OPTION = "i" Then
+             Begin
+             If SECURITY < 80 Then
+             Begin
+                 Error "Your Security level does not permit this action"
+             End
+             If SECURITY >= 80 Then
+             Begin
+                G_ENDING_DATE = 00.00.0000
+                Display Modal Screen "arspr955"
+                If G_ENDING_DATE <> 00.00.0000 Then
+                Begin
+                    Message "Processing Cleanup as requested"
+                    Access SFSDEFAULT, Set SFSDEFAULT:SFS_CODE = L_SFS
+                    Access SFSCOMPANY, Set SFSCOMPANY:COMPANY_ID = SFSDEFAULT:COMPANY_ID
+
+                    If SFSCOMPANY:DEBUG_MODE One Of 1 Then
+                    Begin
+                        Proc ("csbatch arsup800a %s",Str(G_ENDING_DATE,"MMDDYYYY"))
+                    End
+                    Else
+                    Begin
+                        Proc ("csbatch arsup800a %s",Str(G_ENDING_DATE,"MMDDYYYY"))/noconsole
+                    End
+                    Message "                                "
+                End
+             End
+             End
+             Else
+             If L_OPTION = "j" Then
+             Begin
+                Display Modal Screen "arspr965"
+                At Line 5, Column 15
+                With Initial Function "ADD|exit"
+                If G_REPORT_DEVICE <> "" Then
+                {
+                For L_PRINT_COPY_CTR = 1 To G_NO_COPIES
+                Begin
+                 Proc("lp -d %s -oraw %s",Trun(G_REPORT_DEVICE), L_INVOICE_NAME1[1])/noconsole
+
+                 /* new document processing system interface */
+
+L_SFS_CODE = "SFS"
+Access SFSDEFAULT, Set SFSDEFAULT:SFS_CODE = L_SFS_CODE
+
+-- these need to be assigned prior to the include file
+    I_INVOICE_NAME  = L_INVOICE_NAME1[1]
+    I_COMPANY_ID    = SFSDEFAULT:COMPANY_ID
+    I_REPORT_DEVICE = G_REPORT_DEVICE
+    I_STARTING_DATE = G_STARTING_DATE
+    I_ENDING_DATE   = G_ENDING_DATE
+    I_RUN_MODE      = 0
+
+Include "sdpqueue.pro"
+
+                End
+                 Refresh()
+                }
+             End
+         End;
+
+}
+}
+
+Screen Exit
+Closefile( L_LOGFILE )
+
+Errors
+--Write ("%c%s%s",05050,"E R R O R",ERRORTEXT)
+Writefile (L_LOGFILE,"arsmt200 had errors<NL>")
+Writefile (L_LOGFILE,"Date of run: %d<NL> ",TODAYSDATE )
+Writefile (L_LOGFILE,"Agent No   : %n<NL> ",ARSCOMWRK:AGENT_NO )
+Writefile (L_LOGFILE,"Error        %s<NL><NL> ",ERRORTEXT)
+Writefile (L_LOGFILE,"========================================<NL><NL>")
+
+Procedure Definition
+
+Procedure CLEAR_WORK_FILE
+
+Begin
+  Access ARSCOMWRK,
+     Set ARSCOMWRK:COMPANY_ID = G_COMPANY_ID, Approximate
+
+  If ARSCOMWRK:COMPANY_ID = G_COMPANY_ID Then
+    Begin
+      While ARSCOMWRK:ERRORNUMBER = 0 -- until EOF
+        Begin
+          Delete ARSCOMWRK
+          Next ARSCOMWRK
+        End
+    End
+End
+
+Procedure BUILD_WORK_FILE_CASH
+
+Begin
+  L_COMPANY = ""
+  Access ARSPAYMENT,
+     Set ARSPAYMENT:COMPANY_ID = L_COMPANY, Approximate
+
+  access arscontrol2,
+     set arscontrol2:company_id = arspayment:company_id, approximate
+
+  While ARSPAYMENT:ERRORNUMBER = 0
+    Begin
+
+
+      Access SFPMASTER,
+         Set SFPMASTER:POLICY_NO    = SFPCURRENT:POLICY_NO,
+             SFPMASTER:POL_YEAR     = SFPCURRENT:POL_YEAR,
+             SFPMASTER:END_SEQUENCE = SFPCURRENT:END_SEQUENCE
+
+      Access SFSLINE,
+         Set SFSLINE:COMPANY_ID       = SFPNAME:COMPANY_ID,
+             SFSLINE:LINE_OF_BUSINESS = SFPNAME:LINE_OF_BUSINESS,
+             SFSLINE:LOB_SUBLINE      = "00"
+
+
+      L_AGENT_COMM = ARSPAYMENT:COMM_RATE
+      If L_AGENT_COMM = 00 And
+         (ARSPAYMENT:TRANS_CODE < 17 or
+          arspayment:trans_code one of 25,60,62,63,64,65,66) Then
+        {
+          L_AGENT_COMM = SFSLINE:COMM_RATE[1]
+        }
+
+       If ((ARSPAYMENT:PAYMENT_TRANS_DATE => G_STARTING_DATE And
+           ARSPAYMENT:PAYMENT_TRANS_DATE <= G_ENDING_DATE) and
+           ARSPAYMENT:TRANS_CODE Not One Of 18,19,22,23,27,28,29 And -- install chrg or sur charges
+           L_AGENT_COMM <> 0.00 And
+           arspayment:comm_rate <> 0.0 and
+           ARSPAYMENT:COMMISSIONS_RUN_DATE = 00.00.0000 And
+           ARSPAYMENT:COMMISSIONS_APPLIED  = 00.00.0000) Then
+         {
+          access arsmaster,
+              set arsmaster:company_id = arspayment:company_id,
+                  arsmaster:policy_no  = arspayment:policy_no,
+                  arsmaster:trans_date = arspayment:trans_date,
+                  arsmaster:trans_eff  = arspayment:trans_eff,
+                  arsmaster:trans_exp  = arspayment:trans_exp,
+                  arsmaster:trans_code = arspayment:trans_code,
+                  arsmaster:line_of_business = arspayment:line_of_business,
+                  arsmaster:comm_rate  = arspayment:comm_rate, exact
+
+
+
+          Access SFPNAME,
+              Set SFPNAME:POLICY_NO        = arsmaster:POLICY_NO,
+                  SFPNAME:POL_YEAR         = arsmaster:POL_YEAR,
+                  SFPNAME:END_SEQUENCE     = arsmaster:END_SEQUENCE, generic
+
+
+         if sfpname:eff_date => arscontrol2:cash_paid_comm_start_date and
+            sfpname:bill_plan <> "AC" then
+          {
+
+           do check_if_commission_paid
+
+           if l_commissions_applied = "N" then
+           {
+              Access ARSCOMWRK,
+                 Set ARSCOMWRK:COMPANY_ID       = ARSPAYMENT:COMPANY_ID,
+                     ARSCOMWRK:AGENT_NO         = ARSPAYMENT:AGENT_NO,
+                     ARSCOMWRK:POLICY_NO        = ARSPAYMENT:POLICY_NO,
+                     ARSCOMWRK:TRANS_DATE       = ARSPAYMENT:TRANS_DATE,
+                     ARSCOMWRK:TRANS_EFF        = ARSPAYMENT:TRANS_EFF,
+                     ARSCOMWRK:TRANS_EXP        = ARSPAYMENT:TRANS_EXP,
+                     ARSCOMWRK:TRANS_CODE       = ARSPAYMENT:TRANS_CODE,
+                     ARSCOMWRK:LINE_OF_BUSINESS = ARSPAYMENT:LINE_OF_BUSINESS,
+                     ARSCOMWRK:COMM_RATE        = L_AGENT_COMM, Exact
+
+              If ARSCOMWRK:COMPANY_ID       <> ARSPAYMENT:COMPANY_ID or
+                 ARSCOMWRK:POLICY_NO        <> ARSPAYMENT:POLICY_NO or
+                 ARSCOMWRK:AGENT_NO         <> ARSPAYMENT:AGENT_NO or
+                 ARSCOMWRK:POLICY_NO        <> ARSPAYMENT:POLICY_NO or
+                 ARSCOMWRK:TRANS_DATE       <> ARSPAYMENT:TRANS_DATE or
+                 ARSCOMWRK:TRANS_EFF        <> ARSPAYMENT:TRANS_EFF or
+                 ARSCOMWRK:TRANS_CODE       <> ARSPAYMENT:TRANS_CODE or
+                 ARSCOMWRK:LINE_OF_BUSINESS <> ARSPAYMENT:LINE_OF_BUSINESS or
+                 ARSCOMWRK:COMM_RATE        <> L_AGENT_COMM Then
+                {
+                  Add ARSCOMWRK
+                    {
+                      ARSCOMWRK:COMPANY_ID       = ARSPAYMENT:COMPANY_ID
+                      ARSCOMWRK:AGENT_NO         = ARSPAYMENT:AGENT_NO
+                      ARSCOMWRK:POLICY_NO        = ARSPAYMENT:POLICY_NO
+                      ARSCOMWRK:TRANS_DATE       = ARSPAYMENT:TRANS_DATE
+                      ARSCOMWRK:TRANS_EFF        = ARSPAYMENT:TRANS_EFF
+                      ARSCOMWRK:TRANS_EXP        = ARSPAYMENT:TRANS_EXP
+                      ARSCOMWRK:TRANS_CODE       = ARSPAYMENT:TRANS_CODE
+                      ARSCOMWRK:LINE_OF_BUSINESS = ARSPAYMENT:LINE_OF_BUSINESS
+                      ARSCOMWRK:COMM_RATE        = ARSPAYMENT:COMM_RATE
+                      ARSCOMWRK:PREMIUM          = ARSPAYMENT:AMOUNT
+                      ARSCOMWRK:COMMISSION       = ARSPAYMENT:AMOUNT * (L_AGENT_COMM * 0.01)
+                    }  -- end of add
+                }
+              Else
+                Change ARSCOMWRK
+                  {
+                    ARSCOMWRK:PREMIUM      = ARSCOMWRK:PREMIUM + ARSPAYMENT:AMOUNT
+                    ARSCOMWRK:COMMISSION   = ARSCOMWRK:COMMISSION +
+                        (ARSPAYMENT:AMOUNT * (L_AGENT_COMM * 0.01))
+                    if arscomwrk:premium = 0 then
+                      arscomwrk:commission = 0.00
+                  } -- end of change
+
+             If L_OPTION One Of "a" Then
+               {
+                Do UPDATE_ARSPAYMENT  -- this will set the arspayment:commissions_processed date to todaysdate
+--                do update_arsmaster  -- this will set the arsmaster:commissions_applied and arsmaster:commission_run_date
+               }
+           }  -- if l commissions applied
+          }   -- if eff date < cash date
+         }
+
+
+      Next ARSPAYMENT
+      End  --while
+
+
+End -- end of procedure
+
+procedure check_if_commission_paid
+begin
+l_commissions_applied = "N"
+
+Access ARSMASTER,Set arsmaster:COMPANY_ID = arspayment:COMPANY_ID,
+                     arsmaster:POLICY_NO  = arspayment:POLICY_NO,
+                     arsmaster:TRANS_DATE = arspayment:TRANS_DATE,
+                     arsmaster:TRANS_EFF  = arspayment:TRANS_EFF,
+                     arsmaster:TRANS_EXP  = arspayment:TRANS_EXP,
+                     arsmaster:TRANS_CODE = arspayment:TRANS_CODE,
+                     arsmaster:LINE_OF_BUSINESS = arspayment:LINE_OF_BUSINESS,
+                     arsmaster:COMM_RATE  = arspayment:COMM_RATE, generic
+
+If arsmaster:COMPANY_ID = arspayment:COMPANY_ID And
+   arsmaster:POLICY_NO  = arspayment:POLICY_NO And
+   arsmaster:TRANS_DATE = arspayment:TRANS_DATE And
+   arsmaster:TRANS_EFF  = arspayment:TRANS_EFF And
+   arsmaster:TRANS_EXP  = arspayment:TRANS_EXP And
+   arsmaster:TRANS_CODE = arspayment:TRANS_CODE And
+   arsmaster:LINE_OF_BUSINESS = arspayment:LINE_OF_BUSINESS And
+   arsmaster:COMM_RATE  = arspayment:COMM_RATE Then
+   {
+     if arsmaster:commissions_applied <> 00.00.0000 and
+        arsmaster:commission_run_date <> 00.00.0000 then
+            l_commissions_applied = "Y"
+
+   }
+end
+
+Procedure PROCESS_CASH_CANCELLATIONS
+Begin
+
+  L_COMPANY = ""
+  -- this procedure will zero out the agents commission balance for current month
+
+  Access ARSCHECK,
+     Set ARSCHECK:COMPANY_ID = L_COMPANY, Approximate
+
+  While ARSCHECK:ERRORNUMBER = 0 -- read until eof
+    Begin
+       -- allow this disbursements to be an as of process
+       -- this way all missed disbursements will be picked up
+
+-- QUESTION I dont think this should be done for an OVERPAYMENT becuase the overpayment
+-- is not in arspayment
+    if arscheck:eff_date => arscontrol2:cash_paid_comm_start_date then
+     {
+      If (arscheck:check_date => g_starting_date and
+         ARSCHECK:CHECK_DATE <= G_ENDING_DATE) and
+         ARSCHECK:CHECK_DATE <> 00.00.0000 And
+         ARSCHECK:COMMISSIONS_RUN_DATE  = 00.00.0000 And
+         ARSCHECK:RELEASE Not One Of  "V","S" And
+         ARSCHECK:APS_TRANS_CODE Not One Of  "OVER", "VOIDRP" Then
+        Begin
+
+
+          Access SFPCURRENT,
+             Set SFPCURRENT:POLICY_NO  = ARSCHECK:POLICY_NO
+
+          Access SFPNAME,
+             Set SFPNAME:POLICY_NO        = sfpcurrent:POLICY_NO,
+                 SFPNAME:POL_YEAR         = sfpcurrent:POL_YEAR,
+                 SFPNAME:END_SEQUENCE     = sfpcurrent:END_SEQUENCE
+
+--          Access SFPMASTER,
+  --           Set SFPMASTER:POLICY_NO    = SFPCURRENT:POLICY_NO,
+    --             SFPMASTER:POL_YEAR     = SFPCURRENT:POL_YEAR,
+      --           SFPMASTER:END_SEQUENCE = SFPCURRENT:END_SEQUENCE
+
+
+          access arspayment_alias1, set arspayment_alias1:company_id = arscheck:company_id,
+                                        arspayment_alias1:policy_no  = arscheck:policy_no, approximate
+
+          l_no_comm_amount = 0
+          while arspayment_alias1:company_id = arscheck:company_id and
+                arspayment_alias1:policy_no  = arscheck:policy_no
+              {
+               l_date = dateadd(arscheck:eff_date,0,1)
+               if arspayment_alias1:line_of_business one of 9 and
+                  arspayment_alias1:trans_exp   = l_date and
+                  arspayment_alias1:lob_subline = "10" then
+                {
+                 L_no_comm_amount   = l_no_comm_amount + arspayment_alias1:amount
+                }
+              next arspayment_alias1
+              }
+
+          access prsmaster_alt, set prsmaster_alt:company_id = arscheck:company_id,
+                                    prsmaster_alt:policy_no  = arscheck:policy_no, generic
+
+            while prsmaster_alt:company_id = arscheck:company_id and
+                  prsmaster_alt:policy_no  = arscheck:policy_no
+                {
+                 if prsmaster_alt:pol_year     = sfpcurrent:pol_year and
+                    prsmaster_alt:end_sequence = sfpcurrent:end_sequence then
+                  {
+                    if prsmaster_alt:trans_code one of 11 then
+                    {
+                     L_AGENT_COMM       = prsMASTEr_alt:comm_rate
+                    }
+                  }
+               next prsmaster_alt
+               }
+
+
+          L_AGENT_NO         = SFPNAME:AGENT_NO
+          L_EFF_DATE         = SFPNAME:EFF_DATE
+          L_EXP_DATE         = SFPNAME:EXP_DATE
+          L_TRANS_CODE       = 30   --SFPNAME:TRANS_CODE
+          L_LINE_OF_BUSINESS = SFPNAME:LINE_OF_BUSINESS
+--          L_AGENT_COMM       = SFPMASTER:AGENT_COMM
+
+
+          Access ARSCOMWRK,
+             Set ARSCOMWRK:COMPANY_ID       = ARSCHECK:COMPANY_ID,
+                 ARSCOMWRK:AGENT_NO         = L_AGENT_NO,
+                 ARSCOMWRK:POLICY_NO        = ARSCHECK:POLICY_NO,
+                 ARSCOMWRK:TRANS_DATE       = ARSCHECK:CHECK_DATE,
+                 ARSCOMWRK:TRANS_EFF        = L_EFF_DATE,
+                 ARSCOMWRK:TRANS_EXP        = L_EXP_DATE,
+                 ARSCOMWRK:TRANS_CODE       = L_TRANS_CODE,
+                 ARSCOMWRK:LINE_OF_BUSINESS = L_LINE_OF_BUSINESS,
+                 ARSCOMWRK:COMM_RATE        = L_AGENT_COMM,Exact
+
+          If ARSCOMWRK:COMPANY_ID       <> ARSCHECK:COMPANY_ID Or
+             ARSCOMWRK:AGENT_NO         <> L_AGENT_NO Or
+             ARSCOMWRK:POLICY_NO        <> arscheck:POLICY_NO Or
+             ARSCOMWRK:TRANS_DATE       <> ARSCHECK:CHECK_DATE Or
+             ARSCOMWRK:TRANS_EFF        <> L_EFF_DATE Or
+             ARSCOMWRK:TRANS_EXP        <> L_EXP_DATE Or
+             ARSCOMWRK:TRANS_CODE       <> L_TRANS_CODE Or
+             ARSCOMWRK:LINE_OF_BUSINESS <> L_LINE_OF_BUSINESS Or
+             ARSCOMWRK:COMM_RATE        <> L_AGENT_COMM And
+             L_AGENT_COMM               <> 00.00 And
+             ARSCHECK:APS_TRANS_CODE Not One Of "OVER", "VOIDRP" Then
+             {
+              Add ARSCOMWRK
+                {
+                  ARSCOMWRK:COMPANY_ID       = ARSCHECK:COMPANY_ID
+                  ARSCOMWRK:AGENT_NO         = L_AGENT_NO
+                  ARSCOMWRK:POLICY_NO        = ARSCHECK:POLICY_NO
+                  ARSCOMWRK:TRANS_DATE       = ARSCHECK:CHECK_DATE
+                  ARSCOMWRK:TRANS_EFF        = L_EFF_DATE
+                  ARSCOMWRK:TRANS_EXP        = L_EXP_DATE
+                  if arscheck:aps_trans_code = "ENDORSE" then
+                     ARSCOMWRK:TRANS_CODE       = 13
+                  else
+                  if arscheck:aps_trans_code = "CANCEL" then
+                     ARSCOMWRK:TRANS_CODE       = L_TRANS_CODE
+
+                  ARSCOMWRK:LINE_OF_BUSINESS = L_LINE_OF_BUSINESS
+                  ARSCOMWRK:COMM_RATE        = L_AGENT_COMM
+                  if L_no_comm_amount = 0 then
+                    {
+                     ARSCOMWRK:PREMIUM        = ARSCHECK:CHECK_AMOUNT * -1
+                     ARSCOMWRK:COMMISSION       = (ARSCHECK:CHECK_AMOUNT * (l_AGENT_COMM * 0.01)) * -1
+                    }
+                  else
+                  if L_no_comm_amount <> 0 then
+                    {
+                     ARSCOMWRK:PREMIUM       = (ARSCHECK:CHECK_AMOUNT - l_no_comm_amount) * -1
+                     ARSCOMWRK:COMMISSION       = ((ARSCHECK:CHECK_AMOUNT - l_no_comm_amount) * (l_AGENT_COMM * 0.01)) * -1
+                    }
+                }-- end of add
+             }  -- end of checking for "" company_id
+             else -- change
+              change arscomwrk
+               {
+                 if L_no_comm_amount = 0 then
+                  {
+                   ARSCOMWRK:PREMIUM          = arscomwrk:premium + (ARSCHECK:CHECK_AMOUNT * -1)
+                   ARSCOMWRK:COMMISSION       = arscomwrk:commission + ((ARSCHECK:CHECK_AMOUNT * (l_AGENT_COMM * 0.01)) * -1)
+                  }
+                 if L_no_comm_amount <> 0 then
+                  {
+                   ARSCOMWRK:PREMIUM          = arscomwrk:premium + ((ARSCHECK:CHECK_AMOUNT - l_no_comm_amount) * -1)
+                   ARSCOMWRK:COMMISSION       = arscomwrk:commission + (((ARSCHECK:CHECK_AMOUNT - l_no_comm_amount) * (l_AGENT_COMM * 0.01)) * -1)
+                  }
+               }
+            If L_OPTION One Of "a" And
+               ARSCHECK:APS_TRANS_CODE  Not One Of  "OVER", "VOIDRP" Then
+              {
+               Do UPDATE_ARSCHECK -- this will set the arsmaster:commissions_processed date to todaysdate
+              }
+        End      -- end of date, "DB" and trans code checking
+
+     }
+    Next ARSCHECK
+    End  -- end of while stmt
+End  -- end of procedure
+
+-- new procedure to select the stmts 03/11/2002
+
+
+Procedure BUILD_WORK_FILE_SELECTIVE
+Begin
+
+L_COMPANY = ""
+-- this procedure will zero out the agents commission balance for current month
+Do CLEAR_CURRENT_MONTH_BUCKET
+Do CLEAR_COMMISSION_PAID_DATE
+
+Access ARSMASTER, Set ARSMASTER:COMPANY_ID = L_COMPANY, Approximate
+
+While ARSMASTER:ERRORNUMBER = 0 -- read until eof
+Begin
+    If ((ARSMASTER:TRANS_DATE >= G_STARTING_DATE And
+         ARSMASTER:TRANS_DATE <= G_ENDING_DATE And
+         ARSMASTER:TRANS_EFF  <= G_ENDING_DATE) Or
+        (ARSMASTER:TRANS_DATE <  G_STARTING_DATE And
+         ARSMASTER:TRANS_EFF  >= G_STARTING_DATE And
+         ARSMASTER:TRANS_EFF  <= G_ENDING_DATE)) And
+         ARSMASTER:TRANS_CODE Not One Of 18,19,22,23,28,29 And -- install chrg or sur charges
+         ARSMASTER:BILL_PLAN = "DB" And  -- direct bill only
+         ARSMASTER:COMM_RATE <> 0.00 And -- no zero comm rates
+         ARSMASTER:AGENT_NO = G_AGENT_NO
+         Then
+         Begin
+         Access ARSCOMWRK,
+         Set ARSCOMWRK:COMPANY_ID       = ARSMASTER:COMPANY_ID,
+             ARSCOMWRK:AGENT_NO         = ARSMASTER:AGENT_NO,
+             ARSCOMWRK:POLICY_NO        = ARSMASTER:POLICY_NO,
+             ARSCOMWRK:TRANS_DATE       = ARSMASTER:TRANS_DATE,
+             ARSCOMWRK:TRANS_EFF        = ARSMASTER:TRANS_EFF,
+             ARSCOMWRK:TRANS_EXP        = ARSMASTER:TRANS_EXP,
+             ARSCOMWRK:TRANS_CODE       = ARSMASTER:TRANS_CODE,
+             ARSCOMWRK:LINE_OF_BUSINESS = ARSMASTER:LINE_OF_BUSINESS,
+             ARSCOMWRK:COMM_RATE        = ARSMASTER:COMM_RATE,Exact
+
+             If ARSCOMWRK:COMPANY_ID <> ARSMASTER:COMPANY_ID Or
+                ARSCOMWRK:POLICY_NO  <> ARSMASTER:POLICY_NO Or
+                ARSCOMWRK:AGENT_NO   <> ARSMASTER:AGENT_NO Or
+                ARSCOMWRK:POLICY_NO  <> ARSMASTER:POLICY_NO Or
+                ARSCOMWRK:TRANS_DATE <> ARSMASTER:TRANS_DATE Or
+                ARSCOMWRK:TRANS_EFF  <> ARSMASTER:TRANS_EFF Or
+                ARSCOMWRK:TRANS_CODE <> ARSMASTER:TRANS_CODE Or
+                ARSCOMWRK:LINE_OF_BUSINESS <> ARSMASTER:LINE_OF_BUSINESS Or
+                ARSCOMWRK:COMM_RATE  <> ARSMASTER:COMM_RATE Then
+             Begin
+             Add ARSCOMWRK Begin
+                 ARSCOMWRK:COMPANY_ID       = ARSMASTER:COMPANY_ID
+                 ARSCOMWRK:AGENT_NO         = ARSMASTER:AGENT_NO
+                 ARSCOMWRK:POLICY_NO        = ARSMASTER:POLICY_NO
+                 ARSCOMWRK:TRANS_DATE       = ARSMASTER:TRANS_DATE
+                 ARSCOMWRK:TRANS_EFF        = ARSMASTER:TRANS_EFF
+                 ARSCOMWRK:TRANS_EXP        = ARSMASTER:TRANS_EXP
+                 ARSCOMWRK:TRANS_CODE       = ARSMASTER:TRANS_CODE
+                 ARSCOMWRK:LINE_OF_BUSINESS = ARSMASTER:LINE_OF_BUSINESS
+                 ARSCOMWRK:COMM_RATE        = ARSMASTER:COMM_RATE
+                 ARSCOMWRK:PREMIUM          = ARSMASTER:PREMIUM
+                 ARSCOMWRK:COMMISSION       = ARSMASTER:PREMIUM * (ARSMASTER:COMM_RATE * 0.01)
+             End  -- end of add
+
+             End  -- end of checking for "" company_id
+
+         End      -- end of date, "DB" and trans code checking
+
+             Next ARSMASTER
+
+End  -- end of while stmt
+
+End  -- end of procedure
+
+Procedure CHECK_FOR_PAYMENTS
+Begin
+
+L_APPLY_COMMISSION = "N"
+
+If (ARSMASTER:COMMISSIONS_APPLIED = 00.00.0000 And
+    L_OPTION  One Of "a") Or
+    L_OPTION One Of "b","d" Then
+Begin
+
+Access ARSCHKSU,
+   Set ARSCHKSU:POLICY_NO = ARSMASTER:POLICY_NO, Using Fourth Index, Approximate
+While ARSCHKSU:POLICY_NO = ARSMASTER:POLICY_NO
+Begin
+    If (ARSCHKSU:TRANS_DATE >= G_STARTING_DATE And
+         ARSCHKSU:TRANS_DATE <= G_ENDING_DATE) Or
+         ARSCHKSU:TRANS_DATE < G_STARTING_DATE And
+         ARSCHKSU:TRANS_EFF  = ARSMASTER:TRANS_EFF Then
+       Begin
+          L_APPLY_COMMISSION = "Y"
+       End
+Next ARSCHKSU
+
+End -- end of while
+
+End -- end of commissions_appiled = 00.00.0000
+
+End -- end of procedure
+
+Procedure CHECK_FOR_PAYMENTS_PRIOR
+Begin
+
+L_APPLY_COMMISSION = "N"
+
+Access ARSCHKSU, Set ARSCHKSU:POLICY_NO = ARSMASTER_ALT:POLICY_NO, Using Fourth Index, Approximate
+
+While ARSCHKSU:POLICY_NO = ARSMASTER_ALT:POLICY_NO And
+      L_APPLY_COMMISSION = "N"
+Begin
+-- transaction was processed prior to current month but paid in
+-- the current month, then pick up this amount
+    If ARSCHKSU:TRANS_DATE >= L_PRIOR_STARTING_DATE And
+       ARSCHKSU:TRANS_DATE <= G_ENDING_DATE Then
+       Begin
+          L_APPLY_COMMISSION = "Y"
+       End
+Next ARSCHKSU
+
+End -- end of while
+
+End -- end of procedure
+
+Procedure UPDATE_ARSMASTER
+Begin
+
+Access ARSMASTER_ALIAS,Set ARSMASTER_ALIAS:COMPANY_ID = ARSMASTER:COMPANY_ID,
+                           ARSMASTER_ALIAS:POLICY_NO  = ARSMASTER:POLICY_NO,
+                           ARSMASTER_ALIAS:TRANS_DATE = ARSMASTER:TRANS_DATE,
+                           ARSMASTER_ALIAS:TRANS_EFF  = ARSMASTER:TRANS_EFF,
+                           ARSMASTER_ALIAS:TRANS_EXP  = ARSMASTER:TRANS_EXP,
+                           ARSMASTER_ALIAS:TRANS_CODE = ARSMASTER:TRANS_CODE,
+                           ARSMASTER_ALIAS:LINE_OF_BUSINESS = ARSMASTER:LINE_OF_BUSINESS,
+                           ARSMASTER_ALIAS:COMM_RATE  = ARSMASTER:COMM_RATE, Approximate
+
+If ARSMASTER_ALIAS:COMPANY_ID = ARSMASTER:COMPANY_ID And
+   ARSMASTER_ALIAS:POLICY_NO  = ARSMASTER:POLICY_NO And
+   ARSMASTER_ALIAS:TRANS_DATE = ARSMASTER:TRANS_DATE And
+   ARSMASTER_ALIAS:TRANS_EFF  = ARSMASTER:TRANS_EFF And
+   ARSMASTER_ALIAS:TRANS_EXP  = ARSMASTER:TRANS_EXP And
+   ARSMASTER_ALIAS:TRANS_CODE = ARSMASTER:TRANS_CODE And
+   ARSMASTER_ALIAS:LINE_OF_BUSINESS = ARSMASTER:LINE_OF_BUSINESS And
+   ARSMASTER_ALIAS:COMM_RATE  = ARSMASTER:COMM_RATE Then
+   Change ARSMASTER_ALIAS
+   Begin
+       ARSMASTER_ALIAS:COMMISSIONS_APPLIED = G_ENDING_DATE -- month of date
+       ARSMASTER_ALIAS:COMMISSION_RUN_DATE = TODAYSDATE
+   End
+End
+
+Procedure UPDATE_ARSPAYMENT
+Begin
+
+Access ARSPAYMENT_ALIAS,
+   Set ARSPAYMENT_ALIAS:COMPANY_ID       = ARSPAYMENT:COMPANY_ID,
+       ARSPAYMENT_ALIAS:POLICY_NO        = ARSPAYMENT:POLICY_NO,
+       ARSPAYMENT_ALIAS:TRANS_DATE       = ARSPAYMENT:TRANS_DATE,
+       ARSPAYMENT_ALIAS:TRANS_EFF        = ARSPAYMENT:TRANS_EFF,
+       ARSPAYMENT_ALIAS:TRANS_EXP        = ARSPAYMENT:TRANS_EXP,
+       ARSPAYMENT_ALIAS:TRANS_CODE       = ARSPAYMENT:TRANS_CODE,
+       ARSPAYMENT_ALIAS:LINE_OF_BUSINESS = ARSPAYMENT:LINE_OF_BUSINESS,
+       ARSPAYMENT_ALIAS:SUB_CODE         = ARSPAYMENT:SUB_CODE,
+       ARSPAYMENT_ALIAS:COMM_RATE        = ARSPAYMENT:COMM_RATE,
+       ARSPAYMENT_ALIAS:BILLING_CTR      = ARSPAYMENT:BILLING_CTR,
+       ARSPAYMENT_ALIAS:RETURN_CHECK_CTR = ARSPAYMENT:RETURN_CHECK_CTR,
+       ARSPAYMENT_ALIAS:PAYMENT_CTR      = ARSPAYMENT:PAYMENT_CTR
+
+If ARSPAYMENT_ALIAS:COMPANY_ID        = ARSPAYMENT:COMPANY_ID And
+   ARSPAYMENT_ALIAS:POLICY_NO         = ARSPAYMENT:POLICY_NO And
+   ARSPAYMENT_ALIAS:TRANS_DATE        = ARSPAYMENT:TRANS_DATE And
+   ARSPAYMENT_ALIAS:TRANS_EFF         = ARSPAYMENT:TRANS_EFF And
+   ARSPAYMENT_ALIAS:TRANS_EXP         = ARSPAYMENT:TRANS_EXP And
+   ARSPAYMENT_ALIAS:TRANS_CODE        = ARSPAYMENT:TRANS_CODE And
+   ARSPAYMENT_ALIAS:LINE_OF_BUSINESS  = ARSPAYMENT:LINE_OF_BUSINESS And
+   ARSPAYMENT_ALIAS:SUB_CODE          = ARSPAYMENT:SUB_CODE And
+   ARSPAYMENT_ALIAS:COMM_RATE         = ARSPAYMENT:COMM_RATE And
+   ARSPAYMENT_ALIAS:BILLING_CTR       = ARSPAYMENT:BILLING_CTR And
+   ARSPAYMENT_ALIAS:RETURN_CHECK_CTR  = ARSPAYMENT:RETURN_CHECK_CTR  And
+   ARSPAYMENT_ALIAS:PAYMENT_CTR       = ARSPAYMENT:PAYMENT_CTR Then
+   Change ARSPAYMENT_ALIAS
+   Begin
+       ARSPAYMENT_ALIAS:COMMISSIONS_APPLIED  = G_ENDING_DATE -- month of date
+       ARSPAYMENT_ALIAS:COMMISSIONS_RUN_DATE = TODAYSDATE
+   End
+End
+
+Procedure UPDATE_ARSMASTER_PRIOR
+Begin
+
+Access ARSMASTER_ALIAS,Set ARSMASTER_ALIAS:COMPANY_ID = ARSMASTER_ALT:COMPANY_ID,
+                           ARSMASTER_ALIAS:POLICY_NO  = ARSMASTER_ALT:POLICY_NO,
+                           ARSMASTER_ALIAS:TRANS_DATE = ARSMASTER_ALT:TRANS_DATE,
+                           ARSMASTER_ALIAS:TRANS_EFF  = ARSMASTER_ALT:TRANS_EFF,
+                           ARSMASTER_ALIAS:TRANS_EXP  = ARSMASTER_ALT:TRANS_EXP,
+                           ARSMASTER_ALIAS:TRANS_CODE = ARSMASTER_ALT:TRANS_CODE,
+                           ARSMASTER_ALIAS:LINE_OF_BUSINESS = ARSMASTER_ALT:LINE_OF_BUSINESS,
+                           ARSMASTER_ALIAS:COMM_RATE  = ARSMASTER_ALT:COMM_RATE, Approximate
+
+If ARSMASTER_ALIAS:COMPANY_ID = ARSMASTER_ALT:COMPANY_ID And
+   ARSMASTER_ALIAS:POLICY_NO  = ARSMASTER_ALT:POLICY_NO And
+   ARSMASTER_ALIAS:TRANS_DATE = ARSMASTER_ALT:TRANS_DATE And
+   ARSMASTER_ALIAS:TRANS_EFF  = ARSMASTER_ALT:TRANS_EFF And
+   ARSMASTER_ALIAS:TRANS_EXP  = ARSMASTER_ALT:TRANS_EXP And
+   ARSMASTER_ALIAS:TRANS_CODE = ARSMASTER_ALT:TRANS_CODE And
+   ARSMASTER_ALIAS:LINE_OF_BUSINESS = ARSMASTER_ALT:LINE_OF_BUSINESS And
+   ARSMASTER_ALIAS:COMM_RATE  = ARSMASTER_ALT:COMM_RATE Then
+   Change ARSMASTER_ALIAS
+   Begin
+       ARSMASTER_ALIAS:COMMISSIONS_APPLIED = G_ENDING_DATE -- month of date
+   End
+End
+
+Procedure BUILD_WORK_FILE_PRIOR
+Begin
+
+L_COMPANY = ""
+L_APPLY_COMMISSION = "N"
+
+L_PRIOR_STARTING_DATE = 01.01.0000 -- just because
+L_PRIOR_ENDING_DATE   = G_STARTING_DATE - 1-- one day less than the starting date
+
+Access ARSMASTER_ALT,
+   Set ARSMASTER_ALT:COMPANY_ID = L_COMPANY, Approximate
+
+While ARSMASTER_ALT:COMPANY_ID <> "" -- read until eof
+Begin
+If ARSMASTER_ALT:TRANS_CODE Not One Of 18,19,22,23,27,28,29 And -- install chrg or sur charges
+   ARSMASTER_ALT:BILL_PLAN = "DB" And  -- direct bill only
+   ((L_OPTION One Of "a" And ARSMASTER_ALT:COMMISSIONS_APPLIED = 00.00.0000) Or
+     L_OPTION One Of "b") And
+   ARSMASTER_ALT:COMM_RATE <> 0.00     -- no zero comm rates
+   Then
+   Begin
+   L_APPLY_COMMISSION = "N"
+   If ((ARSMASTER_ALT:TRANS_DATE >= L_PRIOR_STARTING_DATE And
+        ARSMASTER_ALT:TRANS_DATE <= L_PRIOR_ENDING_DATE And
+        ARSMASTER_ALT:TRANS_EFF  <= L_PRIOR_ENDING_DATE) Or
+       (ARSMASTER_ALT:TRANS_DATE <  L_PRIOR_STARTING_DATE And -- this should NEVER Happen
+        ARSMASTER_ALT:TRANS_EFF  >= L_PRIOR_STARTING_DATE And
+        ARSMASTER_ALT:TRANS_EFF  <= L_PRIOR_ENDING_DATE)) And
+        ((L_OPTION One Of "a" And ARSMASTER_ALT:COMMISSIONS_APPLIED  = 00.00.0000) Or
+          L_OPTION One Of "b") Then
+        Begin
+           Do CHECK_FOR_PAYMENTS_PRIOR
+           If L_APPLY_COMMISSION = "Y" Then
+           Begin
+               Access ARSCOMWRK,
+                  Set ARSCOMWRK:COMPANY_ID       = ARSMASTER_ALT:COMPANY_ID,
+                      ARSCOMWRK:AGENT_NO         = ARSMASTER_ALT:AGENT_NO,
+                      ARSCOMWRK:POLICY_NO        = ARSMASTER_ALT:POLICY_NO,
+                      ARSCOMWRK:TRANS_DATE       = ARSMASTER_ALT:TRANS_DATE,
+                      ARSCOMWRK:TRANS_EFF        = ARSMASTER_ALT:TRANS_EFF,
+                      ARSCOMWRK:TRANS_EXP        = ARSMASTER_ALT:TRANS_EXP,
+                      ARSCOMWRK:TRANS_CODE       = ARSMASTER_ALT:TRANS_CODE,
+                      ARSCOMWRK:LINE_OF_BUSINESS = ARSMASTER_ALT:LINE_OF_BUSINESS,
+                      ARSCOMWRK:COMM_RATE        = ARSMASTER_ALT:COMM_RATE,Exact
+
+               If ARSCOMWRK:COMPANY_ID <> ARSMASTER_ALT:COMPANY_ID Or
+                  ARSCOMWRK:POLICY_NO  <> ARSMASTER_ALT:POLICY_NO Or
+                  ARSCOMWRK:AGENT_NO   <> ARSMASTER_ALT:AGENT_NO Or
+                  ARSCOMWRK:POLICY_NO  <> ARSMASTER_ALT:POLICY_NO Or
+                  ARSCOMWRK:TRANS_DATE <> ARSMASTER_ALT:TRANS_DATE Or
+                  ARSCOMWRK:TRANS_EFF  <> ARSMASTER_ALT:TRANS_EFF Or
+                  ARSCOMWRK:TRANS_CODE <> ARSMASTER_ALT:TRANS_CODE Or
+                  ARSCOMWRK:LINE_OF_BUSINESS <> ARSMASTER_ALT:LINE_OF_BUSINESS Or
+                  ARSCOMWRK:COMM_RATE  <> ARSMASTER_ALT:COMM_RATE Then
+                  Begin
+
+                  Add ARSCOMWRK Begin
+                      ARSCOMWRK:COMPANY_ID       = ARSMASTER_ALT:COMPANY_ID
+                      ARSCOMWRK:AGENT_NO         = ARSMASTER_ALT:AGENT_NO
+                      ARSCOMWRK:POLICY_NO        = ARSMASTER_ALT:POLICY_NO
+                      ARSCOMWRK:TRANS_DATE       = ARSMASTER_ALT:TRANS_DATE
+                      ARSCOMWRK:TRANS_EFF        = ARSMASTER_ALT:TRANS_EFF
+                      ARSCOMWRK:TRANS_EXP        = ARSMASTER_ALT:TRANS_EXP
+                      ARSCOMWRK:TRANS_CODE       = ARSMASTER_ALT:TRANS_CODE
+                      ARSCOMWRK:LINE_OF_BUSINESS = ARSMASTER_ALT:LINE_OF_BUSINESS
+                      ARSCOMWRK:COMM_RATE        = ARSMASTER_ALT:COMM_RATE
+                      ARSCOMWRK:PREMIUM          = ARSMASTER_ALT:PREMIUM
+                      ARSCOMWRK:COMMISSION       = ARSMASTER_ALT:PREMIUM * (ARSMASTER_ALT:COMM_RATE * 0.01)
+                  End  -- end of add
+          If L_OPTION = "a" Then
+            Begin
+                  Do UPDATE_ARSMASTER_PRIOR  -- this will set the arsmaster:commissions_processed date to todaysdate
+            End
+                  End  -- end of key setting
+
+                  End  -- end of l_apply_commissions = "Y" check
+
+                  End  -- of date checking for prior period
+
+                  End      -- end of date, "DB" and trans code checking
+
+             Next ARSMASTER_ALT
+
+End  -- end of while stmt
+
+End -- end of procedure
+
+Procedure UPDATE_ARSCHECK
+Begin
+
+Access ARSCHECK_ALT, Set ARSCHECK_ALT:COMPANY_ID = ARSCHECK:COMPANY_ID,
+                         ARSCHECK_ALT:POLICY_NO  = ARSCHECK:POLICY_NO,
+                         ARSCHECK_ALT:SUB_CODE   = ARSCHECK:SUB_CODE
+
+If ARSCHECK_ALT:COMPANY_ID = ARSCHECK:COMPANY_ID And
+   ARSCHECK_ALT:POLICY_NO  = ARSCHECK:POLICY_NO And
+   ARSCHECK_ALT:SUB_CODE   = ARSCHECK:SUB_CODE Then
+   Begin
+   Change ARSCHECK_ALT
+   Begin
+       ARSCHECK_ALT:COMMISSIONS_RUN_DATE = G_ENDING_DATE
+   End -- end of change
+
+   End -- end of record exists checking
+
+End -- end of procedure
+
+Procedure CLEAR_COMMISIONS_ARSCHECK
+Begin
+
+L_COMPANY = ""
+
+Access ARSCHECK, Set ARSCHECK:COMPANY_ID = L_COMPANY, Approximate
+
+
+If ARSCHECK:COMMISSIONS_RUN_DATE = G_ENDING_DATE Then
+   Begin
+   Access  ARSCHECK_ALIAS, Set ARSCHECK_ALIAS:COMPANY_ID = ARSCHECK:COMPANY_ID,
+                               ARSCHECK_ALIAS:POLICY_NO  = ARSCHECK:POLICY_NO,
+                               ARSCHECK_ALIAS:SUB_CODE   = ARSCHECK:SUB_CODE
+   If ARSCHECK_ALIAS:COMPANY_ID = ARSCHECK:COMPANY_ID And
+      ARSCHECK_ALIAS:POLICY_NO  = ARSCHECK:POLICY_NO And
+      ARSCHECK_ALIAS:SUB_CODE   = ARSCHECK:SUB_CODE Then
+   Change
+   ARSCHECK_ALT
+   Begin
+       ARSCHECK_ALT:COMMISSIONS_RUN_DATE = 00.00.0000
+   End -- end of change
+
+   End -- end of record exists checking
+
+End -- end of procedure
+
+Procedure CLEAR_COMMISSION_PAID_DATE
+Begin
+
+If L_OPTION One Of "a" Then
+Begin
+
+Access ARSMASTER_ALT, Set ARSMASTER_ALT:COMPANY_ID = "", Approximate
+While ARSMASTER_ALT:ERRORNUMBER = 0
+Begin
+    If ARSMASTER_ALT:COMMISSIONS_APPLIED = G_ENDING_DATE Then
+    Begin
+       Change ARSMASTER_ALT
+       Begin
+           ARSMASTER_ALT:COMMISSIONS_APPLIED = 00.00.0000
+       End
+    End
+    Next ARSMASTER_ALT
+
+End
+
+End -- end of l_option one of "a"
+
+End -- end of procedure
+
+Procedure NEW_STATEMENTS
+Begin
+
+L_HOLD_AGENT_NO = 0
+L_FIRST_TIME = "Y"
+L_COMPANY = ""
+L_TOTALS_PAGE = "N"
+
+Deletefile(L_INVOICE_NAME1[1])
+Writefile(L_INVOICE_NAME1[1],"%s",L_RESET)  -- reset the printer
+
+L_HOLD_AGENT_NO = 0
+L_LINES_PRINTED = 0 -- to track the lines being printed
+L_PAGES_CTR     = 0
+L_COPY_CTR      = 0 -- this is only to control the # of stmts for testing, remove for live
+
+If L_OPTION One Of "a" Then
+Begin
+    Do CLEANUP_APSAGTCK  -- cleanout all records = company, process year and month
+End
+
+Access ARSCOMWRK,
+   Set ARSCOMWRK:COMPANY_ID = L_COMPANY, Approximate
+
+While ARSCOMWRK:ERRORNUMBER <> ERR_EOF -- End of file
+  Begin
+    L_COPY_CTR = L_COPY_CTR + 1
+    If ARSCOMWRK:POLICY_NO <> 0 Then
+      Begin
+        Access ARSMASTER,
+           Set ARSMASTER:COMPANY_ID       = ARSCOMWRK:COMPANY_ID,
+               ARSMASTER:POLICY_NO        = ARSCOMWRK:POLICY_NO,
+               ARSMASTER:TRANS_DATE       = ARSCOMWRK:TRANS_DATE,
+               ARSMASTER:TRANS_EFF        = ARSCOMWRK:TRANS_EFF,
+               ARSMASTER:TRANS_EXP        = ARSCOMWRK:TRANS_EXP,
+               ARSMASTER:TRANS_CODE       = ARSCOMWRK:TRANS_CODE,
+               ARSMASTER:LINE_OF_BUSINESS = ARSCOMWRK:LINE_OF_BUSINESS,
+               ARSMASTER:COMM_RATE        = ARSCOMWRK:COMM_RATE, Approximate
+
+        Access SFPPOINT,
+           Set SFPPOINT:POLICY_NO = ARSMASTER:POLICY_NO,
+               SFPPOINT:POL_YEAR  = ARSMASTER:TRANS_EFF_YYYY
+
+        Access SFPCURRENT,
+           Set SFPCURRENT:POLICY_NO = ARSCOMWRK:POLICY_NO, Exact
+
+        Access SFPNAME,
+           Set SFPNAME:POLICY_NO    = SFPCURRENT:POLICY_NO,
+               SFPNAME:POL_YEAR     = SFPCURRENT:POL_YEAR,
+               SFPNAME:END_SEQUENCE = SFPCURRENT:END_SEQUENCE
+
+        Access SFSCOMPANY,
+           Set SFSCOMPANY:COMPANY_ID = ARSCOMWRK:COMPANY_ID
+
+        Access SFSAGENT,
+           Set SFSAGENT:COMPANY_ID = ARSCOMWRK:COMPANY_ID,
+               SFSAGENT:AGENT_NO   = ARSCOMWRK:AGENT_NO
+
+        Access SFSLINE,
+           Set SFSLINE:COMPANY_ID       = ARSMASTER:COMPANY_ID,
+               SFSLINE:LINE_OF_BUSINESS = ARSMASTER:LINE_OF_BUSINESS,
+               SFSLINE:LOB_SUBLINE      = ARSMASTER:LOB_SUBLINE
+
+        L_COMPANY_ID = SFPNAME:COMPANY_ID
+
+        If L_FIRST_TIME = "Y" Then
+          Begin
+            L_FIRST_TIME = "N"
+            L_HOLD_AGENT_NO = ARSCOMWRK:AGENT_NO
+            L_PAGES_CTR = 1
+            If ARSCONTROL:USE_AGENT_EXP_MOD_ON_STMTS = 1 Then
+              Begin
+                L_LINES_PER_PAGE = 45
+              End
+            Else
+              Begin
+                L_LINES_PER_PAGE = 50
+              End
+            If L_OPTION one of "a","b" Then
+              {
+                If SCIPSIMAGE:ITEMS_AS_IMAGE[4] One Of "1" and
+                   g_scan = 1 Then
+                  {
+                    L_INVOICE_NAME1[1] = PROGRAMID + "i.pcl"
+                    --I need to joinit to the file
+                    --l_invoice_name1[2] (so I can keep the batch of check in
+                    --the same file) then add the imageing header and
+                    --then mv each check to the UNIX
+                    --IMAGE DIRECTORY and then
+                    --I will then remove the file(the one with the I)
+                    --after every check this will eliminate add      }
+                    L_INVOICE_NAME1[2] = PROGRAMID + ".pcl"
+                    L_SFSAGENT_NAME = SFSAGENT:NAME[1]
+                  }   -- scipsimage items_as_image
+               } --l_option = 'a',"b"
+            Do EJECT_PAGE
+            Do PRINT_FORM
+            Do GET_TOTALS
+            L_LINES_PRINTED = 0
+            L_V_POSITION    = 1270
+          End
+        If L_HOLD_AGENT_NO <> ARSCOMWRK:AGENT_NO Then
+          {
+            If L_OPTION one of "a","b" Then
+              {
+                If SCIPSIMAGE:ITEMS_AS_IMAGE[4] One Of "1" and
+                   g_scan = 1 Then  --change to a
+                  {
+                    Do SET_IMAGE_HEADER_VARIBLE
+                    Closefile(L_INVOICE_NAME1[1])
+                    Do ADD_IMAGE_HEADER
+                    L_INVOICE_NAME1[1] = PROGRAMID + "i.pcl"
+                    --I need to joinit to the file
+                    --l_invoice_name1[2] (so I can keep the batch of check
+                    --the same file) then add the imageing header and
+                    --then mv each check to the UNIX
+                    --IMAGE DIRECTORY and then
+                    --I will then remove the file(the one with the I)
+                    --after every check this will eliminate add      }
+                    L_INVOICE_NAME1[2] = PROGRAMID + ".pcl"
+                  } -- if scipsimage
+              } --l_option
+            L_PAGES_CTR = 1
+            Do EJECT_PAGE
+            Do PRINT_FORM
+            Do GET_TOTALS
+            L_HOLD_AGENT_NO = ARSCOMWRK:AGENT_NO
+            L_LINES_PRINTED = 0
+            L_V_POSITION    = 1270
+          }
+        Do PRINT_DETAIL_LINE
+
+        If L_OPTION = "a" Then
+          Begin
+            L_SFSAGENT_NAME = SFSAGENT:NAME[1]   --used for imaging
+            Do UPDATE_APSAGTCK
+          End
+
+      End -- end of checking for 0 policy no
+      L_CURRENT_SFSAGENT_NAME = SFSAGENT:NAME[1]
+      L_CURRENT_SFSAGENT_NO = SFSAGENT:AGENT_NO
+    Next ARSCOMWRK
+  End  --while
+  If L_OPTION one of "a", "b" Then
+    {
+      If SCIPSIMAGE:ITEMS_AS_IMAGE[4] One Of "1" and
+         g_scan = 1 Then
+        {
+          L_HOLD_AGENT_NO = L_CURRENT_SFSAGENT_NO     --assign the last agent infomation to setup the
+          L_SFSAGENT_NAME = L_CURRENT_SFSAGENT_NAME   --image varible for last agent.
+          Do SET_IMAGE_HEADER_VARIBLE
+          Closefile(L_INVOICE_NAME1[1])
+          Do ADD_IMAGE_HEADER
+        }
+    }
+
+End -- end of new_invoices
+
+
+Procedure ADD_IMAGE_HEADER
+
+Begin
+  L_DD = Day(TODAYSDATE)
+  L_MM = Month(TODAYSDATE)
+  L_YY = Year(TODAYSDATE)
+
+  L_HEADER_FILE = Str(L_IMAGE_FILE_NO_1,"9999")
+
+  L_HEADER_FILE_STR = Trun(L_HEADER_FILE)
+
+  L_FILE_NUMBER = Trun(SCIPSIMAGE:FILE_NUMBER[1]) + Trun(L_HEADER_FILE_STR) +
+                  Trun(SCIPSIMAGE:FILE_NUMBER[2])
+
+  Include "sfsrevname.pro"
+  If SCIPSIMAGE:REVERSE_NAME = 1 Then
+    {
+      L_FILE_NAME = Trun(SCIPSIMAGE:FILE_NAME[1]) + Trun(I_REV_NAME) +
+                  Trun(SCIPSIMAGE:FILE_NAME[2])
+    }
+
+  Access SFSLINE,
+     Set SFSLINE:COMPANY_ID       = SFPNAME:COMPANY_ID,
+         SFSLINE:LINE_OF_BUSINESS = SFPNAME:LINE_OF_BUSINESS,
+         SFSLINE:LOB_SUBLINE      = L_LOB_SUBLINE
+
+  L_DRAWER      = Trun(SCIPSIMAGE:DRAWER[1]) +
+                  Trun(L_DRAWER_NAME_TO_USE) +
+                  Trun(SCIPSIMAGE:DRAWER[2])
+
+  L_FOLDER_TYPE = Trun(SCIPSIMAGE:FOLDER_TYPE[1]) +
+                  Trun(L_FOLDER_TYPE_TO_USE) +
+                  Trun(SCIPSIMAGE:FOLDER_TYPE[2])
+
+  L_DOC_TYPE    = Trun(SCIPSIMAGE:DOC_TYPE[1]) +
+                  Trun(L_DOC_TYPES_TO_USE) +
+                  Trun(SCIPSIMAGE:DOC_TYPE[2])
+
+  L_DOC_DATE    = Trun(SCIPSIMAGE:DOC_DATE[1]) +
+                  Str(L_YY,4) + Str(L_MM,2) + Str(L_DD,2) +
+                  Trun(SCIPSIMAGE:DOC_DATE[2])
+
+  Deletefile(L_HEADER_NAME)   --name for the header information to be added for imaging
+/*  If scipsimage:ALPHA_CHARACTER = 1 Then
+    Begin
+      If scipsimage:SPACE_BETWEEN_ALPHA_NUMBER = 0 Then
+        Begin
+          If scipsimage:ZEROSUPPRESS_NUMBER = 1 Then
+              Writefile (l_header_name,"%s%s%s%s<nl>",Trun(scipsimage:FILE_NUMBER[1]),
+                                                   Trun(SFSLINE:ALPHA),
+                                                   l_header_file,
+                                                   Trun(scipsimage:FILE_NUMBER[2]))
+          Else
+              Writefile (l_header_name,"%s%s%s%s<nl>",Trun(scipsimage:FILE_NUMBER[1]),
+                                                   Trun(SFSLINE:ALPHA),
+                                                   l_header_file_str,
+                                                   Trun(scipsimage:FILE_NUMBER[2]))
+        End
+      Else
+        Begin
+          If scipsimage:ZEROSUPPRESS_NUMBER = 1 Then
+              Writefile (l_header_name,"%s%s%s%s%s<nl>",Trun(scipsimage:FILE_NUMBER[1]),
+                                                   Trun(SFSLINE:ALPHA),
+                                                   " ",
+                                                   l_header_file_str,
+                                                   Trun(scipsimage:FILE_NUMBER[2]))
+          Else
+              Writefile (l_header_name,"%s%s%s%s%s<nl>",Trun(scipsimage:FILE_NUMBER[1]),
+                                                   Trun(SFSLINE:ALPHA),
+                                                   " ",
+                                                   l_header_file,
+                                                   Trun(scipsimage:FILE_NUMBER[2]))
+        End
+    End
+  Else
+    BEGIN
+      If scipsimage:ZEROSUPPRESS_NUMBER = 1 Then
+        {
+          Writefile (l_header_name,"%s%s%s%s%s<nl>",Trun(scipsimage:FILE_NUMBER[1]),
+                                                   Trun(SFSLINE:ALPHA),
+                                                   " ",
+                                                   l_header_file_str,
+                                                   Trun(scipsimage:FILE_NUMBER[2]))
+        }
+
+
+  Writefile (l_header_name,"%s%s%s%s%s<nl>",Trun(scipsimage:FILE_NUMBER[1]),
+                                        Trun(SFSLINE:ALPHA)," ",l_header_file,
+                                              Trun(scipsimage:FILE_NUMBER[2]))
+*/
+
+  Writefile (L_HEADER_NAME,"%s<nl>",L_FILE_NUMBER)
+  Writefile (L_HEADER_NAME,"%s<nl>",L_FILE_NAME)
+  Writefile (L_HEADER_NAME,"%s<nl>",L_DRAWER)
+  Writefile (L_HEADER_NAME,"%s<nl>",L_FOLDER_TYPE)
+  Writefile (L_HEADER_NAME,"%s<nl>",L_DOC_TYPE)
+  Writefile (L_HEADER_NAME,"%s<nl>",L_DOC_DATE)
+  Writefile (L_HEADER_NAME,"%s<nl>",SCIPSIMAGE:START_CAPTURE)
+  Writefile (L_HEADER_NAME,"%s<ff>",SCIPSIMAGE:END_CAPTURE)
+  Closefile (L_HEADER_NAME)
+  Proc("cli joinit %s %s",L_INVOICE_NAME1[1],L_HEADER_NAME)/noconsole
+  Proc("cli joinit %s %s",L_INVOICE_NAME1[1],L_INVOICE_NAME1[2])/noconsole  --makes sure the entire run will still be in one file that can be printed by the calling program
+     --this is because the sfpindex will need to go at the beginning
+--  Write("%c%s%s",16001,"l_invoice_name1[1]",l_invoice_name1[1])
+--  Write("%c%s%s",16040,"l_header_name",l_header_name)
+--  Write("%c%s%s",17001,"l_check_pdf_1",l_check_pdf_1)
+--  Write("%c%s%s",17040,"l_filename",l_file_name)
+--  Write("%c%s%s",18001,"l_drawer",l_drawer)
+
+--  read(18,1,"press enter to continue",L_enter,1)
+  Do GET_UNIQUE_PCL_FILE
+  Proc("cli mv %s %s",L_HEADER_NAME,L_CHECK_PDF_1)/noconsole  --make sure we have a unique file name.
+  L_UNIX_PATH   = SCIPSIMAGE:DIRECTORY_PATH/raw
+--  Write("%c%s%s",17001,"l_UNiX_path",l_unix_path)
+  Proc("cli mv %s %s",L_CHECK_PDF_1,L_UNIX_PATH)/noconsole
+  Deletefile(L_HEADER_NAME)    --delete them for the next premium
+  Deletefile(L_INVOICE_NAME1[1])
+End
+
+Procedure GET_UNIQUE_PCL_FILE
+
+Begin
+  I_CSEXEC_APPLICATION = "PRINT                    "/raw
+  Include "sfscsexec.pro"
+  L_CHECK_PDF_1 = PROGRAMID+"_"+Str(I_CSEXEC_NUMBER)+".pcl"
+End
+
+
+Procedure SET_IMAGE_HEADER_VARIBLE
+
+--This procedure is to set the varible for the add_image_header program
+
+Begin
+  L_IMAGE_FILE_NO_1    = L_HOLD_AGENT_NO
+  I_NAME               = L_SFSAGENT_NAME
+  L_DRAWER_NAME_TO_USE = SCIPSIMAGE:DRAWER_NAME_3[3]
+  L_FOLDER_TYPE_TO_USE = SCIPSIMAGE:FOLDER_TYPES[9]
+  L_DOC_TYPES_TO_USE   = SCIPSIMAGE:DOC_TYPES[9]
+End
+
+
+/* *****************  Printing Invoice Form ************************** */
+
+Procedure PRINT_FORM
+Begin
+
+Access SFSCOMPANY, Set SFSCOMPANY:COMPANY_ID = ARSCOMWRK:COMPANY_ID
+
+Writefile(L_INVOICE_NAME1[1],"<033>&a90h0V") -- CAP to top
+Writefile(L_INVOICE_NAME1[1],"%s<NL>",L_ARIAL)
+
+/* draw the box around the form */
+
+     -- left and right verticle lines --
+Writefile(L_INVOICE_NAME1[1],"<033>&a90h0V<033>*c5a2900b0P<NL>")
+Writefile(L_INVOICE_NAME1[1],"<033>&a5670h0V<033>*c5a2900b0P<NL>")
+
+     -- top and bottom horizontal lines --
+Writefile(L_INVOICE_NAME1[1],"<033>&a90h0V<033>*c5580h5v0P<NL>")
+Writefile(L_INVOICE_NAME1[1],"<033>&a90h6960V<033>*c5580h5v0P<NL>")
+
+/* draw lines within the form */
+Writefile(L_INVOICE_NAME1[1],"<033>&a90h1080V<033>*c5580h5v0P<NL>") -- 1st line
+Writefile(L_INVOICE_NAME1[1],"<033>&a90h1260V<033>*c5580h5v0P<NL>") -- 2nd line
+Writefile(L_INVOICE_NAME1[1],"<033>&a90h6460V<033>*c5580h5v0P<NL>") -- 3rd line
+
+/* print the fixed literals */
+Writefile(L_INVOICE_NAME1[1],"%s",L_ARIAL_BOLD)
+
+Writefile(L_INVOICE_NAME1[1],"<033>&a3240h900V")
+Writefile(L_INVOICE_NAME1[1],"CASH - DIRECT BILL COMMISSION STATEMENTS")
+Writefile(L_INVOICE_NAME1[1],"<NL>")
+
+Writefile(L_INVOICE_NAME1[1],"%s",L_ARIAL)
+Writefile(L_INVOICE_NAME1[1],"<033>&a3690h1045V")
+Writefile(L_INVOICE_NAME1[1],"As of: %s",Str(G_ENDING_DATE,"M(15) DD, YYYY"))
+Writefile(L_INVOICE_NAME1[1],"<NL>")
+
+Writefile(L_INVOICE_NAME1[1],"%s",L_LETTER_GOTHIC_8)
+Writefile(L_INVOICE_NAME1[1],"<033>&a180h1215V")
+Writefile(L_INVOICE_NAME1[1],"Effective<NL>")
+Writefile(L_INVOICE_NAME1[1],"<033>&a910h1215V")
+Writefile(L_INVOICE_NAME1[1],"Insured<NL>")
+Writefile(L_INVOICE_NAME1[1],"<033>&a2250h1215V")
+Writefile(L_INVOICE_NAME1[1],"Policy #<NL>")
+Writefile(L_INVOICE_NAME1[1],"<033>&a2970h1215V")
+Writefile(L_INVOICE_NAME1[1],"Description")
+Writefile(L_INVOICE_NAME1[1],"<033>&a3870h1215V")
+
+If L_COMMISSIONS_ON_CASH Not One Of 1 Then
+Begin
+    Writefile(L_INVOICE_NAME1[1],"Premium<NL>")
+End
+Else
+Begin
+    Writefile(L_INVOICE_NAME1[1]," Cash<NL>")
+End
+
+Writefile(L_INVOICE_NAME1[1],"<033>&a4410h1215V")
+Writefile(L_INVOICE_NAME1[1],"Rate<NL>")
+Writefile(L_INVOICE_NAME1[1],"<033>&a5130h1215V")
+Writefile(L_INVOICE_NAME1[1],"Commisson<NL>")
+
+Writefile(L_INVOICE_NAME1[1],"%s",L_LETTER_GOTHIC_10)
+Writefile(L_INVOICE_NAME1[1],"<033>&a180h6600V")
+
+
+If L_COMMISSIONS_ON_CASH Not One Of 1 Then
+Begin
+    Writefile(L_INVOICE_NAME1[1],"Total Premium<NL>")
+End
+Else
+Begin
+    Writefile(L_INVOICE_NAME1[1],"  Total Cash<NL>")
+End
+Writefile(L_INVOICE_NAME1[1],"<033>&a1530h6600V")
+Writefile(L_INVOICE_NAME1[1],"Commission<NL>")
+Writefile(L_INVOICE_NAME1[1],"<033>&a4190h6600V")
+Writefile(L_INVOICE_NAME1[1],"TOTALS THIS MONTH<NL>")
+Writefile(L_INVOICE_NAME1[1],"<033>&a440h6720V")
+Writefile(L_INVOICE_NAME1[1],"YTD<NL>")
+Writefile(L_INVOICE_NAME1[1],"<033>&a1710h6720V")
+Writefile(L_INVOICE_NAME1[1],"YTD<NL>")
+Writefile(L_INVOICE_NAME1[1],"<033>&a3960h6720V")
+
+If L_COMMISSIONS_ON_CASH Not One Of 1 Then
+Begin
+    Writefile(L_INVOICE_NAME1[1],"Premium<NL>")
+End
+Else
+Begin
+    Writefile(L_INVOICE_NAME1[1],"  Cash<NL>")
+End
+
+Writefile(L_INVOICE_NAME1[1],"<033>&a4770h6720V")
+Writefile(L_INVOICE_NAME1[1],"Commission<NL>")
+
+If L_TOTALS_PAGE = "N" Then
+Begin
+
+-- print the company name and address here
+Writefile(L_INVOICE_NAME1[1],"%s",L_ARIAL)
+Writefile(L_INVOICE_NAME1[1],"<033>&a3130h90V")
+Writefile(L_INVOICE_NAME1[1],"%s",Trun(SFSCOMPANY:NAME[1])+"<NL>"+"<CR>")
+Writefile(L_INVOICE_NAME1[1],"<033>&a3120h220V")
+L_V_POSITION = 220
+If SFSCOMPANY:NAME[2] <> "" Then
+Begin
+   Writefile(L_INVOICE_NAME1[1],"%s",Trun(SFSCOMPANY:NAME[2])+"<NL>"+"<CR>")
+   L_V_POSITION = L_V_POSITION + 120
+End
+Writefile(L_INVOICE_NAME1[1],"%s","<033>&a3120h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(L_INVOICE_NAME1[1],"%s",Trun(SFSCOMPANY:ADDRESS[1])+"<NL>"+"<CR>")
+L_V_POSITION = L_V_POSITION + 120
+Writefile(L_INVOICE_NAME1[1],"%s","<033>&a3120h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(L_INVOICE_NAME1[1],"%s",Trun(SFSCOMPANY:CITY)+", "+
+                              Trun(SFSCOMPANY:STR_STATE) +
+                              "  " + Str(Val(SFSCOMPANY:STR_ZIPCODE),"99999-9999"))
+Writefile(L_INVOICE_NAME1[1],"<033>&a180h90V")
+
+--Writefile(l_invoice_name1[1],"Agent Number: %s",Str(ARSMASTER:AGENT_NO,"ZZZZ")+"<NL>")
+--Writefile(l_invoice_name1[1],"Agent Number: %s",Str(l_hold_AGENT_NO,"ZZZZ")+"<NL>")
+Writefile(L_INVOICE_NAME1[1],"Agent Number: %s",Str(SFSAGENT:AGENT_NO,"ZZZZ")+"<NL>")
+
+L_LOOP_CTR = 0
+L_V_POSITION = 90
+For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the name
+Begin
+    If SFSAGENT:NAME[L_LOOP_CTR] <> "" Then
+    {
+        L_V_POSITION = L_V_POSITION + 120
+        Writefile(L_INVOICE_NAME1[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+        Writefile(L_INVOICE_NAME1[1],"%s",SFSAGENT:NAME[L_LOOP_CTR] + "<NL>")
+    }
+End
+
+For L_LOOP_CTR = 1 To 3 -- there are 3 subscripts to the address
+Begin
+  If SFSAGENT:ADDRESS[L_LOOP_CTR] <> "" Then
+    {
+      L_V_POSITION = L_V_POSITION + 120
+      Writefile(L_INVOICE_NAME1[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+      Writefile(L_INVOICE_NAME1[1],"%s",SFSAGENT:ADDRESS[L_LOOP_CTR] + "<NL>")
+    }
+End
+
+L_V_POSITION = L_V_POSITION + 120
+Writefile(L_INVOICE_NAME1[1],"%s","<033>&a180h" + Trun(Str(L_V_POSITION)+"V"))
+Writefile(L_INVOICE_NAME1[1],"%s",Trun(SFSAGENT:CITY) + ", " +
+                              Trun(SFSAGENT:STR_STATE) + "  " +
+                              Str(Val(SFSAGENT:STR_ZIPCODE),"99999-9999") + "<NL>")
+
+End -- end of checking for l_totals_page
+
+If L_TOTALS_PAGE = "Y" Then
+Begin
+    Writefile(L_INVOICE_NAME1[1],"%s",L_ARIAL)
+    Writefile(L_INVOICE_NAME1[1],"<033>&a2130h390V")
+    Writefile(L_INVOICE_NAME1[1],"TOTALS PAGE<NL>   ")
+End
+
+End
+
+Procedure PRINT_DETAIL_LINE
+Begin
+
+I_NAME = SFPNAME:NAME[1]
+
+Include "sfsrevname.pro"
+
+Switch(ARSCOMWRK:TRANS_CODE)
+    Case 10     : L_TRANSACTION = "New Policy     "
+    Case 11,30  : L_TRANSACTION = "Cancellation   "
+    Case 12,13  : L_TRANSACTION = "Endorsement    "
+    Case 14     : L_TRANSACTION = "Renewal        "
+    Case 15     : L_TRANSACTION = "Audit Premium  "
+    Case 16     : L_TRANSACTION = "Reinstatement  "
+    Case 65     : l_Transaction = "NSF return     "
+    Default     : L_TRANSACTION = "Transaction    "
+End
+
+Writefile(L_INVOICE_NAME1[1],"%s<NL>",L_LETTER_GOTHIC_8)
+
+L_V_POSITION = L_V_POSITION + 90
+
+Writefile(L_INVOICE_NAME1[1],"%s","<033>&a120h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(L_INVOICE_NAME1[1],"%s",Trun(Str(ARSCOMWRK:TRANS_EFF,"MM/DD/YYYY")+"<NL>"))
+Writefile(L_INVOICE_NAME1[1],"%s","<033>&a840h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(L_INVOICE_NAME1[1],"%s",Trun(I_REV_NAME[1,30])+"<NL>")
+Writefile(L_INVOICE_NAME1[1],"%s","<033>&a2200h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(L_INVOICE_NAME1[1],"%s",Trun(SFSLINE:ALPHA) + " " + Str(ARSCOMWRK:POLICY_NO)+"<NL>")
+Writefile(L_INVOICE_NAME1[1],"%s","<033>&a3000h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(L_INVOICE_NAME1[1],"%s",Trun(L_TRANSACTION) + "<NL>")
+Writefile(L_INVOICE_NAME1[1],"%s","<033>&a3690h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(L_INVOICE_NAME1[1],"%s",Trun(Str(ARSCOMWRK:PREMIUM,"(ZZZ,ZZZ.99)")+"<NL>"))
+Writefile(L_INVOICE_NAME1[1],"%s","<033>&a4380h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(L_INVOICE_NAME1[1],"%s",Trun(Str(ARSCOMWRK:COMM_RATE,"ZZZ.Z")+"<NL>"))
+Writefile(L_INVOICE_NAME1[1],"%s","<033>&a5040h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile(L_INVOICE_NAME1[1],"%s",Trun(Str(ARSCOMWRK:COMMISSION,"(ZZ,ZZZ.99)")+"<NL>"))
+Writefile(L_INVOICE_NAME1[1],"%s","<NL>")
+
+L_LINES_PRINTED = L_LINES_PRINTED + 1
+If L_LINES_PRINTED >= L_LINES_PER_PAGE Then
+{
+   Do EJECT_PAGE
+   Do PRINT_FORM
+   L_LINES_PRINTED = 0
+   L_PAGES_CTR = L_PAGES_CTR + 1
+   L_V_POSITION = 1270
+}
+
+End
+
+Procedure GET_TOTALS
+Begin
+
+L_TOTAL_PREMIUM = 0
+L_TOTAL_COMMISSION = 0
+
+Access ARSCOMWRK_ALIAS,
+   Set ARSCOMWRK_ALIAS:COMPANY_ID = ARSCOMWRK:COMPANY_ID,
+       ARSCOMWRK_ALIAS:AGENT_NO   = ARSCOMWRK:AGENT_NO, Approximate
+
+While ARSCOMWRK_ALIAS:COMPANY_ID = ARSCOMWRK:COMPANY_ID And
+      ARSCOMWRK_ALIAS:AGENT_NO   = ARSCOMWRK:AGENT_NO
+Begin
+        L_TOTAL_PREMIUM = L_TOTAL_PREMIUM + ARSCOMWRK_ALIAS:PREMIUM
+        L_TOTAL_COMMISSION = L_TOTAL_COMMISSION + ARSCOMWRK_ALIAS:COMMISSION
+
+        Access ARSCONTROL, Set ARSCONTROL:COMPANY_ID = ARSCOMWRK:COMPANY_ID
+
+        If ARSCONTROL:USE_AGENT_EXP_MOD_ON_STMTS = 1 Then -- go calc the modifier
+        Begin
+            Do GET_EXPERIENCE_MODIFIER
+            L_TOTAL_EXP_COMM =(((L_TOTAL_COMMISSION * L_EXPERIENCE_MODIFIER) * ARSCONTROL:EXPERIENCE_ADJUSTMENT_FACTOR) - L_TOTAL_COMMISSION)
+        End
+        Else If ARSCONTROL:USE_AGENT_EXP_MOD_ON_STMTS = 0 Then
+        Begin
+           L_TOTAL_EXP_COMM = 0.00
+        End
+
+Next ARSCOMWRK_ALIAS
+
+If L_OPTION One Of "a", "c", "d" Then
+Begin
+    Do UPDATE_ARSAGTCOM
+End
+
+End
+
+-- can print total line here since the amounts are already known
+If L_OPTION One Of "a", "b", "c" Then
+Begin
+If L_TOTAL_PREMIUM <> 0 Or
+   L_TOTAL_COMMISSION <> 0 Then
+   Begin
+       Writefile(l_invoice_name1[1],"%s",L_LETTER_GOTHIC_10)
+       Writefile(l_invoice_name1[1],"%s","<033>&a280h6850V")
+       Writefile(l_invoice_name1[1],"%s<NL>",Str(L_YTD_PREMIUM,"($ZZZ,ZZZ.99)"))
+       Writefile(l_invoice_name1[1],"%s","<033>&a1530h6850V")
+       Writefile(l_invoice_name1[1],"%s<NL>",Str(L_YTD_COMMISSION,"($ZZ,ZZZ.99)"))
+       Writefile(l_invoice_name1[1],"%s","<033>&a3760h6850V")
+       Writefile(l_invoice_name1[1],"%s<NL>",Str(L_TOTAL_PREMIUM,"($ZZZ,ZZZ.99)"))
+       Writefile(l_invoice_name1[1],"%s","<033>&a4770h6850V")
+       Writefile(l_invoice_name1[1],"%s<NL>",Str(L_TOTAL_COMMISSION + L_TOTAL_EXP_COMM,"($ZZ,ZZZ.99)"))
+   End
+End
+
+If L_TOTAL_EXP_COMM <> 0.00 Then
+Begin
+
+     Writefile (l_invoice_name1[1],"%s",L_LETTER_GOTHIC_10)
+
+     L_V_POSITION = 6120
+     Writefile(l_invoice_name1[1],"%s","<033>&a2500h" + Trun(Str(L_V_POSITION) + "V"))
+     Writefile (l_invoice_name1[1],"Commission Amount   ")
+
+     Writefile(l_invoice_name1[1],"%s","<033>&a4770h" + Trun(Str(L_V_POSITION) + "V"))
+     Writefile(l_invoice_name1[1],"%s<NL>",Str(L_TOTAL_COMMISSION,"($ZZ,ZZZ.99)"))
+
+     L_V_POSITION = L_V_POSITION + 120
+     Writefile(l_invoice_name1[1],"%s","<033>&a2500h" + Trun(Str(L_V_POSITION) + "V"))
+     Writefile (l_invoice_name1[1],"5 Year Loss Experience Modifier ")
+
+     Writefile(l_invoice_name1[1],"%s","<033>&a4770h" + Trun(Str(L_V_POSITION) + "V"))
+     Writefile(l_invoice_name1[1],"%s<NL>",Str(L_EXPERIENCE_MODIFIER,"(ZZ,ZZZ.999)"))
+
+     L_V_POSITION = L_V_POSITION + 120
+     Writefile(l_invoice_name1[1],"%s","<033>&a2500h" + Trun(Str(L_V_POSITION) + "V"))
+     Writefile (l_invoice_name1[1],"Experience Commission ")
+
+     Writefile(l_invoice_name1[1],"%s","<033>&a4770h" + Trun(Str(L_V_POSITION) + "V"))
+     Writefile(l_invoice_name1[1],"%s<NL>",Str(L_TOTAL_EXP_COMM,"($ZZ,ZZZ.99)"))
+
+     If L_YTD_EXPERIENCE_COMM > 0.00 Then -- only show positive amounts
+     Begin
+
+         L_V_POSITION = 6120
+         Writefile(l_invoice_name1[1],"%s","<033>&a500h" + Trun(Str(L_V_POSITION) + "V"))
+         Writefile (l_invoice_name1[1],"Your Total YTD Experience")
+
+         L_V_POSITION = L_V_POSITION + 120
+         Writefile(l_invoice_name1[1],"%s","<033>&a500h" + Trun(Str(L_V_POSITION) + "V"))
+         Writefile (l_invoice_name1[1],"%s%s","paid is ",Str(L_YTD_EXPERIENCE_COMM,"($ZZ,ZZZ.99)"))
+
+     End -- end of l_ytd_experience_comm > 0 check
+
+End -- end of l_total_exp_comm <> 0 check
+
+End
+
+Procedure GET_EXPERIENCE_MODIFIER
+Begin
+
+L_EXPERIENCE_MODIFIER = 0.00
+
+Access SFSAGTEXP, Set SFSAGTEXP:COMPANY_ID = ARSCOMWRK:COMPANY_ID,
+                      SFSAGTEXP:AGENT_NO   = ARSCOMWRK:AGENT_NO, Approximate
+
+While SFSAGTEXP:COMPANY_ID = ARSCOMWRK:COMPANY_ID And
+      SFSAGTEXP:AGENT_NO   = ARSCOMWRK:AGENT_NO
+      Begin
+
+      If SFSAGTEXP:RATE_DATE <= G_STARTING_DATE Then
+      Begin
+          L_EXPERIENCE_MODIFIER = SFSAGTEXP:EXPERIENCE_MODIFIER
+      End
+
+      Next SFSAGTEXP
+
+      End
+
+End
+
+Procedure EJECT_PAGE
+Begin
+
+    Writefile(l_invoice_name1[1],"%s",L_FORMFEED+"<NL>")
+    Writefile(l_invoice_name1[1],"%s",L_RESET + "<NL>")
+-- options are:
+--     1 = Executive
+--     2 = Letter
+--     3 = Legal
+--     4 = A4
+--     5 = Monarch
+--     6 = Commercial 10
+--     7 = International DL
+--     8 = International C5
+
+Writefile(l_invoice_name1[1],"<033>&l2A")   -- set the printer to Letter, see above
+--Writefile(l_invoice_name1[1],"<033>&k2G") -- set to cr=cr+lf, lf=lf, ff=ff
+--Writefile(l_invoice_name1[1],"<033>&s0C") -- enable end of line wrap
+
+    L_PAGES_CTR = L_PAGES_CTR + 1
+
+End
+
+Procedure UPDATE_AGENTS_YTD
+Begin
+
+L_HOLD_AGENT_NO = 0
+
+Access ARSCOMWRK, Set ARSCOMWRK:COMPANY_ID = L_COMPANY, Approximate
+
+While ARSCOMWRK:ERRORNUMBER <> ERR_EOF -- not EOF
+
+Begin
+If L_hold_agent_no <> arsCOMWRK:AGENT_NO Then
+{
+    L_HOLD_AGENT_NO = ARSCOMWRK:AGENT_NO
+    Do GET_TOTALS
+}
+Next ARSCOMWRK
+
+End
+
+End
+/* ===================================================== */
+--  external file updates.
+--  update arsagtcom - agents ytd commission totals file
+--  update apsagtck  - agents accounts payable check file
+
+Procedure UPDATE_ARSAGTCOM
+Begin
+
+L_YTD_PREMIUM = 0
+L_YTD_COMMISSION = 0
+
+L_PAID_YEAR = Year(G_ENDING_DATE)
+L_PAID_MONTH = Month(G_ENDING_DATE)
+
+Access ARSAGTCOM, Set ARSAGTCOM:COMPANY_ID = ARSCOMWRK:COMPANY_ID,
+                      ARSAGTCOM:AGENT_NO   = ARSCOMWRK:AGENT_NO,
+                      ARSAGTCOM:PAID_YEAR  = L_PAID_YEAR, Approximate
+
+If ARSAGTCOM:COMPANY_ID <> ARSCOMWRK:COMPANY_ID Or
+   ARSAGTCOM:AGENT_NO   <> ARSCOMWRK:AGENT_NO Or
+   ARSAGTCOM:PAID_YEAR  <> L_PAID_YEAR Then
+   /* record not found */
+   Begin
+   Add ARSAGTCOM
+   Begin
+       ARSAGTCOM:COMPANY_ID               = ARSCOMWRK:COMPANY_ID
+       ARSAGTCOM:AGENT_NO                 = ARSCOMWRK:AGENT_NO
+       ARSAGTCOM:PAID_YEAR                = L_PAID_YEAR
+       ARSAGTCOM:PREMIUM[L_PAID_MONTH]    = L_TOTAL_PREMIUM
+       ARSAGTCOM:COMMISSION[L_PAID_MONTH] = L_TOTAL_COMMISSION
+       ARSAGTCOM:NET[L_PAID_MONTH]        = L_TOTAL_PREMIUM - L_TOTAL_COMMISSION
+       ARSAGTCOM:EXPERIENCE_COMMISSION[L_PAID_MONTH] = L_TOTAL_EXP_COMM
+   End
+   End
+   Else
+   Change ARSAGTCOM Begin
+       ARSAGTCOM:PREMIUM[L_PAID_MONTH]    = L_TOTAL_PREMIUM
+       ARSAGTCOM:COMMISSION[L_PAID_MONTH] = L_TOTAL_COMMISSION
+       ARSAGTCOM:NET[L_PAID_MONTH]        = L_TOTAL_PREMIUM - L_TOTAL_COMMISSION
+       ARSAGTCOM:EXPERIENCE_COMMISSION[L_PAID_MONTH] = L_TOTAL_EXP_COMM
+   End
+
+Access ARSAGTCOM_ALT, Set ARSAGTCOM_ALT:COMPANY_ID = ARSCOMWRK:COMPANY_ID,
+                          ARSAGTCOM_ALT:AGENT_NO   = ARSCOMWRK:AGENT_NO,
+                          ARSAGTCOM_ALT:PAID_YEAR  = L_PAID_YEAR
+
+If ARSAGTCOM_ALT:COMPANY_ID = ARSCOMWRK:COMPANY_ID And
+   ARSAGTCOM_ALT:AGENT_NO   = ARSCOMWRK:AGENT_NO And
+   ARSAGTCOM_ALT:PAID_YEAR  = L_PAID_YEAR Then
+
+   Change ARSAGTCOM_ALT
+   Begin
+       ARSAGTCOM_ALT:PREMIUM[13]              = 0
+       ARSAGTCOM_ALT:COMMISSION[13]           = 0
+       ARSAGTCOM_ALT:NET[13]                  = 0
+       ARSAGTCOM_ALT:EXPERIENCE_COMMISSION[13]= 0
+
+       For L_LOOP_CTR = 1 To 12 -- was L_PAID_MONTH
+       Begin
+           ARSAGTCOM_ALT:PREMIUM[13]          = ARSAGTCOM_ALT:PREMIUM[13] + ARSAGTCOM_ALT:PREMIUM[L_LOOP_CTR]
+           ARSAGTCOM_ALT:COMMISSION[13]       = ARSAGTCOM_ALT:COMMISSION[13] + ARSAGTCOM_ALT:COMMISSION[L_LOOP_CTR]
+           ARSAGTCOM_ALT:NET[13]              = ARSAGTCOM_ALT:NET[13] + ARSAGTCOM_ALT:NET[13] + ARSAGTCOM_ALT:NET[L_LOOP_CTR]
+           ARSAGTCOM_ALT:EXPERIENCE_COMMISSION[13] = ARSAGTCOM_ALT:EXPERIENCE_COMMISSION[13] + ARSAGTCOM_ALT:EXPERIENCE_COMMISSION[L_LOOP_CTR]
+       End
+
+       L_YTD_PREMIUM = ARSAGTCOM_ALT:PREMIUM[13]
+       L_YTD_COMMISSION = ARSAGTCOM_ALT:COMMISSION[13] +
+                          ARSAGTCOM_ALT:EXPERIENCE_COMMISSION[13]
+       L_YTD_EXPERIENCE_COMM = ARSAGTCOM_ALT:EXPERIENCE_COMMISSION[13]
+    End
+
+End
+
+/* Accounts Payable interface starts here */
+
+Procedure CLEANUP_APSAGTCK
+Begin
+
+L_PAID_YEAR = Year(G_ENDING_DATE)
+L_PAID_MONTH = Month(G_ENDING_DATE)
+
+Access APSAGTCK, Set APSAGTCK:COMPANY_ID = "", Approximate
+
+While APSAGTCK:ERRORNUMBER = 0
+Begin
+    If APSAGTCK:PROCESS_YEAR = L_PAID_YEAR And
+       APSAGTCK:PROCESS_MONTH = L_PAID_MONTH Then
+       Begin
+           Delete APSAGTCK
+       End
+       Next APSAGTCK
+End
+
+End
+
+Procedure UPDATE_APSAGTCK
+Begin
+
+L_SUB_CODE = 10
+
+--L_COMMISSION = ARSAGTCOM:COMMISSION[L_PAID_MONTH]
+L_COMMISSION = ARSCOMWRK:COMMISSION
+
+Access SFSAGENT, Set SFSAGENT:COMPANY_ID = ARSCOMWRK:COMPANY_ID,
+                     SFSAGENT:AGENT_NO   = ARSCOMWRK:AGENT_NO
+
+Access ARSCONTROL, Set ARSCONTROL:COMPANY_ID = ARSCOMWRK:COMPANY_ID
+
+Access APSAGTCK_ALT, Set APSAGTCK_ALT:COMPANY_ID = ARSCOMWRK:COMPANY_ID,
+                         APSAGTCK_ALT:AGENT_NO   = ARSCOMWRK:AGENT_NO, Approximate
+
+Access APSAGTCK, Set APSAGTCK:COMPANY_ID = ARSCOMWRK:COMPANY_ID,
+                     APSAGTCK:AGENT_NO   = ARSCOMWRK:AGENT_NO,
+                     APSAGTCK:PROCESS_YEAR = L_PAID_YEAR,
+                     APSAGTCK:PROCESS_MONTH = L_PAID_MONTH, Approximate
+
+If (APSAGTCK:COMPANY_ID <> ARSCOMWRK:COMPANY_ID Or
+    APSAGTCK:AGENT_NO   <> ARSCOMWRK:AGENT_NO Or
+    APSAGTCK:PROCESS_YEAR <> L_PAID_YEAR Or
+    APSAGTCK:PROCESS_MONTH <> L_PAID_MONTH)
+--    L_COMMISSION <> 0.00 -- added 08/09/2001 changed 08/12/2003 - > 0.00 only
+   Then
+   Begin
+      Add APSAGTCK
+      Begin
+      APSAGTCK:COMPANY_ID                       = ARSCOMWRK:COMPANY_ID
+      APSAGTCK:AGENT_NO                         = ARSCOMWRK:AGENT_NO
+      APSAGTCK:PROCESS_YEAR                     = L_PAID_YEAR
+      APSAGTCK:PROCESS_MONTH                    = L_PAID_MONTH
+      APSAGTCK:ACCOUNT                          = ARSCONTROL:COMMISSION_ACCOUNT_NO
+      APSAGTCK:APS_TRANS_CODE                   = "COMMISSION"
+      APSAGTCK:TEN99                            = 0 -- changed 7/24/2001
+      If SFSAGENT:USE_CONTACT_ON_AP One Of 1 Then
+      Begin
+          APSAGTCK:PAYEE_NAME[1]              = SFSAGENT:CONTACT[1]
+          APSAGTCK:PAYEE_NAME[2]              = SFSAGENT:NAME[1]
+      End
+      Else
+      Begin
+          APSAGTCK:PAYEE_NAME[1]              = SFSAGENT:NAME[1]
+          APSAGTCK:PAYEE_NAME[2]              = SFSAGENT:NAME[2]
+      End
+      APSAGTCK:PAYEE_NAME[3]                  = SFSAGENT:NAME[3]
+      If SFSAGENT:USE_CONTACT_ON_AP One Of 1 Then
+      Begin
+          APSAGTCK:MAILTO_NAME[1]              = SFSAGENT:CONTACT[1]
+          APSAGTCK:MAILTO_NAME[2]              = SFSAGENT:NAME[1]
+      End
+      Else
+      Begin
+          APSAGTCK:MAILTO_NAME[1]             = SFSAGENT:NAME[1]
+          APSAGTCK:MAILTO_NAME[2]             = SFSAGENT:NAME[2]
+      End
+      APSAGTCK:MAILTO_NAME[3]                 = SFSAGENT:NAME[3]
+      if sfsagent:use_address_on_check one of 1 then
+      begin
+          apsagtck:payee_name[4]              = sfsagent:address[1]
+          apsagtck:payee_name[5]              = sfsagent:address[2]
+          apsagtck:payee_name[6]              =
+          trun(sfsagent:city) + ", " + str_state + "  " + str_zipcode[1,5]+"-"+str_zipcode[6,9]
+      end
+      APSAGTCK:ADDRESS[1]                     = SFSAGENT:ADDRESS[1]
+      APSAGTCK:ADDRESS[2]                     = SFSAGENT:ADDRESS[2]
+      APSAGTCK:ADDRESS[3]                     = SFSAGENT:ADDRESS[3]
+      APSAGTCK:CITY                           = SFSAGENT:CITY
+      APSAGTCK:STR_STATE                      = SFSAGENT:STR_STATE
+      APSAGTCK:STR_ZIPCODE                    = SFSAGENT:STR_ZIPCODE
+      APSAGTCK:CHECK_DRAFT                    = "C"
+      APSAGTCK:COMMENTS                       = "Check created by apsmt200"
+      APSAGTCK:PAYMENT_MESSAGE                = ""
+      APSAGTCK:CHECK_AMOUNT                   = L_COMMISSION + L_TOTAL_EXP_COMM
+      APSAGTCK:CHECK_DATE                     = 00.00.0000
+      APSAGTCK:CHECK_NO                       = "000000"
+      APSAGTCK:RELEASE                        = ""
+      APSAGTCK:RELEASE_DATE                   = 00.00.0000
+      APSAGTCK:CHECK_CLEARED                  = 0
+      APSAGTCK:CHECK_CLEARED_DATE             = 00.00.0000
+      APSAGTCK:ENTERING_USER_NAME             = USERNAME
+      APSAGTCK:CLEARING_USER_NAME             = ""
+      APSAGTCK:RELEASE_USER_NAME              = ""
+      APSAGTCK:PAYEE_TYPE[1]                  = "A"
+      APSAGTCK:PAYEE_TYPE[2]                  = "A"
+      APSAGTCK:TIN                            = SFSAGENT:IDENT_NO
+      APSAGTCK:STATUS_AFTER_CHECK             = ""
+      End
+      End
+      Else Begin
+      Change APSAGTCK
+      Begin
+      APSAGTCK:CHECK_AMOUNT                   = APSAGTCK:CHECK_AMOUNT +
+                                                L_COMMISSION
+      End
+      End
+
+End
+
+Procedure CREATE_TOTALS_PAGE
+Begin
+
+L_TOTALS_PAGE = "Y"
+L_PAID_YEAR  = Year(G_ENDING_DATE)
+L_PAID_MONTH = Month(G_ENDING_DATE)
+L_TOTAL_PREMIUM    = 0
+L_TOTAL_COMMISSION = 0 -- can do this here since this is the last procedure
+L_COMPANY    = ""
+
+/*  eject page and print the form */
+Do EJECT_PAGE
+Do PRINT_FORM
+
+Writefile(l_invoice_name1[1],"%s",L_LETTER_GOTHIC_8)
+
+L_LINES_PRINTED = 0
+L_PAGES_CTR = 0
+L_V_POSITION = 1270
+
+Access ARSAGTCOM,
+   Set ARSAGTCOM:COMPANY_ID = L_COMPANY,Approximate
+
+While ARSAGTCOM:ERRORNUMBER <> 4026
+Begin
+
+If ARSAGTCOM:PAID_YEAR = L_PAID_YEAR Then
+Begin
+
+Access SFSAGENT, Set SFSAGENT:COMPANY_ID = ARSAGTCOM:COMPANY_ID,
+                     SFSAGENT:AGENT_NO   = ARSAGTCOM:AGENT_NO
+
+If ARSAGTCOM:PREMIUM[L_PAID_MONTH] <> 0 And
+   ARSAGTCOM:COMMISSION[L_PAID_MONTH] <> 0 Then
+Begin
+L_V_POSITION = L_V_POSITION + 90
+Writefile (l_invoice_name1[1],"%s","<033>&a120h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile (l_invoice_name1[1],"%s",Trun(Str(ARSAGTCOM:AGENT_NO,"ZZZZ")) + "<NL>")
+Writefile (l_invoice_name1[1],"%s","<033>&a480h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile (l_invoice_name1[1],"%s",Trun(SFSAGENT:NAME[1])+"<NL>")
+Writefile (l_invoice_name1[1],"%s","<033>&a3690h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile (l_invoice_name1[1],"%s",Trun(Str(ARSAGTCOM:PREMIUM[L_PAID_MONTH],"($ZZZ,ZZZ.99)")) + "<NL>")
+Writefile (l_invoice_name1[1],"%s","<033>&a5040h" + Trun(Str(L_V_POSITION) + "V"))
+Writefile (l_invoice_name1[1],"%s",Trun(Str(ARSAGTCOM:COMMISSION[L_PAID_MONTH],"($ZZZ,ZZZ.99)")) + "<NL>")
+
+L_TOTAL_PREMIUM    = L_TOTAL_PREMIUM    + ARSAGTCOM:PREMIUM[L_PAID_MONTH]
+L_TOTAL_COMMISSION = L_TOTAL_COMMISSION + ARSAGTCOM:COMMISSION[L_PAID_MONTH]
+
+L_LINES_PRINTED = L_LINES_PRINTED + 1
+End
+
+If L_LINES_PRINTED >= 50 Then
+Begin
+     Do EJECT_PAGE
+     Do PRINT_FORM
+     L_LINES_PRINTED = 0
+     L_PAGES_CTR = L_PAGES_CTR + 1
+     L_V_POSITION = 1270
+     Writefile(l_invoice_name1[1],"%s",L_LETTER_GOTHIC_8)
+End
+
+End -- end of checking for paid year
+
+Next ARSAGTCOM
+
+End -- end of while for arsagtcom
+
+End -- end of procedure create_totals_page
+
+Procedure PRINT_TOTALS_LINE
+Begin
+
+--L_V_POSITION = 5850 -- was 6850
+L_V_POSITION = 6850
+Writefile(l_invoice_name1[1],"<NL>")
+Writefile(l_invoice_name1[1],"%s",L_LETTER_GOTHIC_10)
+Writefile(l_invoice_name1[1],"%s","<033>&a3700h" + Trun(Str(L_V_POSITION)) + "V")
+Writefile(l_invoice_name1[1],"%s<NL>",Str(L_TOTAL_PREMIUM,"($ZZ,ZZZ,ZZZ.99)"))
+Writefile(l_invoice_name1[1],"%s","<033>&a4760h" + Trun(Str(L_V_POSITION)) + "V")
+Writefile(l_invoice_name1[1],"%s<NL>",Str(L_TOTAL_COMMISSION,"($ZZZ,ZZZ.99)"))
+
+End
+
+Procedure CLEAR_CURRENT_MONTH_BUCKET
+Begin
+
+L_PAID_YEAR = Year(G_ENDING_DATE)
+L_PAID_MONTH = Month(G_ENDING_DATE)
+
+/* Access ARSAGTCOM, Set ARSAGTCOM:COMPANY_ID = ARSCOMWRK:COMPANY_ID,
+                      ARSAGTCOM:AGENT_NO   = ARSCOMWRK:AGENT_NO,
+                      ARSAGTCOM:PAID_YEAR  = L_PAID_YEAR, Approximate
+
+If ARSAGTCOM:COMPANY_ID = ARSCOMWRK:COMPANY_ID And
+   ARSAGTCOM:AGENT_NO   = ARSCOMWRK:AGENT_NO And
+   ARSAGTCOM:PAID_YEAR  = L_PAID_YEAR Then
+   Begin
+*/
+
+Access ARSAGTCOM, Set ARSAGTCOM:COMPANY_ID = L_COMPANY, Approximate
+
+While ARSAGTCOM:ERRORNUMBER <> 4026 -- end of file
+Begin
+If ARSAGTCOM:PAID_YEAR = L_PAID_YEAR Then
+Begin
+    Change ARSAGTCOM
+    Begin
+         ARSAGTCOM:PREMIUM[L_PAID_MONTH] = 0
+         ARSAGTCOM:COMMISSION[L_PAID_MONTH] = 0
+         ARSAGTCOM:EXPERIENCE_COMMISSION[L_PAID_MONTH] = 0
+         ARSAGTCOM:PREMIUM[13] = 0
+         ARSAGTCOM:COMMISSION[13] = 0
+         ARSAGTCOM:EXPERIENCE_COMMISSION[13]=0
+         For L_SUB = 1 To L_PAID_MONTH
+         Begin
+             ARSAGTCOM:PREMIUM[13]    = ARSAGTCOM:PREMIUM[13]    + ARSAGTCOM:PREMIUM[L_SUB]
+             ARSAGTCOM:COMMISSION[13] = ARSAGTCOM:COMMISSION[13] + ARSAGTCOM:COMMISSION[L_SUB]
+             ARSAGTCOM:EXPERIENCE_COMMISSION[13] = ARSAGTCOM:EXPERIENCE_COMMISSION[13] + ARSAGTCOM:EXPERIENCE_COMMISSION[L_SUB]
+         End
+    End -- end of change
+    End -- end of paid_year = l_paid_year
+    Next ARSAGTCOM
+End -- end of while loop
+
+End  -- end of procedure
+
+Procedure DELETE_NEGATIVE_CHECKS
+Begin
+
+Access APSAGTCK, Set APSAGTCK:COMPANY_ID = "", Approximate
+
+While APSAGTCK:COMPANY_ID <> ""
+Begin
+    If Val(APSAGTCK:CHECK_NO) = 0 And
+       APSAGTCK:CHECK_AMOUNT < 0 Then
+       Begin
+           Delete APSAGTCK
+       End
+
+       Next APSAGTCK
+End
+
+End
+
+End  -- end of program

@@ -1,0 +1,131 @@
+Cyberscreen System                                     Function [____________]
+Screen 2. ARSPAYMENT Update Screen
+ 1. Company Id:             __________
+ 2. Policy Number:            _________
+ 3. Transaction Date:       __________
+ 4. Transaction Effective:  __________
+ 5. Transaction Expiration: __________
+ 6. Transaction Code:              ____  19. Trans Eff Yyyy: ____
+ 7. Line Of Business:              ____  20. Agent Number:   ____
+ 8. Commission Rate:              _____  21. Lob Subline:    __
+ 9. Sub Code:                      ____  22. pol year:       ____
+10. Billing Ctr:                   ____  23. payment trans date: __________
+11. Return Check Ctr:              ____  24. commission run date: __________
+12. Payment Ctr:                   ____  25. commission apply: __________
+13. Check Reference:            _______
+14. Check Number:           ____________________
+15. Amount:                 ___________
+
+
+17. Trans Eff Mm:                    __
+18. Trans Eff Dd:                    __
+%%
+Screen
+        Name = "Arspayment" ;
+        Type = "Detail" ;
+        padcharacter = Space;
+
+        Global String G_COMPANY_ID[10] ;
+        Global Unsigned Ascii Number G_POLICY_NO[9] ;
+        Global Wdate G_TRANS_DATE ;
+        Global Wdate G_TRANS_EFF ;
+        Global Wdate G_TRANS_EXP ;
+        Global Unsigned Ascii Number G_TRANS_CODE[4] ;
+        Global Unsigned Ascii Number G_LINE_OF_BUSINESS[4] ;
+        Global Unsigned Ascii Number G_COMM_RATE[4]/decimals=2 ;
+        Global Unsigned Ascii Number G_SUB_CODE[4] ;
+        Global Unsigned Ascii Number G_BILLING_CTR[4] ;
+        Global Unsigned Ascii Number G_RETURN_CHECK_CTR[4] ;
+        Global Unsigned Ascii Number G_PAYMENT_CTR[4] ;
+
+        Access ARSPAYMENT,
+           Set ARSPAYMENT:COMPANY_ID = G_COMPANY_ID ,
+               ARSPAYMENT:POLICY_NO = G_POLICY_NO ,
+               ARSPAYMENT:TRANS_DATE = G_TRANS_DATE ,
+               ARSPAYMENT:TRANS_EFF = G_TRANS_EFF ,
+               ARSPAYMENT:TRANS_EXP = G_TRANS_EXP ,
+               ARSPAYMENT:TRANS_CODE = G_TRANS_CODE ,
+               ARSPAYMENT:LINE_OF_BUSINESS = G_LINE_OF_BUSINESS ,
+               ARSPAYMENT:COMM_RATE = G_COMM_RATE ,
+               ARSPAYMENT:SUB_CODE = G_SUB_CODE ,
+               ARSPAYMENT:BILLING_CTR = G_BILLING_CTR ,
+               ARSPAYMENT:RETURN_CHECK_CTR = G_RETURN_CHECK_CTR ,
+               ARSPAYMENT:PAYMENT_CTR = G_PAYMENT_CTR ;
+
+
+        Include "STDKEYS.INC"
+
+Functions
+        Add;            /* Add a record */
+        Change;         /* Change an existing record */
+        Delete;         /* Delete an existing record */
+
+        Find ;          /* Select a record using an exact key */
+        Search;         /* Select a record using an approximate key */
+        Next;           /* Display the next record(s) in key sequence */
+        Previous;       /* Display the previous record(s) in key sequence */
+        View;           /* View the contents of freetext fields */
+
+        Page/noreturn;  /* Display a different page - no going back */
+
+"Back"  Return;         /* Back to previous screen */
+"Exit"  Return;
+        Return;
+
+"Bye"   Stop;           /* Terminate this session */
+        Stop;
+
+        Print;          /* Print the screen on the default printer */
+"Cq"    Proc "CQ";      /* Enter Cyberquery */
+"Cli"   Proc ":CLI";    /* Push to the CLI */
+
+Fields
+        FUNCTION ;
+301     ARSPAYMENT:COMPANY_ID                   Mandatory;
+401     ARSPAYMENT:POLICY_NO                    Mandatory;
+501     ARSPAYMENT:TRANS_DATE                   Mandatory;
+601     ARSPAYMENT:TRANS_EFF                    Mandatory;
+701     ARSPAYMENT:TRANS_EXP                    Mandatory;
+801     ARSPAYMENT:TRANS_CODE                   Mandatory;
+901     ARSPAYMENT:LINE_OF_BUSINESS             Mandatory;
+1001    ARSPAYMENT:COMM_RATE                    Mandatory;
+1101    ARSPAYMENT:SUB_CODE                     Mandatory;
+1201    ARSPAYMENT:BILLING_CTR                  Mandatory;
+1301    ARSPAYMENT:RETURN_CHECK_CTR             Mandatory;
+1401    ARSPAYMENT:PAYMENT_CTR                  Mandatory;
+1501    ARSPAYMENT:CHECK_REFERENCE              Mandatory;
+1601    ARSPAYMENT:CHECK_NUMBER                 Mandatory;
+1701    ARSPAYMENT:AMOUNT                       Mandatory;
+
+2001    ARSPAYMENT:TRANS_EFF_MM;
+2101    ARSPAYMENT:TRANS_EFF_DD;
+802     ARSPAYMENT:TRANS_EFF_YYYY;
+902     ARSPAYMENT:AGENT_NO;
+1002    ARSPAYMENT:LOB_SUBLINE;
+1102    arspayment:pol_year ;
+1202    arspayment:payment_trans_date ;
+1302    arspayment:commissions_run_date ;
+1402    arspayment:commissions_applied ;
+Screen Exit
+        If ARSPAYMENT:COMPANY_ID > ""
+        Then G_COMPANY_ID = ARSPAYMENT:COMPANY_ID ;
+        If ARSPAYMENT:POLICY_NO > 0 Then G_POLICY_NO = ARSPAYMENT:POLICY_NO ;
+        If ARSPAYMENT:TRANS_DATE > 0
+        Then G_TRANS_DATE = ARSPAYMENT:TRANS_DATE ;
+        If ARSPAYMENT:TRANS_EFF > 0 Then G_TRANS_EFF = ARSPAYMENT:TRANS_EFF ;
+        If ARSPAYMENT:TRANS_EXP > 0 Then G_TRANS_EXP = ARSPAYMENT:TRANS_EXP ;
+        If ARSPAYMENT:TRANS_CODE > 0
+        Then G_TRANS_CODE = ARSPAYMENT:TRANS_CODE ;
+        If ARSPAYMENT:LINE_OF_BUSINESS > 0
+        Then G_LINE_OF_BUSINESS = ARSPAYMENT:LINE_OF_BUSINESS ;
+        If ARSPAYMENT:COMM_RATE > 0 Then G_COMM_RATE = ARSPAYMENT:COMM_RATE ;
+        If ARSPAYMENT:SUB_CODE > 0 Then G_SUB_CODE = ARSPAYMENT:SUB_CODE ;
+        If ARSPAYMENT:BILLING_CTR > 0
+        Then G_BILLING_CTR = ARSPAYMENT:BILLING_CTR ;
+        If ARSPAYMENT:RETURN_CHECK_CTR > 0
+        Then G_RETURN_CHECK_CTR = ARSPAYMENT:RETURN_CHECK_CTR ;
+        If ARSPAYMENT:PAYMENT_CTR > 0
+        Then G_PAYMENT_CTR = ARSPAYMENT:PAYMENT_CTR ;
+
+
+End

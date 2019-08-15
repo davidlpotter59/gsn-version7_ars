@@ -1,0 +1,115 @@
+%%
+Screen
+        Name = "Arsmt925" ;
+        Type = "Detail" ;
+        Padcharacter = Space ;
+        Highlight = Underscore ;
+        Screensize = "dynamic";
+        domain = "arscxnotice" ;
+        Windowtitle="%a    %s Non Pay C/X Notice Wording - Ver 7.00    %m";
+--      resizeable = yes ;
+        iconline = 0 ;
+
+        local String L_DATE[10],
+                     L_LINE_FIELD[75],
+                     L_LINE_1[75],
+                     L_LINE_2[75];
+
+        local Unsigned Ascii Number L_POS[3]=0/decimals=0;
+
+        Include "stdkeys7.inc"
+
+Style Definition
+
+        Include "styles.inc"
+
+Functions
+
+        add/reuse  tagged add_fn;
+
+        Include "stdfunc7.inc"
+
+Menu Definition
+
+        Include "stdmenu7.inc"
+
+}
+
+Toolbar Definition
+
+        Include "stdtoolbar7.inc"
+}
+
+screen
+{
+%%
+                                                        _______________
+*-----------------------------------------------------------------------------------*
+|                                                                                   |
+| Company Id: __________ __________________________________________________         |
+| Notice Type: _____                                                                |
+*-----------------------------------------------------------------------------------*
+| Heading Wording:                                                                  |
+|  _______________________________________________________________________________  |
+| Heading V Position: ____         Form Edition: ____________________               |
+| Heading H Position: ____         Form Edition V Position: ____  H Position: ____  |
+*-----------------------------------------------------------------------------------*
+| Line 1:                                                                           |
+|    ___________________________________________________________________________    |
+| Line 2:                                                                           |
+|    ___________________________________________________________________________    |
+| Line 3:                                                                           |
+|    ___________________________________________________________________________    |
+| Line 4:                                                                           |
+|    ___________________________________________________________________________    |
+| Line 5:                                                                           |
+|    ___________________________________________________________________________    |
+| Line 6:                                                                           |
+|    ___________________________________________________________________________    |
+| Line 7:                                                                           |
+|    ___________________________________________________________________________    |
+*-----------------------------------------------------------------------------------*
+| Character Substituion Available                                                   |
+|                                                                                   |
+| @ -- Effective Date of the Notice     * -- Effective Date of the Policy           |
+| & -- Expiration Date of the Policy    ^ -- Total Amount Due (Includes Late Fees)  |
+| ` -- Line of Business                 + -- Late fee Amount Charged                |
+| ! -- Due date of the CX Notice                                                    |
+*-----------------------------------------------------------------------------------*
+
+
+%%
+
+components
+
+Fields
+        FUNCTION/noecho/showasguidetext ;
+0401    ARSCXNOTICE:COMPANY_ID                  Mandatory
+        Include "companyhlp.inc"
+0402    SFSCOMPANY:NAME[1];
+0501    ARSCXNOTICE:NOTICE_TYPE
+
+        Activehelp/optionlist/title="Notice Types"
+        "CX - Cancellation Notice  ","CX"/returntext,
+        "RS - Reinstatements       ","RS"/returntext,
+        "NSF- Non-sufficient Funds ","NSF"/returntext,
+        "NSFNP-Non Pay NSF         ","NSFNP"/returntext,
+        "Retrn-Returned Check      ","RETRN"/returntext,
+        "OTHER-Other Type of Notice","OT"/returntext;
+0801    ARSCXNOTICE:HEADING_WORDING;
+0901    ARSCXNOTICE:HEADING_V_POSITION;
+0902    ARSCXNOTICE:FORM_EDITION;
+1001    ARSCXNOTICE:HEADING_H_POSITION;
+1002    ARSCXNOTICE:FORM_EDITION_V_POSITION;
+1003    ARSCXNOTICE:FORM_EDITION_H_POSITION;
+1301    ARSCXNOTICE:LINE_FIELD[1];
+1501    ARSCXNOTICE:LINE_FIELD[2];
+1701    ARSCXNOTICE:LINE_FIELD[3];
+1901    ARSCXNOTICE:LINE_FIELD[4];
+2101    ARSCXNOTICE:LINE_FIELD[5];
+2301    ARSCXNOTICE:LINE_FIELD[6];
+2501    ARSCXNOTICE:LINE_FIELD[7];
+
+}
+
+End

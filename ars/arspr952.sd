@@ -1,0 +1,79 @@
+%%
+Screen
+        Name = "Arspr952" ;
+        Type = "Detail" ;
+        Padcharacter=Space;
+        Highlite=Underscore;
+        Domain="ARSDATES";
+        Screensize = "dynamic";
+        Windowtitle="%a     %s - Purge CX Notice Date Options - Version 7.00   %m";
+        iconline=0;
+
+        Global Mmddyyyy Date G_STARTING_DATE ;
+        Global Mmddyyyy Date G_ENDING_DATE ;
+        Global String G_COMPANY_ID[10];
+        Global Unsigned Ascii Number G_NO_COPIES[2];
+
+        string l_continue_1[50]="";
+
+        Access ARSDATES, Set ARSDATES:COMPANY_ID = G_COMPANY_ID, Approximate ;
+
+        Include "STDKEYS7.INC"
+
+Style Definition
+    include "styles.inc"
+
+Functions
+
+        Include "STDFUNC7.INC"
+Menu Definition
+    include "stdmenu7.inc"
+}
+
+ToolBar Definition
+    include "stdtoolbar7.inc"
+}
+
+Screen
+Properties
+    {
+    LayOutType      = Column
+    }
+{
+
+Panel Tagged Header_pl
+Properties
+    {
+    BorderStyle     = Raised
+    ScrollBarPolicy = AsNeeded
+    }
+{
+%%
+                                    ____________
+*---------------------------------------------------*
+|   Cancellation Notice Run Date: __________        |
+|                                                   |
+|   Cancellation Notice Due Date: __________        |
+*---------------------------------------------------*
+~
+~
+
+%%
+
+Components
+
+Fields
+0101    FUNCTION/noecho/showasguidetext ;
+0301    G_STARTING_DATE/mask="MM/DD/YYYY"/default { Mandatory } ;
+0501    G_ENDING_DATE/mask="MM/DD/YYYY"/default   { Mandatory }
+        ;
+}
+}
+
+Screen Exit
+        If ARSDATES:COMPANY_ID <> ""
+            Then G_COMPANY_ID = ARSDATES:COMPANY_ID;
+        Access ARSDATES_ALT, Set ARSDATES_ALT:COMPANY_ID = ARSDATES:COMPANY_ID
+        Delete ARSDATES_ALT -- cleans up file for next date entry
+
+End
